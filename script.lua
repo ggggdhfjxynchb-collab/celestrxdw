@@ -4,11 +4,10 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Очистка старых версий GUI и ESP
+-- Очистка старых версий
 local function cleanup()
     local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("DuckKlientGui")
     if oldGui then oldGui:Destroy() end
-    
     local oldEspContainer = CoreGui:FindFirstChild("EspContainer")
     if oldEspContainer then oldEspContainer:Destroy() end
 end
@@ -21,30 +20,28 @@ screenGui.Name = "DuckKlientGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- Тема чита: Желто-оранжевый градиент
 local MainGradientScheme = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 215, 0)), -- Золотой (желтый)
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 120, 0))  -- Оранжевый
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 215, 0)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 120, 0))
 })
 
 -- Главное окно
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 550, 0, 400) -- Немного компактнее
+mainFrame.Size = UDim2.new(0, 550, 0, 400)
 mainFrame.Position = UDim2.new(0.5, -275, 0.5, -200)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15) -- Глубокий черный фон
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 mainFrame.BorderSizePixel = 0
-mainFrame.Visible = false -- Скрыто по умолчанию
+mainFrame.Visible = true -- ТЕПЕРЬ МЕНЮ ОТКРЫТО СРАЗУ ПОСЛЕ ЗАПУСКА!
 mainFrame.ZIndex = 10
 mainFrame.Parent = screenGui
 
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- Добавляем градиент на главный фон (Стиль чита)
 local mainBgGradient = Instance.new("UIGradient")
 mainBgGradient.Color = MainGradientScheme
 mainBgGradient.Rotation = 45
-mainBgGradient.Transparency = NumberSequence.new(0.9) -- Очень прозрачный градиент на фоне
+mainBgGradient.Transparency = NumberSequence.new(0.9)
 mainBgGradient.Parent = mainFrame
 
 -- Сайдбар
@@ -55,10 +52,8 @@ sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 sidebar.BorderSizePixel = 0
 sidebar.ZIndex = 11
 sidebar.Parent = mainFrame
-
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 12)
 
--- Градиентная полоска слева (Стиль!)
 local sidebarGradientLine = Instance.new("Frame")
 sidebarGradientLine.Size = UDim2.new(0, 4, 1, -20)
 sidebarGradientLine.Position = UDim2.new(0, 5, 0, 10)
@@ -71,7 +66,6 @@ sideGrad.Color = MainGradientScheme
 sideGrad.Rotation = 90
 sideGrad.Parent = sidebarGradientLine
 
--- Заголовок duck klient
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -20, 0, 50)
 titleLabel.Position = UDim2.new(0, 20, 0, 0)
@@ -84,7 +78,6 @@ titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.ZIndex = 12
 titleLabel.Parent = sidebar
 
--- Контейнер контента
 local contentFrame = Instance.new("Frame")
 contentFrame.Name = "Content"
 contentFrame.Size = UDim2.new(1, -170, 1, -20)
@@ -93,7 +86,6 @@ contentFrame.BackgroundTransparency = 1
 contentFrame.ZIndex = 11
 contentFrame.Parent = mainFrame
 
--- Страницы
 local combatPage = Instance.new("ScrollingFrame")
 combatPage.Name = "CombatPage"
 combatPage.Size = UDim2.new(1, 0, 1, 0)
@@ -101,7 +93,6 @@ combatPage.BackgroundTransparency = 1
 combatPage.ScrollBarThickness = 2
 combatPage.Visible = true
 combatPage.Parent = contentFrame
-
 Instance.new("UIListLayout", combatPage).Padding = UDim.new(0, 10)
 
 local visualPage = Instance.new("ScrollingFrame")
@@ -111,11 +102,19 @@ visualPage.BackgroundTransparency = 1
 visualPage.ScrollBarThickness = 2
 visualPage.Visible = false
 visualPage.Parent = contentFrame
-
 Instance.new("UIListLayout", visualPage).Padding = UDim.new(0, 10)
 
--- Функция создания кнопок (Желто-оранжевая тема)
-local function createModuleButton(parent, title, description, callback)
+-- === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
+local Modules = {
+    SafeZone = false,
+    PlayerEsp = false,
+    Tracers = false,
+    Target = false
+}
+local TargetPlayerName = ""
+
+-- Функция создания кнопок (ЛКМ - вкл/выкл, ПКМ - кастом коллбэк)
+local function createModuleButton(parent, title, description, lmbCallback, rmbCallback)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -10, 0, 60)
     button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
@@ -126,10 +125,9 @@ local function createModuleButton(parent, title, description, callback)
 
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
     
-    -- Градиент обводки (включено/выключено)
     local uistroke = Instance.new("UIStroke")
     uistroke.Thickness = 2
-    uistroke.Color = Color3.fromRGB(40, 40, 40) -- Цвет выключенной обводки
+    uistroke.Color = Color3.fromRGB(40, 40, 40)
     uistroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     uistroke.Parent = button
 
@@ -158,20 +156,26 @@ local function createModuleButton(parent, title, description, callback)
     descText.Parent = button
 
     local active = false
-    button.MouseButton1Click:Connect(function()
-        active = not active
-        if active then
-            -- Включено: Красим обводку в оранжевый
-            uistroke.Color = Color3.fromRGB(255, 140, 0)
-            titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        else
-            -- Выключено
-            uistroke.Color = Color3.fromRGB(40, 40, 40)
-            titleText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    
+    -- Обработка кликов (ЛКМ и ПКМ)
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            active = not active
+            if active then
+                uistroke.Color = Color3.fromRGB(255, 140, 0)
+                titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                uistroke.Color = Color3.fromRGB(40, 40, 40)
+                titleText.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+            if lmbCallback then lmbCallback(active, uistroke) end
+            
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            if rmbCallback then rmbCallback() end
         end
-        
-        if callback then callback(active, uistroke) end
     end)
+    
+    return button
 end
 
 -- Вкладки саидбара
@@ -207,37 +211,71 @@ end
 createTab("Combat", combatPage, 60, true)
 createTab("Visuals", visualPage, 105, false)
 
--- === ЛОГИКА ФУНКЦИЙ ЧИТА (РАБОЧАЯ ЧАСТЬ) ===
+-- === ДОБАВЛЕНИЕ КНОПОК ===
 
-local Modules = {
-    SafeZone = false,
-    PlayerEsp = false,
-    Tracers = false
-}
-
--- 1. COMBAT: Safe Zone (РАБОТАЕТ, отталкивает)
-createModuleButton(combatPage, "Safe Zone", "Физически отталкивает врагов (15 сек)", function(state, stroke)
+-- 1. COMBAT: Safe Zone
+createModuleButton(combatPage, "Safe Zone", "Отталкивает врагов. Выключится через 15 сек", function(state, stroke)
     Modules.SafeZone = state
     if state then
         task.spawn(function()
             task.wait(15)
             if Modules.SafeZone then
                 Modules.SafeZone = false
-                stroke.Color = Color3.fromRGB(40, 40, 40) -- Гасим кнопку
-                print("Safe Zone отключена по таймеру")
+                stroke.Color = Color3.fromRGB(40, 40, 40)
             end
         end)
     end
 end)
 
--- 2. VISUALS: Настройка ESP Системы
+-- 2. VISUALS: Player ESP
 createModuleButton(visualPage, "Player ESP", "Показывает 2D квадраты сквозь стены", function(state)
     Modules.PlayerEsp = state
 end)
 
+-- 3. VISUALS: Tracers
 createModuleButton(visualPage, "Tracers", "Рисует линии до игроков", function(state)
     Modules.Tracers = state
 end)
+
+-- 4. VISUALS: TARGET (Новая функция с ПКМ)
+local TargetSettingsFrame = Instance.new("Frame")
+TargetSettingsFrame.Size = UDim2.new(1, -10, 0, 40)
+TargetSettingsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+TargetSettingsFrame.Visible = false
+TargetSettingsFrame.ZIndex = 12
+TargetSettingsFrame.Parent = visualPage
+
+Instance.new("UICorner", TargetSettingsFrame).CornerRadius = UDim.new(0, 8)
+
+local TargetInput = Instance.new("TextBox")
+TargetInput.Size = UDim2.new(1, -20, 1, 0)
+TargetInput.Position = UDim2.new(0, 10, 0, 0)
+TargetInput.BackgroundTransparency = 1
+TargetInput.Text = "Введи ник (или часть) и нажми Enter"
+TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+TargetInput.Font = Enum.Font.Gotham
+TargetInput.TextSize = 14
+TargetInput.ZIndex = 13
+TargetInput.ClearTextOnFocus = true
+TargetInput.Parent = TargetSettingsFrame
+
+TargetInput.FocusLost:Connect(function()
+    TargetPlayerName = string.lower(TargetInput.Text)
+    if TargetPlayerName == "" then
+        TargetInput.Text = "Введи ник (или часть) и нажми Enter"
+    else
+        TargetInput.Text = "Цель: " .. TargetPlayerName
+    end
+end)
+
+createModuleButton(visualPage, "Target", "ЛКМ: Вкл/Выкл | ПКМ: Настроить ник цели", 
+    function(state) -- ЛКМ
+        Modules.Target = state
+    end,
+    function() -- ПКМ
+        TargetSettingsFrame.Visible = not TargetSettingsFrame.Visible
+    end
+)
 
 -- Управление открытием на Ъ (RightBracket)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -247,65 +285,69 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- === ЯДРО ЧИТА (CORE LOGIC) ===
+-- === ЯДРО ЧИТА (ОТРИСОВКА И ЛОГИКА) ===
 
--- Создаем контейнер для ESP рисунков (Folder в CoreGui, чтобы не удалялось при спавне)
 local EspContainer = Instance.new("Folder")
 EspContainer.Name = "EspContainer"
 pcall(function() EspContainer.Parent = game:GetService("CoreGui") end) 
-if not EspContainer.Parent then EspContainer.Parent = LocalPlayer.PlayerGui end -- Резервный вариант
+if not EspContainer.Parent then EspContainer.Parent = LocalPlayer.PlayerGui end
 
--- Таблица для хранения Drawing объектов каждого игрока
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
     if plr == LocalPlayer then return end
     
-    -- Создаем рисунки (Drawing API - работает только в экзекуторах типа Xeno)
     local box = Drawing.new("Square")
     box.Visible = false
-    box.Color = Color3.fromRGB(255, 170, 0) -- Желто-оранжевый ESP
+    box.Color = Color3.fromRGB(255, 170, 0)
     box.Thickness = 1
     box.Filled = false
     box.Transparency = 1
 
     local tracer = Drawing.new("Line")
     tracer.Visible = false
-    tracer.Color = Color3.fromRGB(255, 255, 255) -- Белые линии
+    tracer.Color = Color3.fromRGB(255, 255, 255)
     tracer.Thickness = 1
     tracer.Transparency = 0.6
+    
+    -- НОВЫЙ ТЕКСТ ДЛЯ TARGET
+    local targetText = Drawing.new("Text")
+    targetText.Visible = false
+    targetText.Color = Color3.fromRGB(255, 0, 0) -- Красный цвет
+    targetText.Text = "TARGET"
+    targetText.Size = 20
+    targetText.Center = true
+    targetText.Outline = true
+    targetText.Transparency = 1
 
-    EspObjects[plr] = {Box = box, Tracer = tracer}
+    EspObjects[plr] = {Box = box, Tracer = tracer, Txt = targetText}
 end
 
--- Создаем ESP для тех, кто уже на сервере
 for _, plr in pairs(Players:GetPlayers()) do createEspForPlayer(plr) end
--- И для новых
 Players.PlayerAdded:Connect(createEspForPlayer)
--- Удаляем при выходе
+
 Players.PlayerRemoving:Connect(function(plr)
     if EspObjects[plr] then
         EspObjects[plr].Box:Remove()
         EspObjects[plr].Tracer:Remove()
+        EspObjects[plr].Txt:Remove()
         EspObjects[plr] = nil
     end
 end)
 
--- ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ (RenderStepped - 60 раз в секунду)
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     
     if not myRoot then
-        -- Если мы мертвы, скрываем весь ESP
         for _, obj in pairs(EspObjects) do
             obj.Box.Visible = false
             obj.Tracer.Visible = false
+            obj.Txt.Visible = false
         end
         return 
     end
 
-    -- Перебираем всех игроков для SafeZone и ESP
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
@@ -316,48 +358,53 @@ RunService.RenderStepped:Connect(function()
         if enemyRoot and enemyHum and enemyHum.Health > 0 then
             local dist = (enemyRoot.Position - myRoot.Position).Magnitude
             
-            -- === ЛОГИКА SAFE ZONE ===
-            if Modules.SafeZone and dist < 35 then -- Радиус 35 стадов
-                -- Вычисляем направление от нас к нему
+            -- SAFE ZONE
+            if Modules.SafeZone and dist < 35 then
                 local direction = (enemyRoot.Position - myRoot.Position).Unit
-                -- Применяем жесткий импульс, чтобы откинуть врага
-                enemyRoot.AssemblyLinearVelocity = direction * 160 -- Сила отталкивания
+                enemyRoot.AssemblyLinearVelocity = direction * 160
             end
 
-            -- === ЛОГИКА ESP (Visuals) ===
+            -- VISUALS
             local esp = EspObjects[plr]
             if not esp then continue end
 
             local pos, onScreen = Camera:WorldToViewportPoint(enemyRoot.Position)
             
-            -- Обновление Player ESP (Box)
+            -- Player ESP (Box)
             if Modules.PlayerEsp and onScreen then
-                -- Вычисляем размер квадрата в зависимости от дистанции
                 local scaleFactor = 1000 / dist
                 local boxSize = Vector2.new(4 * scaleFactor, 6 * scaleFactor)
-                if boxSize.Y > 200 then boxSize = Vector2.new(40, 60) end -- Ограничиваем макс размер рядом
+                if boxSize.Y > 200 then boxSize = Vector2.new(40, 60) end
 
                 esp.Box.Size = boxSize
                 esp.Box.Position = Vector2.new(pos.X - boxSize.X/2, pos.Y - boxSize.Y/2)
                 esp.Box.Visible = true
+                
+                -- TARGET LOGIC (Текст пишется только если ESP включено и имя совпадает)
+                if Modules.Target and TargetPlayerName ~= "" and string.find(string.lower(plr.Name), TargetPlayerName) then
+                    esp.Txt.Position = Vector2.new(pos.X, pos.Y - boxSize.Y/2 - 25)
+                    esp.Txt.Visible = true
+                else
+                    esp.Txt.Visible = false
+                end
             else
                 esp.Box.Visible = false
+                esp.Txt.Visible = false
             end
 
-            -- Обновление Tracers (Линии)
+            -- Tracers
             if Modules.Tracers and onScreen then
-                esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y) -- Центр низа экрана
-                esp.Tracer.To = Vector2.new(pos.X, pos.Y + (esp.Box.Size.Y / 2)) -- К ногам врага
+                esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                esp.Tracer.To = Vector2.new(pos.X, pos.Y + (esp.Box.Size.Y / 2))
                 esp.Tracer.Visible = true
             else
                 esp.Tracer.Visible = false
             end
-
         else
-            -- Если враг мертв или скрыт, скрываем его ESP
             if EspObjects[plr] then
                 EspObjects[plr].Box.Visible = false
                 EspObjects[plr].Tracer.Visible = false
+                EspObjects[plr].Txt.Visible = false
             end
         end
     end
