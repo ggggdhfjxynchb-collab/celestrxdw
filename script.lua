@@ -13,7 +13,6 @@ pcall(function()
 end)
 
 -- === 2. СОЗДАНИЕ GUI ===
-
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DuckKlientGui"
 screenGui.ResetOnSpawn = false
@@ -29,15 +28,14 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 550, 0, 420)
 mainFrame.Position = UDim2.new(0.5, -275, 0.5, -210)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15) -- Темная база
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15) 
 mainFrame.BorderSizePixel = 0
 mainFrame.Visible = true
 mainFrame.ZIndex = 10
 mainFrame.Parent = screenGui
-
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- ИСПРАВЛЕННЫЙ ГРАДИЕНТ
+-- ГРАДИЕНТ
 local gradientOverlay = Instance.new("Frame")
 gradientOverlay.Size = UDim2.new(1, 0, 1, 0)
 gradientOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -108,10 +106,10 @@ Instance.new("UIListLayout", settingsPage).Padding = UDim.new(0, 10)
 
 -- === 3. ПАНЕЛИ НАСТРОЕК СПРАВА ОТ МЕНЮ ===
 
-local function createRightPanel(name)
+local function createRightPanel(name, height)
     local panel = Instance.new("Frame")
     panel.Name = name
-    panel.Size = UDim2.new(0, 200, 0, 220)
+    panel.Size = UDim2.new(0, 200, 0, height or 220)
     panel.Position = UDim2.new(1, 10, 0, 0) 
     panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     panel.Visible = false
@@ -135,12 +133,14 @@ local function createRightPanel(name)
     return panel, pGrad
 end
 
-local ParticlesRightPanel, pGrad1 = createRightPanel("ParticlesConfig")
-local TargetRightPanel, pGrad2 = createRightPanel("TargetConfig")
+local ParticlesRightPanel, pGrad1 = createRightPanel("ParticlesConfig", 220)
+local TargetRightPanel, pGrad2 = createRightPanel("TargetConfig", 90)
+local DroneRightPanel, pGrad3 = createRightPanel("DroneConfig", 250)
 
 local function closeAllRightPanels()
     ParticlesRightPanel.Visible = false
     TargetRightPanel.Visible = false
+    DroneRightPanel.Visible = false
 end
 
 -- === 4. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
@@ -151,12 +151,18 @@ local Modules = {
     Tracers = false,
     Target = false,
     HitParticles = false,
-    Scope = false
+    Scope = false,
+    AutoDrone = false
 }
 local TargetPlayerName = ""
 local ParticleConfig = {
     Color = Color3.fromRGB(255, 50, 50),
     Texture = "rbxassetid://243098098"
+}
+local DroneConfig = {
+    Target = "",
+    Type = "Stealth",
+    Flight = "Pulse"
 }
 local PreviousHealths = {}
 
@@ -169,6 +175,7 @@ local function updateTheme(color1, color2)
     sideGrad.Color = CurrentGradient
     pGrad1.Color = CurrentGradient
     pGrad2.Color = CurrentGradient
+    pGrad3.Color = CurrentGradient
 end
 
 -- === УТИЛИТЫ И КНОПКИ ===
@@ -265,8 +272,7 @@ createTab("Combat", combatPage, 60, true)
 createTab("Visuals", visualPage, 105, false)
 createTab("Settings", settingsPage, 150, false)
 
--- === 5. ИСПРАВЛЕННЫЕ ВЫДВИЖНЫЕ СПИСКИ ===
-
+-- === 5. ВЫДВИЖНЫЕ СПИСКИ (DROPDOWNS) ===
 local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
     local mainBtn = Instance.new("TextButton")
     mainBtn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -285,16 +291,14 @@ local function createDropdown(parent, titleText, yPos, options, defaultIndex, ca
     dropFrame.Position = UDim2.new(0, 0, 1, 2)
     dropFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     dropFrame.Visible = false
-    dropFrame.ZIndex = 20 -- Высокий ZIndex чтобы менюшка была поверх всего
+    dropFrame.ZIndex = 20
     dropFrame.Parent = mainBtn
     Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 6)
     
     local layout = Instance.new("UIListLayout", dropFrame)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    mainBtn.MouseButton1Click:Connect(function()
-        dropFrame.Visible = not dropFrame.Visible
-    end)
+    mainBtn.MouseButton1Click:Connect(function() dropFrame.Visible = not dropFrame.Visible end)
 
     for i, opt in ipairs(options) do
         local optBtn = Instance.new("TextButton")
@@ -315,7 +319,7 @@ local function createDropdown(parent, titleText, yPos, options, defaultIndex, ca
     end
 end
 
--- НАСТРОЙКИ ПАРТИКЛОВ (Dropdowns с правильными аргументами!)
+-- НАСТРОЙКИ ПАРТИКЛОВ
 local pTitle = Instance.new("TextLabel", ParticlesRightPanel)
 pTitle.Size = UDim2.new(1, 0, 0, 40); pTitle.BackgroundTransparency = 1; pTitle.Text = "Настройки Партиклов"; pTitle.TextColor3 = Color3.fromRGB(255, 255, 255); pTitle.Font = Enum.Font.GothamBold; pTitle.ZIndex = 13
 
@@ -338,13 +342,13 @@ local tTitle = Instance.new("TextLabel", TargetRightPanel)
 tTitle.Size = UDim2.new(1, 0, 0, 40); tTitle.BackgroundTransparency = 1; tTitle.Text = "Настройка Target"; tTitle.TextColor3 = Color3.fromRGB(255, 255, 255); tTitle.Font = Enum.Font.GothamBold; tTitle.ZIndex = 13
 
 local TargetInput = Instance.new("TextBox")
-TargetInput.Size = UDim2.new(0.9, 0, 0, 40)
-TargetInput.Position = UDim2.new(0.05, 0, 0, 50)
+TargetInput.Size = UDim2.new(0.9, 0, 0, 30)
+TargetInput.Position = UDim2.new(0.05, 0, 0, 45)
 TargetInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-TargetInput.Text = "Введи ник сюда..."
+TargetInput.Text = "Введи ник сюда"
 TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200)
 TargetInput.Font = Enum.Font.Gotham
-TargetInput.TextSize = 14
+TargetInput.TextSize = 12
 TargetInput.ZIndex = 13
 TargetInput.ClearTextOnFocus = true
 TargetInput.Parent = TargetRightPanel
@@ -352,19 +356,58 @@ Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
 
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
+-- НАСТРОЙКИ AUTO DRONE
+local dTitle = Instance.new("TextLabel", DroneRightPanel)
+dTitle.Size = UDim2.new(1, 0, 0, 40); dTitle.BackgroundTransparency = 1; dTitle.Text = "Настройка Auto Drone"; dTitle.TextColor3 = Color3.fromRGB(255, 255, 255); dTitle.Font = Enum.Font.GothamBold; dTitle.ZIndex = 13
+
+local DroneInput = Instance.new("TextBox")
+DroneInput.Size = UDim2.new(0.9, 0, 0, 30)
+DroneInput.Position = UDim2.new(0.05, 0, 0, 40)
+DroneInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+DroneInput.Text = "Ник цели для дрона"
+DroneInput.TextColor3 = Color3.fromRGB(200, 200, 200)
+DroneInput.Font = Enum.Font.Gotham
+DroneInput.TextSize = 12
+DroneInput.ZIndex = 13
+DroneInput.ClearTextOnFocus = true
+DroneInput.Parent = DroneRightPanel
+Instance.new("UICorner", DroneInput).CornerRadius = UDim.new(0, 6)
+
+DroneInput.FocusLost:Connect(function() DroneConfig.Target = string.lower(DroneInput.Text) end)
+
+createDropdown(DroneRightPanel, "Тип", 80, {
+    {Name = "Скрытная", Value = "Stealth"},
+    {Name = "ТП", Value = "TP"},
+    {Name = "Авто", Value = "Auto"}
+}, 1, function(val) DroneConfig.Type = val end)
+
+createDropdown(DroneRightPanel, "Полет", 120, {
+    {Name = "Пульс", Value = "Pulse"},
+    {Name = "Серкл", Value = "Circle"},
+    {Name = "Рандом", Value = "Random"}
+}, 1, function(val) DroneConfig.Flight = val end)
+
+
 -- === 6. ДОБАВЛЕНИЕ КНОПОК ===
 
+-- COMBAT
 createModuleButton(combatPage, "Safe Zone", "Отталкивает врагов. Выключится через 15 сек", function(state, stroke)
     Modules.SafeZone = state
     if state then task.spawn(function() task.wait(15); if Modules.SafeZone then Modules.SafeZone = false; stroke.Color = Color3.fromRGB(40, 40, 40) end end) end
 end)
 createModuleButton(combatPage, "Target Aim", "Намертво наводит камеру на твой Target", function(state) Modules.TargetAim = state end)
 
+createModuleButton(combatPage, "Auto Drone", "ЛКМ: Вкл/Выкл | ПКМ: Панель ИИ", 
+    function(state) Modules.AutoDrone = state end,
+    function() closeAllRightPanels(); DroneRightPanel.Visible = true end
+)
+
+-- VISUALS
 createModuleButton(visualPage, "Player ESP", "Показывает 2D квадраты сквозь стены", function(state) Modules.PlayerEsp = state end)
 createModuleButton(visualPage, "Tracers", "Рисует линии до игроков", function(state) Modules.Tracers = state end)
 createModuleButton(visualPage, "Scope", "Рисует удобный прицел в центре экрана", function(state) Modules.Scope = state end)
 
-createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл/Выкл | ПКМ: Выдвинуть настройки", 
+createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл/Выкл | ПКМ: Настройки", 
     function(state) Modules.HitParticles = state end,
     function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end
 )
@@ -373,6 +416,7 @@ createModuleButton(visualPage, "Target", "ЛКМ: Вкл/Выкл | ПКМ: Ук
     function() closeAllRightPanels(); TargetRightPanel.Visible = true end
 )
 
+-- SETTINGS
 createModuleButton(settingsPage, "Theme: Azure & Gold", "Голубой и Желтый (Дефолт)", function(s) updateTheme(Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 215, 0)) end)
 createModuleButton(settingsPage, "Theme: Blood & Night", "Красный и Темно-серый", function(s) updateTheme(Color3.fromRGB(255, 20, 20), Color3.fromRGB(40, 40, 40)) end)
 createModuleButton(settingsPage, "Theme: Toxic Slime", "Кислотно-зеленый", function(s) updateTheme(Color3.fromRGB(50, 255, 50), Color3.fromRGB(0, 100, 0)) end)
@@ -402,7 +446,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end
 end)
 
--- === 7. ЯДРО ЧИТА (ОТРИСОВКА И ЛОГИКА) ===
+-- === 7. ЯДРО ЧИТА ===
 
 local ScopeGui = Instance.new("ScreenGui", screenGui)
 local function createLine(size, pos)
@@ -446,23 +490,43 @@ Players.PlayerRemoving:Connect(function(plr)
     end
 end)
 
+-- УЛЬТИМАТИВНЫЕ ПАРТИКЛЫ (Светятся, непрерывно работают полсекунды)
 local function spawnHitParticle(targetPart)
     local att = Instance.new("Attachment", targetPart)
     local pe = Instance.new("ParticleEmitter", att)
     pe.Texture = ParticleConfig.Texture
     pe.Color = ColorSequence.new(ParticleConfig.Color)
-    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0)})
+    pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 0)}) -- Огромные
     pe.Speed = NumberRange.new(15, 30)
     pe.SpreadAngle = Vector2.new(360, 360)
     pe.Lifetime = NumberRange.new(0.5, 1)
-    pe.Rate = 0
-    pe:Emit(30)
+    pe.LightEmission = 1 -- Светятся в темноте!
+    pe.ZOffset = 1 -- Всегда поверх текстур
+    pe.Rate = 100 -- Плотный поток
+    
+    -- Спавним непрерывно полсекунды, потом плавно тушим
+    task.delay(0.5, function()
+        pe.Enabled = false
+    end)
     Debris:AddItem(att, 2)
 end
 
-RunService.RenderStepped:Connect(function()
+-- Функция поиска игрока по нику (для дрона)
+local function getPlayerByName(nameFragment)
+    if nameFragment == "" then return nil end
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and string.find(string.lower(plr.Name), nameFragment) then
+            return plr
+        end
+    end
+    return nil
+end
+
+-- === ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ===
+RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
+    local myHum = char and char:FindFirstChild("Humanoid")
     
     local showScope = Modules.Scope and myRoot ~= nil
     scopeDot.Visible = showScope; scopeTop.Visible = showScope; scopeBot.Visible = showScope; scopeLeft.Visible = showScope; scopeRight.Visible = showScope
@@ -472,6 +536,40 @@ RunService.RenderStepped:Connect(function()
             obj.Box.Visible = false; obj.Tracer.Visible = false; obj.Txt.Visible = false
         end
         return 
+    end
+
+    -- AUTO DRONE LOGIC
+    if Modules.AutoDrone and DroneConfig.Target ~= "" then
+        local targetPlr = getPlayerByName(DroneConfig.Target)
+        if targetPlr and targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart") then
+            local tRoot = targetPlr.Character.HumanoidRootPart
+            local basePos = tRoot.Position
+            local targetPos = basePos
+            local t = tick()
+
+            -- Применяем ПОЛЕТ (Модификатор позиции)
+            if DroneConfig.Flight == "Pulse" then
+                targetPos = targetPos + Vector3.new(0, math.sin(t * 8) * 15, 0)
+            elseif DroneConfig.Flight == "Circle" then
+                targetPos = targetPos + Vector3.new(math.cos(t * 3) * 15, 5, math.sin(t * 3) * 15)
+            elseif DroneConfig.Flight == "Random" then
+                targetPos = targetPos + Vector3.new(math.sin(t * 5) * 10, math.cos(t * 4) * 10, math.sin(t * 6) * 10)
+            end
+
+            -- Применяем ТИП (Модификатор движения)
+            local distToTarget = (myRoot.Position - basePos).Magnitude
+            if DroneConfig.Type == "TP" then
+                myRoot.CFrame = CFrame.new(targetPos, tRoot.Position)
+            elseif DroneConfig.Type == "Stealth" then
+                if myHum then myHum:MoveTo(targetPos) end
+            elseif DroneConfig.Type == "Auto" then
+                if distToTarget > 100 then
+                    myRoot.CFrame = CFrame.new(targetPos, tRoot.Position)
+                else
+                    if myHum then myHum:MoveTo(targetPos) end
+                end
+            end
+        end
     end
 
     local currentTargetRoot = nil
@@ -485,6 +583,7 @@ RunService.RenderStepped:Connect(function()
         
         if enemyRoot and enemyHum and enemyHum.Health > 0 then
             
+            -- HIT PARTICLES
             if Modules.HitParticles then
                 local oldHp = PreviousHealths[plr] or enemyHum.MaxHealth
                 if enemyHum.Health < oldHp then spawnHitParticle(enemyRoot) end
@@ -493,6 +592,7 @@ RunService.RenderStepped:Connect(function()
 
             local dist = (enemyRoot.Position - myRoot.Position).Magnitude
             
+            -- SAFE ZONE
             if Modules.SafeZone and dist < 35 then
                 enemyRoot.AssemblyLinearVelocity = (enemyRoot.Position - myRoot.Position).Unit * 160
             end
@@ -505,6 +605,7 @@ RunService.RenderStepped:Connect(function()
 
             if isTarget then currentTargetRoot = enemyRoot end
             
+            -- ESP
             if Modules.PlayerEsp and onScreen then
                 local scaleFactor = 1000 / dist
                 local boxSize = Vector2.new(4 * scaleFactor, 6 * scaleFactor)
@@ -524,6 +625,7 @@ RunService.RenderStepped:Connect(function()
                 esp.Box.Visible = false; esp.Txt.Visible = false
             end
 
+            -- TRACERS
             if Modules.Tracers and onScreen then
                 esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                 esp.Tracer.To = Vector2.new(pos.X, pos.Y + (esp.Box.Size.Y / 2))
@@ -538,6 +640,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- TARGET AIM (Аимбот камеры)
     if Modules.TargetAim and currentTargetRoot then
         Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, currentTargetRoot.Position)
     end
