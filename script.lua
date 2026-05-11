@@ -4,21 +4,25 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Очистка старых версий
+-- 1. БЕЗОПАСНАЯ ОЧИСТКА (Без использования CoreGui, чтобы экзекутор не крашился)
 local function cleanup()
-    local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("DuckKlientGui")
-    if oldGui then oldGui:Destroy() end
-    local oldEspContainer = CoreGui:FindFirstChild("EspContainer")
-    if oldEspContainer then oldEspContainer:Destroy() end
+    if not LocalPlayer then return end
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local oldGui = pg:FindFirstChild("DuckKlientGui")
+        if oldGui then oldGui:Destroy() end
+    end
 end
 cleanup()
+
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- === СОЗДАНИЕ GUI (Дизайн "duck klient") ===
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DuckKlientGui"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+screenGui.Parent = PlayerGui
 
 local MainGradientScheme = ColorSequence.new({
     ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 215, 0)),
@@ -32,7 +36,7 @@ mainFrame.Size = UDim2.new(0, 550, 0, 400)
 mainFrame.Position = UDim2.new(0.5, -275, 0.5, -200)
 mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 mainFrame.BorderSizePixel = 0
-mainFrame.Visible = true -- ТЕПЕРЬ МЕНЮ ОТКРЫТО СРАЗУ ПОСЛЕ ЗАПУСКА!
+mainFrame.Visible = true -- Открыто сразу после инжекта
 mainFrame.ZIndex = 10
 mainFrame.Parent = screenGui
 
@@ -157,7 +161,6 @@ local function createModuleButton(parent, title, description, lmbCallback, rmbCa
 
     local active = false
     
-    -- Обработка кликов (ЛКМ и ПКМ)
     button.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             active = not active
@@ -213,7 +216,6 @@ createTab("Visuals", visualPage, 105, false)
 
 -- === ДОБАВЛЕНИЕ КНОПОК ===
 
--- 1. COMBAT: Safe Zone
 createModuleButton(combatPage, "Safe Zone", "Отталкивает врагов. Выключится через 15 сек", function(state, stroke)
     Modules.SafeZone = state
     if state then
@@ -227,17 +229,14 @@ createModuleButton(combatPage, "Safe Zone", "Отталкивает врагов
     end
 end)
 
--- 2. VISUALS: Player ESP
 createModuleButton(visualPage, "Player ESP", "Показывает 2D квадраты сквозь стены", function(state)
     Modules.PlayerEsp = state
 end)
 
--- 3. VISUALS: Tracers
 createModuleButton(visualPage, "Tracers", "Рисует линии до игроков", function(state)
     Modules.Tracers = state
 end)
 
--- 4. VISUALS: TARGET (Новая функция с ПКМ)
 local TargetSettingsFrame = Instance.new("Frame")
 TargetSettingsFrame.Size = UDim2.new(1, -10, 0, 40)
 TargetSettingsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
@@ -269,12 +268,8 @@ TargetInput.FocusLost:Connect(function()
 end)
 
 createModuleButton(visualPage, "Target", "ЛКМ: Вкл/Выкл | ПКМ: Настроить ник цели", 
-    function(state) -- ЛКМ
-        Modules.Target = state
-    end,
-    function() -- ПКМ
-        TargetSettingsFrame.Visible = not TargetSettingsFrame.Visible
-    end
+    function(state) Modules.Target = state end,
+    function() TargetSettingsFrame.Visible = not TargetSettingsFrame.Visible end
 )
 
 -- Управление открытием на Ъ (RightBracket)
@@ -287,33 +282,30 @@ end)
 
 -- === ЯДРО ЧИТА (ОТРИСОВКА И ЛОГИКА) ===
 
-local EspContainer = Instance.new("Folder")
-EspContainer.Name = "EspContainer"
-pcall(function() EspContainer.Parent = game:GetService("CoreGui") end) 
-if not EspContainer.Parent then EspContainer.Parent = LocalPlayer.PlayerGui end
-
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
     if plr == LocalPlayer then return end
     
-    local box = Drawing.new("Square")
+    local successBox, box = pcall(function() return Drawing.new("Square") end)
+    local successLine, tracer = pcall(function() return Drawing.new("Line") end)
+    local successTxt, targetText = pcall(function() return Drawing.new("Text") end)
+    
+    if not successBox or not successLine or not successTxt then return end -- Защита от краша экзекутора
+    
     box.Visible = false
     box.Color = Color3.fromRGB(255, 170, 0)
     box.Thickness = 1
     box.Filled = false
     box.Transparency = 1
 
-    local tracer = Drawing.new("Line")
     tracer.Visible = false
     tracer.Color = Color3.fromRGB(255, 255, 255)
     tracer.Thickness = 1
     tracer.Transparency = 0.6
     
-    -- НОВЫЙ ТЕКСТ ДЛЯ TARGET
-    local targetText = Drawing.new("Text")
     targetText.Visible = false
-    targetText.Color = Color3.fromRGB(255, 0, 0) -- Красный цвет
+    targetText.Color = Color3.fromRGB(255, 0, 0)
     targetText.Text = "TARGET"
     targetText.Size = 20
     targetText.Center = true
@@ -328,9 +320,9 @@ Players.PlayerAdded:Connect(createEspForPlayer)
 
 Players.PlayerRemoving:Connect(function(plr)
     if EspObjects[plr] then
-        EspObjects[plr].Box:Remove()
-        EspObjects[plr].Tracer:Remove()
-        EspObjects[plr].Txt:Remove()
+        pcall(function() EspObjects[plr].Box:Remove() end)
+        pcall(function() EspObjects[plr].Tracer:Remove() end)
+        pcall(function() EspObjects[plr].Txt:Remove() end)
         EspObjects[plr] = nil
     end
 end)
@@ -358,19 +350,16 @@ RunService.RenderStepped:Connect(function()
         if enemyRoot and enemyHum and enemyHum.Health > 0 then
             local dist = (enemyRoot.Position - myRoot.Position).Magnitude
             
-            -- SAFE ZONE
             if Modules.SafeZone and dist < 35 then
                 local direction = (enemyRoot.Position - myRoot.Position).Unit
                 enemyRoot.AssemblyLinearVelocity = direction * 160
             end
 
-            -- VISUALS
             local esp = EspObjects[plr]
             if not esp then continue end
 
             local pos, onScreen = Camera:WorldToViewportPoint(enemyRoot.Position)
             
-            -- Player ESP (Box)
             if Modules.PlayerEsp and onScreen then
                 local scaleFactor = 1000 / dist
                 local boxSize = Vector2.new(4 * scaleFactor, 6 * scaleFactor)
@@ -380,7 +369,6 @@ RunService.RenderStepped:Connect(function()
                 esp.Box.Position = Vector2.new(pos.X - boxSize.X/2, pos.Y - boxSize.Y/2)
                 esp.Box.Visible = true
                 
-                -- TARGET LOGIC (Текст пишется только если ESP включено и имя совпадает)
                 if Modules.Target and TargetPlayerName ~= "" and string.find(string.lower(plr.Name), TargetPlayerName) then
                     esp.Txt.Position = Vector2.new(pos.X, pos.Y - boxSize.Y/2 - 25)
                     esp.Txt.Visible = true
@@ -392,7 +380,6 @@ RunService.RenderStepped:Connect(function()
                 esp.Txt.Visible = false
             end
 
-            -- Tracers
             if Modules.Tracers and onScreen then
                 esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                 esp.Tracer.To = Vector2.new(pos.X, pos.Y + (esp.Box.Size.Y / 2))
