@@ -37,11 +37,11 @@ mainFrame.Parent = screenGui
 
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
--- ИСПРАВЛЕННЫЙ ГРАДИЕНТ (Отдельный слой поверх фона)
+-- ИСПРАВЛЕННЫЙ ГРАДИЕНТ
 local gradientOverlay = Instance.new("Frame")
 gradientOverlay.Size = UDim2.new(1, 0, 1, 0)
 gradientOverlay.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-gradientOverlay.BackgroundTransparency = 0.85 -- Легкая тонировка цветом
+gradientOverlay.BackgroundTransparency = 0.85 
 gradientOverlay.ZIndex = 10
 gradientOverlay.Parent = mainFrame
 Instance.new("UICorner", gradientOverlay).CornerRadius = UDim.new(0, 12)
@@ -265,7 +265,7 @@ createTab("Combat", combatPage, 60, true)
 createTab("Visuals", visualPage, 105, false)
 createTab("Settings", settingsPage, 150, false)
 
--- === 5. ВЫДВИЖНЫЕ СПИСКИ (DROPDOWNS) ===
+-- === 5. ИСПРАВЛЕННЫЕ ВЫДВИЖНЫЕ СПИСКИ ===
 
 local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
     local mainBtn = Instance.new("TextButton")
@@ -285,7 +285,7 @@ local function createDropdown(parent, titleText, yPos, options, defaultIndex, ca
     dropFrame.Position = UDim2.new(0, 0, 1, 2)
     dropFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     dropFrame.Visible = false
-    dropFrame.ZIndex = 20
+    dropFrame.ZIndex = 20 -- Высокий ZIndex чтобы менюшка была поверх всего
     dropFrame.Parent = mainBtn
     Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 6)
     
@@ -315,22 +315,22 @@ local function createDropdown(parent, titleText, yPos, options, defaultIndex, ca
     end
 end
 
--- НАСТРОЙКИ ПАРТИКЛОВ (Dropdowns)
+-- НАСТРОЙКИ ПАРТИКЛОВ (Dropdowns с правильными аргументами!)
 local pTitle = Instance.new("TextLabel", ParticlesRightPanel)
 pTitle.Size = UDim2.new(1, 0, 0, 40); pTitle.BackgroundTransparency = 1; pTitle.Text = "Настройки Партиклов"; pTitle.TextColor3 = Color3.fromRGB(255, 255, 255); pTitle.Font = Enum.Font.GothamBold; pTitle.ZIndex = 13
 
-createDropdown(ParticlesRightPanel, "Цвет", {
+createDropdown(ParticlesRightPanel, "Цвет", 50, {
     {Name = "Красный", Value = Color3.fromRGB(255, 50, 50)},
     {Name = "Синий", Value = Color3.fromRGB(50, 150, 255)},
     {Name = "Желтый", Value = Color3.fromRGB(255, 215, 0)},
     {Name = "Белый", Value = Color3.fromRGB(255, 255, 255)}
-}, 1, 50, function(val) ParticleConfig.Color = val end)
+}, 1, function(val) ParticleConfig.Color = val end)
 
-createDropdown(ParticlesRightPanel, "Тип", {
+createDropdown(ParticlesRightPanel, "Тип", 90, {
     {Name = "Искры", Value = "rbxassetid://243098098"},
     {Name = "Звезды", Value = "rbxassetid://2173499710"},
     {Name = "Дым", Value = "rbxassetid://243098118"}
-}, 1, 90, function(val) ParticleConfig.Texture = val end)
+}, 1, function(val) ParticleConfig.Texture = val end)
 
 
 -- НАСТРОЙКИ TARGET
@@ -402,7 +402,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end
 end)
 
--- === 7. ЯДРО ЧИТА ===
+-- === 7. ЯДРО ЧИТА (ОТРИСОВКА И ЛОГИКА) ===
 
 local ScopeGui = Instance.new("ScreenGui", screenGui)
 local function createLine(size, pos)
@@ -451,7 +451,6 @@ local function spawnHitParticle(targetPart)
     local pe = Instance.new("ParticleEmitter", att)
     pe.Texture = ParticleConfig.Texture
     pe.Color = ColorSequence.new(ParticleConfig.Color)
-    -- СДЕЛАЛ ЧАСТИЦЫ БОЛЬШЕ (В 3 РАЗА!)
     pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0)})
     pe.Speed = NumberRange.new(15, 30)
     pe.SpreadAngle = Vector2.new(360, 360)
