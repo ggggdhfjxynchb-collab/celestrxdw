@@ -1,6 +1,11 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
+
+-- Очистка от старых версий (чтобы меню не дублировалось при перезапуске)
+local oldGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("CelestialMenuGui")
+if oldGui then oldGui:Destroy() end
 
 -- Основной экран интерфейса
 local screenGui = Instance.new("ScreenGui")
@@ -83,8 +88,8 @@ visualLayout.Padding = UDim.new(0, 10)
 visualLayout.SortOrder = Enum.SortOrder.LayoutOrder
 visualLayout.Parent = visualPage
 
--- Функция для создания кнопок в меню (по дизайну со скрина)
-local function createModuleButton(parent, title, description, isEnabled)
+-- УЛУЧШЕННАЯ Функция для создания кнопок (теперь поддерживает логику работы)
+local function createModuleButton(parent, title, description, isEnabled, callback)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, -10, 0, 60)
     button.BackgroundColor3 = isEnabled and Color3.fromRGB(180, 80, 180) or Color3.fromRGB(30, 30, 35)
@@ -125,22 +130,45 @@ local function createModuleButton(parent, title, description, isEnabled)
         active = not active
         if active then
             button.BackgroundColor3 = Color3.fromRGB(180, 80, 180) -- Розовый (включено)
-            print(title .. " Включен")
         else
             button.BackgroundColor3 = Color3.fromRGB(30, 30, 35) -- Темный (выключено)
-            print(title .. " Выключен")
+        end
+        
+        -- Вызываем рабочую функцию чита, если она передана
+        if callback then
+            callback(active, button)
         end
     end)
 
     return button
 end
 
+-- === РАБОЧИЕ ФУНКЦИИ ЧИТА ===
+
+local SafeMomentActive = false
+
 -- Наполнение вкладки Combat
+createModuleButton(combatPage, "Safe Moment", "Отталкивает игроков вокруг (Авто-отключение через 15 сек)", false, function(state, btn)
+    SafeMomentActive = state
+    
+    if state then
+        -- Запускаем таймер на 15 секунд в отдельном потоке
+        task.spawn(function()
+            task.wait(15)
+            if SafeMomentActive then
+                SafeMomentActive = false
+                btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35) -- Возвращаем темный цвет кнопке
+                print("Safe Moment автоматически отключен")
+            end
+        end)
+    end
+end)
+
 createModuleButton(combatPage, "Ragdoll Aura", "Каждые 3 сек роняет игроков в радиусе (нужен серверный скрипт)", false)
 createModuleButton(combatPage, "Attack Aura", "Автоматически атакует врагов рядом", false)
 createModuleButton(combatPage, "Auto Heal", "Использует лечение при низком HP", false)
 
--- Наполнение вкладки Visuals (как ты просил, добавил много функций)
+-- Наполнение вкладки Visuals (пустышки для будущих обновлений)
 createModuleButton(visualPage, "Player ESP", "Показывает рамки и ники сквозь стены", false)
 createModuleButton(visualPage, "Hit Particles", "Настраиваемые эффекты при нанесении урона", false)
 createModuleButton(visualPage, "Tracers", "Рисует линии до других игроков", false)
@@ -173,7 +201,7 @@ local function createTabButton(title, targetPage, isSelected, positionY)
         -- Показываем нужную
         targetPage.Visible = true
 
-        -- Сбрасываем цвета всех кнопок вкладок (это нужно делать глобально, но для примера упростим)
+        -- Сбрасываем цвета всех кнопок вкладок
         for _, child in ipairs(sidebar:GetChildren()) do
             if child:IsA("TextButton") then
                 child.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
@@ -187,12 +215,40 @@ end
 createTabButton("Combat", combatPage, true, 70)
 createTabButton("Visuals", visualPage, false, 120)
 
--- ЛОГИКА ОТКРЫТИЯ/ЗАКРЫТИЯ НА ПРАВЫЙ SHIFT
+-- ЛОГИКА ОТКРЫТИЯ/ЗАКРЫТИЯ НА КНОПКУ "Ъ" (Правая квадратная скобка)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    -- Игнорируем, если игрок пишет в чат
     if gameProcessed then return end 
 
-    if input.KeyCode == Enum.KeyCode.RightShift then
+    -- Enum.KeyCode.RightBracket = Кнопка "Ъ" на русской раскладке
+    if input.KeyCode == Enum.KeyCode.RightBracket then
         mainFrame.Visible = not mainFrame.Visible
+    end
+end)
+
+-- === ГЛОБАЛЬНЫЙ ЦИКЛ ЧИТА (Здесь работает Safe Moment) ===
+RunService.RenderStepped:Connect(function()
+    -- Логика Safe Moment
+    if SafeMomentActive then
+        local character = LocalPlayer.Character
+        local myRoot = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if myRoot then
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character then
+                    local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if targetRoot then
+                        local distance = (targetRoot.Position - myRoot.Position).Magnitude
+                        
+                        -- Если игрок ближе чем на 30 стадов (метров)
+                        if distance < 30 then
+                            -- Вычисляем направление от нас к нему и откидываем с силой 150
+                            local pushDirection = (targetRoot.Position - myRoot.Position).Unit
+                            targetRoot.AssemblyLinearVelocity = pushDirection * 150
+                        end
+                    end
+                end
+            end
+        end
     end
 end)
