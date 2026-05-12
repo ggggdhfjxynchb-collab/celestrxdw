@@ -119,8 +119,8 @@ end
 createTab("Combat", combatPage, 60); createTab("Visuals", visualPage, 105); createTab("Settings", settingsPage, 150)
 
 -- НАСТРОЙКИ ПАРТИКЛОВ (ПКМ)
-createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
-createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
+createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}, {Name="Белый", Value=Color3.fromRGB(255,255,255)}}, 1, function(v) ParticleConfig.Color = v end)
+createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}, {Name="Дым", Value="rbxassetid://243098118"}}, 1, function(v) ParticleConfig.Texture = v end)
 
 -- НАСТРОЙКИ TARGET (ПКМ)
 createDropdown(TargetRightPanel, "Кого бить", 40, {
@@ -223,14 +223,12 @@ RunService.RenderStepped:Connect(function()
         local eHum = plr.Character:FindFirstChild("Humanoid")
         
         if eRoot and eHum and eHum.Health > 0 then
-            -- Hit Particles
             if Modules.HitParticles then
                 local oldHp = PreviousHealths[plr] or eHum.MaxHealth
                 if eHum.Health < oldHp then spawnHitParticle(eRoot) end
                 PreviousHealths[plr] = eHum.Health
             end
 
-            -- Safe Zone
             if Modules.SafeZone and myRoot and (eRoot.Position - myRoot.Position).Magnitude < 35 then
                 eRoot.AssemblyLinearVelocity = (eRoot.Position - myRoot.Position).Unit * 160
             end
@@ -244,7 +242,6 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
-            -- ESP
             local esp = EspObjects[plr]
             if esp then
                 local pos, onScreen = Camera:WorldToViewportPoint(eRoot.Position)
@@ -267,35 +264,56 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- AUTO DRONE LOGIC (ИИ ПОЛЕТ)
+    -- === ИСПРАВЛЕННЫЙ AUTO DRONE (С АНТИ-КРАШЕМ И НАСТРОЙКАМИ ПОЛЕТА) ===
     if Modules.AutoDrone and d and bestTargetRoot then
-        local targetPos = bestTargetRoot.Position
         local t = tick()
+        
+        -- Базовая точка полета (всегда НАД врагом на 20 стадов, чтобы не биться об пол)
+        local baseTargetPos = bestTargetRoot.Position + Vector3.new(0, 20, 0)
+        local offset = Vector3.new(0, 0, 0)
 
-        -- ПОЛЕТ (Модификатор позиции)
-        if DroneConfig.Flight == "Pulse" then targetPos = targetPos + Vector3.new(0, math.sin(t * 8) * 20, 0)
-        elseif DroneConfig.Flight == "Circle" then targetPos = targetPos + Vector3.new(math.cos(t * 3) * 25, 10, math.sin(t * 3) * 25)
-        elseif DroneConfig.Flight == "Random" then targetPos = targetPos + Vector3.new(math.sin(t * 5) * 15, math.cos(t * 4) * 15, math.sin(t * 6) * 15) end
+        -- ПРИМЕНЯЕМ СТИЛИ ПОЛЕТА (Влияют на оффсет от цели)
+        if DroneConfig.Flight == "Pulse" then 
+            offset = Vector3.new(0, math.sin(t * 5) * 20, 0) -- Прыгает вверх-вниз
+        elseif DroneConfig.Flight == "Circle" then 
+            offset = Vector3.new(math.cos(t * 2.5) * 30, 0, math.sin(t * 2.5) * 30) -- Крутится радиусом 30
+        elseif DroneConfig.Flight == "Random" then 
+            offset = Vector3.new(math.sin(t * 4) * 20, math.cos(t * 3) * 15, math.sin(t * 5) * 20) -- Бешеная муха
+        end
 
-        -- ТИП ДВИЖЕНИЯ
-        local distToTarget = (d.Position - bestTargetRoot.Position).Magnitude
+        local finalTargetPos = baseTargetPos + offset
+
+        -- АНТИ-КРАШ В СТЕНЫ И ПОЛ: 
+        -- Если дрон слишком низко (ниже головы врага + 5 стадов), заставляем его лететь СТРОГО ВВЕРХ
+        if d.Position.Y < bestTargetRoot.Position.Y + 5 then
+            finalTargetPos = Vector3.new(d.Position.X, bestTargetRoot.Position.Y + 40, d.Position.Z)
+        end
+
+        -- ПРИМЕНЯЕМ ТИП ДВИЖЕНИЯ
+        local distToTarget = (d.Position - finalTargetPos).Magnitude
+        
         if DroneConfig.Type == "TP" then
-            d.CFrame = CFrame.lookAt(targetPos, bestTargetRoot.Position)
-        elseif DroneConfig.Type == "Stealth" then
-            d.AssemblyLinearVelocity = (targetPos - d.Position).Unit * 100
-            d.CFrame = CFrame.lookAt(d.Position, bestTargetRoot.Position)
-        elseif DroneConfig.Type == "Auto" then
-            if distToTarget > 150 then
-                d.CFrame = CFrame.lookAt(targetPos, bestTargetRoot.Position)
+            d.CFrame = CFrame.lookAt(finalTargetPos, bestTargetRoot.Position)
+            d.AssemblyLinearVelocity = Vector3.zero
+        else
+            -- Stealth / Auto (Используем скорость для полета)
+            if DroneConfig.Type == "Auto" and distToTarget > 200 then
+                -- Если цель слишком далеко, авто-телепортируемся к ней
+                d.CFrame = CFrame.lookAt(finalTargetPos, bestTargetRoot.Position)
             else
-                d.AssemblyLinearVelocity = (targetPos - d.Position).Unit * 100
-                d.CFrame = CFrame.lookAt(d.Position, bestTargetRoot.Position)
+                -- Иначе плавно (но быстро) летим к рассчитанной точке
+                local flyDirection = (finalTargetPos - d.Position).Unit
+                d.AssemblyLinearVelocity = flyDirection * 120 -- Скорость дрона
+                d.CFrame = CFrame.lookAt(d.Position, bestTargetRoot.Position) -- Всегда смотрит мордой на врага
             end
         end
+
+        -- Камера летит сзади за дроном, чтобы было удобно смотреть
         Camera.CameraType = Enum.CameraType.Scriptable
-        Camera.CFrame = CFrame.lookAt(d.Position - (d.CFrame.LookVector * 25) + Vector3.new(0, 10, 0), d.Position)
+        Camera.CFrame = CFrame.lookAt(d.Position - (d.CFrame.LookVector * 25) + Vector3.new(0, 10, 0), bestTargetRoot.Position)
+        
     elseif Modules.AutoDrone and not bestTargetRoot then
-        -- Если включен Auto Drone, но нет цели, просто даем управление ручками
+        -- Если дрон включен, но цель не выбрана в Target -> Возвращаем обычное управление
         Camera.CameraType = Enum.CameraType.Custom
     end
 
