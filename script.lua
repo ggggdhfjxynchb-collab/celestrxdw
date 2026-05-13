@@ -1,9 +1,8 @@
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -18,7 +17,6 @@ pcall(function()
     if oldGui then oldGui:Destroy() end
 end)
 
--- === 2. СОЗДАНИЕ ГЛАВНОГО GUI ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DuckKlientGui"; screenGui.ResetOnSpawn = false; screenGui.Parent = targetParent
 
@@ -53,7 +51,7 @@ contentFrame.Name = "Duck_Content"; contentFrame.Size = UDim2.new(1, -170, 1, -2
 
 local visualPage = Instance.new("ScrollingFrame"); visualPage.Name="Duck_VisPage"; visualPage.Size = UDim2.new(1, 0, 1, 0); visualPage.BackgroundTransparency = 1; visualPage.ScrollBarThickness = 2; visualPage.Visible = true; visualPage.Parent = contentFrame; Instance.new("UIListLayout", visualPage).Padding = UDim.new(0, 10)
 
--- === 3. TARGET INFO ПАНЕЛЬ ===
+-- === 3. TARGET INFO ПАНЕЛЬ (GUI БАР) ===
 local targetInfoFrame = Instance.new("Frame")
 targetInfoFrame.Name = "Duck_TargetInfo"; targetInfoFrame.Size = UDim2.new(0, 250, 0, 100); targetInfoFrame.Position = UDim2.new(1, -270, 0.5, -50); targetInfoFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); targetInfoFrame.Visible = false; targetInfoFrame.ZIndex = 10; targetInfoFrame.Parent = screenGui
 Instance.new("UICorner", targetInfoFrame).CornerRadius = UDim.new(0, 8)
@@ -121,23 +119,21 @@ end
 local ParticlesRightPanel = createRightPanel("ParticlesConfig", 180)
 local SoundRightPanel = createRightPanel("SoundConfig", 100)
 local TargetRightPanel = createRightPanel("TargetConfig", 160)
+local HealthRightPanel = createRightPanel("HealthConfig", 100) -- Панель для настройки вида ХП
 
 local function closeAllRightPanels()
-    ParticlesRightPanel.Visible = false; SoundRightPanel.Visible = false; TargetRightPanel.Visible = false
+    ParticlesRightPanel.Visible = false; SoundRightPanel.Visible = false; TargetRightPanel.Visible = false; HealthRightPanel.Visible = false
 end
 
 -- === 6. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
-local Modules = { TargetInfo = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
+local Modules = { HealthDisplay = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
 local TargetMode = "All" 
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
--- Заменил крашащие звуки на стандартные роблоксовские (точно рабочие)
 local SoundConfig = { Id = "rbxassetid://130972023" } 
-local PreviousVelocities = {}
-local PreviousCars = {} -- Для проверки респавна тачки
+local HealthConfig = { Style = "ESP" } -- "ESP" (полоска над машиной) или "GUI" (радар панель)
 
-local LastHitPlayer = nil
-local LastHitTime = 0
+local PreviousVelocities = {}
 local CurrentTargetPlr = nil
 local CarMaxPartsCache = {}
 
@@ -190,26 +186,23 @@ createTab("Visuals", visualPage, 60)
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
-createDropdown(SoundRightPanel, "Звук", 40, {
-    {Name="Колокольчик", Value="rbxassetid://130972023"}, 
-    {Name="Мягкий Удар", Value="rbxassetid://12222084"}, 
-    {Name="Взрыв", Value="rbxassetid://142070127"} -- Заменил крашащий металл на 100% рабочий звук взрыва
-}, 1, function(v) SoundConfig.Id = v end)
-
+createDropdown(SoundRightPanel, "Звук", 40, {{Name="Колокольчик", Value="rbxassetid://130972023"}, {Name="Мягкий Удар", Value="rbxassetid://12222084"}, {Name="Металл", Value="rbxassetid://160432334"}}, 1, function(v) SoundConfig.Id = v end)
 createDropdown(TargetRightPanel, "Кого бить", 40, {{Name = "Никто", Value = "None"}, {Name = "Все машины", Value = "All"}, {Name = "По нику", Value = "Player"}}, 2, function(v) TargetMode = v end)
+
 local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0, 0, 30); TargetInput.Position = UDim2.new(0.05, 0, 0, 80); TargetInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30); TargetInput.Text = "Ник (если выбран)"; TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200); TargetInput.Font = Enum.Font.Gotham; TargetInput.TextSize = 12; TargetInput.ZIndex = 13; TargetInput.ClearTextOnFocus = true; TargetInput.Parent = TargetRightPanel; Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
+-- Единая настройка для вида ХП
+createDropdown(HealthRightPanel, "Вид ХП", 40, {{Name="ESP Бар", Value="ESP"}, {Name="GUI Панель", Value="GUI"}}, 1, function(v) HealthConfig.Style = v end)
+
 -- === 8. КНОПКИ ОСНОВНОГО МЕНЮ ===
-createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает ХП машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
+createModuleButton(visualPage, "Car Health", "ЛКМ: Вкл ХП | ПКМ: Вид (ESP/GUI)", function(state) Modules.HealthDisplay = state; if not state then targetInfoFrame.Visible = false end end, function() closeAllRightPanels(); HealthRightPanel.Visible = true end)
 createModuleButton(visualPage, "Engine Chams", "Свечение самого мотора сквозь машину", function(state) Modules.EngineChams = state end)
 createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана", function(state) Modules.WeakSpot = state end)
 createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
 createModuleButton(visualPage, "Tracers", "Рисует линии до уязвимых точек", function(state) Modules.Tracers = state end)
-
 createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
 createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
-
 createModuleButton(visualPage, "Target Config", "ПКМ: Настроить авто-цель", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
 -- === 9. ЯДРО ЧИТА ===
@@ -221,6 +214,10 @@ local function createEspForPlayer(plr)
     local sTxt, nametag = pcall(function() return Drawing.new("Text") end); local sWeak, weakTxt = pcall(function() return Drawing.new("Text") end)
     local sCirc, weakCirc = pcall(function() return Drawing.new("Circle") end)
     
+    -- Линии для ESP Бара
+    local sHpBg, hpBg = pcall(function() return Drawing.new("Line") end)
+    local sHpVal, hpVal = pcall(function() return Drawing.new("Line") end)
+    
     if not sBox or not sLine or not sTxt then return end
     
     box.Visible = false; box.Color = Color3.fromRGB(0, 200, 255); box.Thickness = 1.5; box.Filled = false; box.Transparency = 1
@@ -230,7 +227,10 @@ local function createEspForPlayer(plr)
     weakTxt.Visible = false; weakTxt.Color = Color3.fromRGB(255, 0, 0); weakTxt.Text = "[WEAK SPOT]"; weakTxt.Size = 18; weakTxt.Center = true; weakTxt.Outline = true; weakTxt.Transparency = 1
     weakCirc.Visible = false; weakCirc.Color = Color3.fromRGB(255, 0, 0); weakCirc.Thickness = 2; weakCirc.Radius = 15; weakCirc.Filled = false; weakCirc.Transparency = 1
 
-    EspObjects[plr] = {Box = box, Tracer = tracer, Nametag = nametag, WeakTxt = weakTxt, WeakCirc = weakCirc}
+    if sHpBg then hpBg.Visible = false; hpBg.Color = Color3.fromRGB(20, 20, 20); hpBg.Thickness = 4; hpBg.Transparency = 1 end
+    if sHpVal then hpVal.Visible = false; hpVal.Color = Color3.fromRGB(0, 255, 0); hpVal.Thickness = 2; hpVal.Transparency = 1 end
+
+    EspObjects[plr] = {Box = box, Tracer = tracer, Nametag = nametag, WeakTxt = weakTxt, WeakCirc = weakCirc, HpBg = hpBg, HpVal = hpVal}
 end
 
 for _, plr in pairs(Players:GetPlayers()) do createEspForPlayer(plr) end
@@ -243,13 +243,19 @@ local function hidePlayerEsp(plr)
         EspObjects[plr].Nametag.Visible = false
         EspObjects[plr].WeakTxt.Visible = false
         EspObjects[plr].WeakCirc.Visible = false
+        EspObjects[plr].HpBg.Visible = false
+        EspObjects[plr].HpVal.Visible = false
     end
 end
 
 Players.PlayerRemoving:Connect(function(plr)
     if CurrentTargetPlr == plr then CurrentTargetPlr = nil; targetInfoFrame.Visible = false end
-    if LastHitPlayer == plr then LastHitPlayer = nil end
-    if EspObjects[plr] then pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end); EspObjects[plr] = nil; PreviousVelocities[plr] = nil; PreviousCars[plr] = nil end
+    if EspObjects[plr] then 
+        pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end)
+        pcall(function() EspObjects[plr].HpBg:Remove(); EspObjects[plr].HpVal:Remove() end)
+        EspObjects[plr] = nil 
+    end
+    PreviousVelocities[plr] = nil
 end)
 
 local function getCarData(plr)
@@ -281,7 +287,6 @@ local function getSafePosition(obj)
     return nil
 end
 
--- Считаем ХП только у живых деталей, исключая сломанный/пропавший мусор
 local function getCarHealth(carModel)
     if not carModel then return 0, 100 end
     
@@ -310,35 +315,36 @@ local function getCarHealth(carModel)
 end
 
 local function getWeakSpotData(carRoot, enginePart)
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return carRoot.Position, "Нет данных" end
-    
-    local enginePos = getSafePosition(enginePart)
-    local engineOffset = enginePos and (enginePos - carRoot.Position) or Vector3.zero
-    local fwdDot = engineOffset:Dot(carRoot.CFrame.LookVector)
-    
-    local advice = ""
     local weakSpotPos = carRoot.Position
+    local advice = "[БИТЬ В ДВЕРИ (T-BONE)]"
     
-    if fwdDot > 3 then
-        advice = "[БИТЬ В КАПОТ]"
-        weakSpotPos = carRoot.Position + (carRoot.CFrame.LookVector * 8)
-    elseif fwdDot < -3 then
-        advice = "[БИТЬ В БАГАЖНИК]"
-        weakSpotPos = carRoot.Position - (carRoot.CFrame.LookVector * 8)
-    else
-        advice = "[БИТЬ В ДВЕРИ (T-BONE)]"
-        local toEnemy = (carRoot.Position - myRoot.Position).Unit
-        local rightVec = carRoot.CFrame.RightVector
-        local sideMultiplier = (toEnemy:Dot(rightVec) > 0) and -1 or 1
-        weakSpotPos = carRoot.Position + (rightVec * (6 * sideMultiplier))
-    end
+    pcall(function()
+        local enginePos = getSafePosition(enginePart)
+        if not enginePos then enginePos = carRoot.Position end
+        
+        local engineOffset = (enginePos - carRoot.Position)
+        local fwdDot = engineOffset:Dot(carRoot.CFrame.LookVector)
+        
+        if fwdDot > 3 then
+            advice = "[БИТЬ В КАПОТ]"
+            weakSpotPos = carRoot.Position + (carRoot.CFrame.LookVector * 8)
+        elseif fwdDot < -3 then
+            advice = "[БИТЬ В БАГАЖНИК]"
+            weakSpotPos = carRoot.Position - (carRoot.CFrame.LookVector * 8)
+        else
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local myPos = myRoot and myRoot.Position or Camera.CFrame.Position
+            local toEnemy = (carRoot.Position - myPos).Unit
+            local rightVec = carRoot.CFrame.RightVector
+            local sideMultiplier = (toEnemy:Dot(rightVec) > 0) and -1 or 1
+            weakSpotPos = carRoot.Position + (rightVec * (6 * sideMultiplier))
+        end
+    end)
     
     return weakSpotPos, advice
 end
 
 local function updateTargetInfoPanel(plr, advice, health, maxHealth)
-    if not Modules.TargetInfo then targetInfoFrame.Visible = false; return end
     targetInfoFrame.Visible = true
     
     if CurrentTargetPlr ~= plr then
@@ -360,13 +366,9 @@ local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     hpFill.Size = UDim2.new(hpPercent, 0, 1, 0)
     hpText.Text = "CAR HEALTH: " .. math.floor(hpPercent * 100) .. "%"
     
-    if hpPercent > 0.6 then
-        hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    elseif hpPercent > 0.3 then
-        hpFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-    else
-        hpFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    end
+    if hpPercent > 0.6 then hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    elseif hpPercent > 0.3 then hpFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
+    else hpFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0) end
 end
 
 local function spawnHitParticle(targetPos)
@@ -392,105 +394,118 @@ local function isPlayerTarget(plr)
     return false
 end
 
--- === ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ===
+-- === ОСНОВНОЙ ЦИКЛ ===
 RunService.RenderStepped:Connect(function()
+    local myRootPos = Camera.CFrame.Position
     local myCar, myCarRoot, _ = getCarData(LocalPlayer)
-    
-    local myVelChange = 0
     if myCarRoot and myCarRoot:IsDescendantOf(workspace) then
-        local myCurrentVel = myCarRoot.AssemblyLinearVelocity
-        if PreviousCars[LocalPlayer] ~= myCar then PreviousVelocities[LocalPlayer] = myCurrentVel; PreviousCars[LocalPlayer] = myCar end
-        local myOldVel = PreviousVelocities[LocalPlayer] or myCurrentVel
-        myVelChange = (myOldVel - myCurrentVel).Magnitude
-        PreviousVelocities[LocalPlayer] = myCurrentVel
-    else
-        PreviousVelocities[LocalPlayer] = nil
-        PreviousCars[LocalPlayer] = nil
+        myRootPos = myCarRoot.Position
+    elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        myRootPos = LocalPlayer.Character.HumanoidRootPart.Position
     end
+
+    local bestTarget = nil
+    local shortestDist = 300
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
-        local car, carRoot, engine = getCarData(plr)
-        local esp = EspObjects[plr]
-        
-        -- ФИЛЬТР: Если машина взорвалась или исчезла, прячем всё
-        if not carRoot or not carRoot:IsDescendantOf(workspace) then
-            hidePlayerEsp(plr)
-            PreviousVelocities[plr] = nil
-            PreviousCars[plr] = nil
-            continue
-        end
-        
-        if Modules.EngineChams and engine and (engine:IsA("BasePart") or engine:IsA("Model") or engine:IsA("Folder")) then
-            local hl = engine:FindFirstChild("Duck_EngineChams")
-            if not hl then hl = Instance.new("Highlight"); hl.Name = "Duck_EngineChams"; hl.FillColor = Color3.fromRGB(0, 255, 255); hl.OutlineColor = Color3.fromRGB(255, 255, 255); hl.FillTransparency = 0.2; hl.OutlineTransparency = 0; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent = engine end
-        else
-            if engine and engine:FindFirstChild("Duck_EngineChams") then engine.Duck_EngineChams:Destroy() end
-        end
-        
-        if esp then
-            local isT = isPlayerTarget(plr)
+        pcall(function()
+            local car, carRoot, engine = getCarData(plr)
+            local esp = EspObjects[plr]
             
-            local currentVel = carRoot.AssemblyLinearVelocity
-            if PreviousCars[plr] ~= car then PreviousVelocities[plr] = currentVel; PreviousCars[plr] = car end
-            local oldVel = PreviousVelocities[plr] or currentVel
-            local velChange = (oldVel - currentVel).Magnitude
-
-            -- ЗАХВАТ ЦЕЛИ ПРИ ТАРАНЕ (Двойная проверка скорости + дистанция)
-            if velChange > 15 and myVelChange > 15 and myCarRoot and (myCarRoot.Position - carRoot.Position).Magnitude < 35 then
-                if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
-                if Modules.HitSound then playHitSound() end
-                
-                LastHitPlayer = plr
-                LastHitTime = tick()
+            if not carRoot or not carRoot:IsDescendantOf(workspace) then
+                hidePlayerEsp(plr)
+                return
             end
-            PreviousVelocities[plr] = currentVel
             
-            if isT then
-                local weakSpotPos, aiAdvice = getWeakSpotData(carRoot, engine)
-                local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
+            if Modules.EngineChams and engine and (engine:IsA("BasePart") or engine:IsA("Model") or engine:IsA("Folder")) then
+                local hl = engine:FindFirstChild("Duck_EngineChams")
+                if not hl then hl = Instance.new("Highlight"); hl.Name = "Duck_EngineChams"; hl.FillColor = Color3.fromRGB(0, 255, 255); hl.OutlineColor = Color3.fromRGB(255, 255, 255); hl.FillTransparency = 0.2; hl.OutlineTransparency = 0; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent = engine end
+            else
+                if engine and engine:FindFirstChild("Duck_EngineChams") then engine.Duck_EngineChams:Destroy() end
+            end
+            
+            if esp then
+                local isT = isPlayerTarget(plr)
+                local distToMe = (myRootPos - carRoot.Position).Magnitude
                 
-                if onScreen then
-                    if Modules.EngineEsp then
-                        local distToMe = (carRoot.Position - Camera.CFrame.Position).Magnitude
+                -- Радар (Ищем того, кто ближе к центру экрана для GUI)
+                if isT and distToMe < shortestDist then
+                    local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
+                    if onScreen then
+                        local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local distToCenter = (Vector2.new(pos.X, pos.Y) - centerScreen).Magnitude
+                        if distToCenter < 250 then
+                            shortestDist = distToMe
+                            bestTarget = plr
+                        end
+                    end
+                end
+                
+                if isT then
+                    local weakSpotPos, aiAdvice = getWeakSpotData(carRoot, engine)
+                    local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
+                    
+                    if onScreen then
                         local scaleFactor = 1000 / distToMe
                         local boxSize = Vector2.new(6 * scaleFactor, 4 * scaleFactor)
                         if boxSize.Y > 150 then boxSize = Vector2.new(200, 150) end
-                        esp.Box.Size = boxSize; esp.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2); esp.Box.Visible = true
-                        esp.Nametag.Text = plr.Name; esp.Nametag.Position = Vector2.new(pos.X, pos.Y - (boxSize.Y / 2) - 15); esp.Nametag.Visible = true
-                    else esp.Box.Visible = false; esp.Nametag.Visible = false end
 
-                    if Modules.WeakSpot then
-                        local wPos, wOnScreen = Camera:WorldToViewportPoint(weakSpotPos)
-                        if wOnScreen then
-                            esp.WeakCirc.Position = Vector2.new(wPos.X, wPos.Y); esp.WeakCirc.Visible = true
-                            esp.WeakTxt.Position = Vector2.new(wPos.X, wPos.Y - 25); esp.WeakTxt.Visible = true
+                        if Modules.EngineEsp then
+                            esp.Box.Size = boxSize; esp.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2); esp.Box.Visible = true
+                            esp.Nametag.Text = plr.Name; esp.Nametag.Position = Vector2.new(pos.X, pos.Y - (boxSize.Y / 2) - 15); esp.Nametag.Visible = true
+                        else esp.Box.Visible = false; esp.Nametag.Visible = false end
+
+                        -- ЛОГИКА ESP БАРА (Только если выбран этот режим)
+                        if Modules.HealthDisplay and HealthConfig.Style == "ESP" then
+                            local currentHealth, maxHealth = getCarHealth(car)
+                            local hpPercent = math.clamp(maxHealth > 0 and currentHealth / maxHealth or 1, 0, 1)
+                            local hpColor = Color3.fromHSV(hpPercent * 0.3, 1, 1)
+
+                            esp.HpBg.From = Vector2.new(pos.X - boxSize.X / 2 - 8, pos.Y - boxSize.Y / 2)
+                            esp.HpBg.To = Vector2.new(pos.X - boxSize.X / 2 - 8, pos.Y + boxSize.Y / 2)
+                            esp.HpBg.Visible = true
+
+                            esp.HpVal.From = Vector2.new(pos.X - boxSize.X / 2 - 8, pos.Y + boxSize.Y / 2)
+                            esp.HpVal.To = Vector2.new(pos.X - boxSize.X / 2 - 8, pos.Y + boxSize.Y / 2 - (boxSize.Y * hpPercent))
+                            esp.HpVal.Color = hpColor
+                            esp.HpVal.Visible = true
+                        else
+                            esp.HpBg.Visible = false; esp.HpVal.Visible = false
                         end
-                    else esp.WeakCirc.Visible = false; esp.WeakTxt.Visible = false end
 
-                    if Modules.Tracers then esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); esp.Tracer.To = Vector2.new(pos.X, pos.Y); esp.Tracer.Visible = true else esp.Tracer.Visible = false end
+                        if Modules.WeakSpot then
+                            local wPos, wOnScreen = Camera:WorldToViewportPoint(weakSpotPos)
+                            if wOnScreen then
+                                esp.WeakCirc.Position = Vector2.new(wPos.X, wPos.Y); esp.WeakCirc.Visible = true
+                                esp.WeakTxt.Position = Vector2.new(wPos.X, wPos.Y - 25); esp.WeakTxt.Visible = true
+                            end
+                        else esp.WeakCirc.Visible = false; esp.WeakTxt.Visible = false end
+
+                        if Modules.Tracers then esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); esp.Tracer.To = Vector2.new(pos.X, pos.Y); esp.Tracer.Visible = true else esp.Tracer.Visible = false end
+                    else
+                        hidePlayerEsp(plr)
+                    end
                 else
                     hidePlayerEsp(plr)
                 end
-            else
-                hidePlayerEsp(plr)
             end
-        end
+        end)
     end
 
-    -- ОБНОВЛЕНИЕ ПАНЕЛИ ИНФЫ: Работает ТОЛЬКО после удара (10 секунд)
-    if LastHitPlayer and (tick() - LastHitTime < 10) then
-        local car, carRoot, engine = getCarData(LastHitPlayer)
-        -- Если корень существует в мире, машина еще жива
-        if carRoot and carRoot:IsDescendantOf(workspace) then
-            local currentHealth, maxHealth = getCarHealth(car)
-            local _, advice = getWeakSpotData(carRoot, engine)
-            updateTargetInfoPanel(LastHitPlayer, advice, currentHealth, maxHealth)
-        else
-            -- Если машина пропала (взорвалась) - прячем панель
-            targetInfoFrame.Visible = false
-        end
+    -- Обновляем панель GUI (Только если выбран режим GUI)
+    if Modules.HealthDisplay and HealthConfig.Style == "GUI" and bestTarget then
+        pcall(function()
+            local car, carRoot, engine = getCarData(bestTarget)
+            if carRoot and carRoot:IsDescendantOf(workspace) then
+                local currentHealth, maxHealth = getCarHealth(car)
+                local _, advice = getWeakSpotData(carRoot, engine)
+                updateTargetInfoPanel(bestTarget, advice, currentHealth, maxHealth)
+            else
+                targetInfoFrame.Visible = false
+            end
+        end)
     else
         targetInfoFrame.Visible = false
         CurrentTargetPlr = nil
