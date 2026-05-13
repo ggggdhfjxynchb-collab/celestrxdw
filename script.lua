@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -64,19 +65,13 @@ local function closeAllRightPanels()
 end
 
 -- === 4. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
-local Modules = { AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, Nametags = false, CustomSky = false, HitParticles = false, HitSound = false }
+local Modules = { AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, HitParticles = false, HitSound = false, CustomSky = false, Scope = false }
 local TargetMode = "None" 
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
-local SoundConfig = { Id = "rbxassetid://8111055570" } -- Metal Clank default
-local SkyConfig = { Id = "rbxassetid://159454299" } -- Galaxy default
-local PreviousHealths = {}
-local OriginalSky = nil
-
-local function updateTheme(color1, color2)
-    local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
-    mainBgGradient.Color = newGrad; sideGrad.Color = newGrad; pGrad1.Color = newGrad; pGrad2.Color = newGrad; pGrad3.Color = newGrad; pGrad4.Color = newGrad
-end
+local SoundConfig = { Id = "rbxassetid://8111055570" }
+local SkyConfig = { Id = "rbxassetid://159454299" }
+local PreviousVelocities = {}
 
 -- === 5. ФУНКЦИИ GUI ===
 local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
@@ -119,7 +114,7 @@ local function createTab(title, page, y)
 end
 createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
 
--- НАСТРОЙКИ ПАНЕЛЕЙ (ПКМ)
+-- НАСТРОЙКИ ПАНЕЛЕЙ
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
@@ -131,26 +126,24 @@ local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
 -- === 6. КНОПКИ ОСНОВНОГО МЕНЮ ===
-createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепортирует вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
+createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепорт вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
 
-createModuleButton(visualPage, "Weak Spot ESP (Авто-Цель)", "Показывает КУДА БИТЬ чтобы взорвать тачку", function(state) Modules.WeakSpot = state end)
+createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана (бока/капот)", function(state) Modules.WeakSpot = state end)
 createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
 createModuleButton(visualPage, "Tracers", "Рисует линии до уязвимых точек", function(state) Modules.Tracers = state end)
 createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
-createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Вкл звук удара | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
+createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
 createModuleButton(visualPage, "Custom Skybox", "ЛКМ: Изменить небо | ПКМ: Выбрать", function(state) 
     Modules.CustomSky = state
     if state then
-        OriginalSky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
         local newSky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", Lighting)
         newSky.SkyboxBk = SkyConfig.Id; newSky.SkyboxDn = SkyConfig.Id; newSky.SkyboxFt = SkyConfig.Id; newSky.SkyboxLf = SkyConfig.Id; newSky.SkyboxRt = SkyConfig.Id; newSky.SkyboxUp = SkyConfig.Id
     else
-        local current = Lighting:FindFirstChildOfClass("Sky")
-        if current then current:Destroy() end
+        local current = Lighting:FindFirstChildOfClass("Sky"); if current then current:Destroy() end
     end
 end, function() closeAllRightPanels(); SkyRightPanel.Visible = true end)
 
-createModuleButton(visualPage, "Target Config", "ПКМ: Настроить сканер машин", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
+createModuleButton(visualPage, "Target Config", "ПКМ: Настроить авто-цель", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
 -- Перетаскивание
 local dragging, dragInput, dragStart, startPos
@@ -159,7 +152,7 @@ mainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.Us
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart; mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end end)
 
--- === 7. ЯДРО ЧИТА (УМНЫЙ СКАНЕР WEAK SPOT) ===
+-- === 7. ЯДРО ЧИТА (АЛГОРИТМ УЯЗВИМОСТИ И ЗВУКИ) ===
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
@@ -187,31 +180,37 @@ Players.PlayerAdded:Connect(createEspForPlayer)
 Players.PlayerRemoving:Connect(function(plr)
     if EspObjects[plr] then 
         pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end)
-        EspObjects[plr] = nil; PreviousHealths[plr] = nil
+        EspObjects[plr] = nil; PreviousVelocities[plr] = nil
     end
 end)
 
--- НОВЫЙ АЛГОРИТМ ПОИСКА УЯЗВИМОСТИ (WEAK SPOT)
-local function getWeakSpot(plr)
+-- НОВЫЙ АЛГОРИТМ: ВЫЧИСЛЕНИЕ ЛУЧШЕЙ ТОЧКИ ДЛЯ ТАРАНА (T-BONE)
+local function getWeakSpotCFrame(plr)
     if not plr.Character then return nil end
     local hum = plr.Character:FindFirstChild("Humanoid")
     if hum and hum.SeatPart then
         local car = hum.SeatPart:FindFirstAncestorOfClass("Model")
-        if car then
-            -- 1. Ищем деталь мотора по именам
-            local engine = car:FindFirstChild("Engine", true) or car:FindFirstChild("Core", true) or car:FindFirstChild("Motor", true)
-            if engine and engine:IsA("BasePart") then return engine.Position end
+        local rootPart = hum.SeatPart
+        if car and car.PrimaryPart then rootPart = car.PrimaryPart end
+        
+        if rootPart then
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return rootPart.Position end
             
-            -- 2. Если мотор скрыт, вычисляем капот (спереди от сиденья)
-            local seat = hum.SeatPart
-            local hoodPosition = seat.CFrame.Position + (seat.CFrame.LookVector * 5)
-            return hoodPosition
+            -- Вычисляем, какая сторона машины врага к нам ближе (левая или правая)
+            local toEnemy = (rootPart.Position - myRoot.Position).Unit
+            local rightVec = rootPart.CFrame.RightVector
+            local dot = toEnemy:Dot(rightVec)
+            
+            -- Если dot > 0, мы смотрим на левый бок. Если < 0, на правый.
+            -- Смещаем прицел на 5 стадов в бок, чтобы бить точно в двери (T-Bone урон максимальный)
+            local sideMultiplier = (dot > 0) and -1 or 1
+            local weakSpotPos = rootPart.Position + (rightVec * (5 * sideMultiplier))
+            
+            return weakSpotPos, rootPart
         end
     end
-    -- Если не в тачке, просто целимся в тело
-    local root = plr.Character:FindFirstChild("HumanoidRootPart")
-    if root then return root.Position end
-    return nil
+    return nil, nil
 end
 
 local function spawnHitParticle(targetPos)
@@ -220,13 +219,13 @@ local function spawnHitParticle(targetPos)
     task.delay(0.5, function() pe.Enabled = false end); Debris:AddItem(part, 2)
 end
 
+-- ИСПРАВЛЕННЫЙ ЗВУК: Играет через SoundService, чтобы было слышно всегда
 local function playHitSound()
     local snd = Instance.new("Sound")
     snd.SoundId = SoundConfig.Id
-    snd.Volume = 2
-    snd.Parent = workspace
-    snd:Play()
-    Debris:AddItem(snd, 3)
+    snd.Volume = 3
+    SoundService:PlayLocalSound(snd) -- 100% локальное воспроизведение!
+    snd:Destroy()
 end
 
 local function isPlayerTarget(plr)
@@ -254,22 +253,24 @@ RunService.RenderStepped:Connect(function()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
-        local weakSpotPos = getWeakSpot(plr)
-        local eChar = plr.Character
-        local eHum = eChar and eChar:FindFirstChild("Humanoid")
+        local weakSpotPos, carRoot = getWeakSpotCFrame(plr)
         
-        if weakSpotPos and eHum and eHum.Health > 0 then
+        -- ДЕТЕКТОР УДАРА МАШИНЫ (Через резкое изменение скорости)
+        if carRoot then
+            local currentVel = carRoot.AssemblyLinearVelocity.Magnitude
+            local oldVel = PreviousVelocities[plr] or currentVel
             
-            -- HIT DETECTION (Партиклы + Звуки)
-            local oldHp = PreviousHealths[plr] or eHum.MaxHealth
-            if eHum.Health < oldHp then 
+            -- Если скорость машины резко упала более чем на 40 стадов/сек (жесткий удар)
+            if oldVel - currentVel > 40 then
                 if Modules.HitParticles then spawnHitParticle(weakSpotPos) end
                 if Modules.HitSound then playHitSound() end
             end
-            PreviousHealths[plr] = eHum.Health
+            PreviousVelocities[plr] = currentVel
+        end
 
-            local esp = EspObjects[plr]
-            if esp then
+        local esp = EspObjects[plr]
+        if esp then
+            if weakSpotPos and carRoot and isPlayerTarget(plr) then
                 local pos, onScreen = Camera:WorldToViewportPoint(weakSpotPos)
                 
                 if onScreen then
@@ -314,10 +315,9 @@ RunService.RenderStepped:Connect(function()
                 else
                     esp.Box.Visible = false; esp.Nametag.Visible = false; esp.Tracer.Visible = false; esp.WeakCirc.Visible = false; esp.WeakTxt.Visible = false
                 end
-            end
-        else
-            if EspObjects[plr] then
-                EspObjects[plr].Box.Visible = false; EspObjects[plr].Nametag.Visible = false; EspObjects[plr].Tracer.Visible = false; EspObjects[plr].WeakCirc.Visible = false; EspObjects[plr].WeakTxt.Visible = false
+            else
+                -- Если не цель или не в машине
+                esp.Box.Visible = false; esp.Nametag.Visible = false; esp.Tracer.Visible = false; esp.WeakCirc.Visible = false; esp.WeakTxt.Visible = false
             end
         end
     end
