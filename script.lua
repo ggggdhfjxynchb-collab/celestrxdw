@@ -67,7 +67,6 @@ targetName.Size = UDim2.new(0, 150, 0, 25); targetName.Position = UDim2.new(0, 9
 local targetAdvice = Instance.new("TextLabel")
 targetAdvice.Size = UDim2.new(0, 150, 0, 20); targetAdvice.Position = UDim2.new(0, 90, 0, 40); targetAdvice.BackgroundTransparency = 1; targetAdvice.Text = "Анализ..."; targetAdvice.TextColor3 = Color3.fromRGB(0, 255, 255); targetAdvice.Font = Enum.Font.Gotham; targetAdvice.TextSize = 12; targetAdvice.TextXAlignment = Enum.TextXAlignment.Left; targetAdvice.ZIndex = 11; targetAdvice.Parent = targetInfoFrame
 
--- ПОЛОСКА ЗДОРОВЬЯ МАШИНЫ
 local hpBg = Instance.new("Frame")
 hpBg.Size = UDim2.new(0, 140, 0, 14); hpBg.Position = UDim2.new(0, 90, 0, 65); hpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40); hpBg.BorderSizePixel = 0; hpBg.ZIndex = 11; hpBg.Parent = targetInfoFrame
 Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 4)
@@ -103,11 +102,10 @@ local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxasse
 local SoundConfig = { Id = "rbxassetid://130972023" } 
 local PreviousVelocities = {}
 
--- ПЕРЕМЕННЫЕ ДЛЯ ФАЙТА И АНАЛИЗАТОРА ХП
 local LastHitPlayer = nil
 local LastHitTime = 0
 local CurrentTargetPlr = nil
-local CarMaxPartsCache = {} -- Кэш начального количества деталей машин для вычисления ХП
+local CarMaxPartsCache = {}
 
 local function updateTheme(color1, color2)
     local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
@@ -155,7 +153,6 @@ local function createTab(title, page, y)
 end
 createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
 
--- НАСТРОЙКИ ПАНЕЛЕЙ
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
@@ -220,7 +217,6 @@ Players.PlayerRemoving:Connect(function(plr)
     if EspObjects[plr] then pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end); EspObjects[plr] = nil; PreviousVelocities[plr] = nil end
 end)
 
--- ФУНКЦИИ АНАЛИЗА МАШИНЫ
 local function getCarData(plr)
     if not plr.Character then return nil, nil, nil end
     local hum = plr.Character:FindFirstChild("Humanoid")
@@ -250,11 +246,9 @@ local function getSafePosition(obj)
     return nil
 end
 
--- АЛГОРИТМ ЗДОРОВЬЯ МАШИНЫ (Считаем по деталям или переменным)
 local function getCarHealth(carModel)
     if not carModel then return 100, 100 end
     
-    -- Ищем встроенные переменные
     for _, v in pairs(carModel:GetDescendants()) do
         if v:IsA("NumberValue") or v:IsA("IntValue") then
             local name = string.lower(v.Name)
@@ -265,7 +259,6 @@ local function getCarHealth(carModel)
         end
     end
     
-    -- Если переменных нет, считаем отвалившиеся детали машины
     local currentParts = 0
     for _, p in pairs(carModel:GetDescendants()) do
         if p:IsA("BasePart") then currentParts = currentParts + 1 end
@@ -306,7 +299,6 @@ local function getWeakSpotData(carRoot, enginePart)
     return weakSpotPos, advice
 end
 
--- ОБНОВЛЕНИЕ ПАНЕЛИ
 local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     if not Modules.TargetInfo then targetInfoFrame.Visible = false; return end
     targetInfoFrame.Visible = true
@@ -322,7 +314,6 @@ local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     
     targetAdvice.Text = "Анализ ИИ: " .. advice
     
-    -- ОБНОВЛЕНИЕ ПОЛОСКИ ХП МАШИНЫ
     local hpPercent = 1
     if maxHealth and maxHealth > 0 then
         hpPercent = math.clamp(health / maxHealth, 0, 1)
@@ -389,16 +380,15 @@ RunService.RenderStepped:Connect(function()
         if carRoot and esp then
             local isT = isPlayerTarget(plr)
             
-            -- Детектор столкновения
-            local currentVel = carRoot.AssemblyLinearVelocity.Magnitude
+            -- ИСПРАВЛЕННЫЙ ВЕКТОРНЫЙ ДЕТЕКТОР УДАРА (МОМЕНТАЛЬНО РАБОТАЕТ ПРИ T-BONE)
+            local currentVel = carRoot.AssemblyLinearVelocity
             local oldVel = PreviousVelocities[plr] or currentVel
-            local velChange = math.abs(oldVel - currentVel)
+            local velChange = (oldVel - currentVel).Magnitude
 
-            if velChange > 30 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 50 then
+            if velChange > 20 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 60 then
                 if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
                 if Modules.HitSound then playHitSound() end
                 
-                -- Захват цели при ударе
                 LastHitPlayer = plr
                 LastHitTime = tick()
             end
@@ -438,7 +428,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ОБНОВЛЕНИЕ ПАНЕЛИ ИНФЫ
     if LastHitPlayer and (tick() - LastHitTime < 10) then
         local car, carRoot, engine = getCarData(LastHitPlayer)
         if carRoot then
