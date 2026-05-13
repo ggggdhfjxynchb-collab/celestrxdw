@@ -8,15 +8,20 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- === 1. БЕЗОПАСНАЯ ОЧИСТКА ===
+-- === 1. БЕЗОПАСНАЯ И СКРЫТАЯ ЗАГРУЗКА GUI ===
+local targetParent = nil
+pcall(function() targetParent = gethui() end)
+if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
+if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
+
 pcall(function()
-    local oldGui = PlayerGui:FindFirstChild("DuckKlientGui")
+    local oldGui = targetParent:FindFirstChild("DuckKlientGui")
     if oldGui then oldGui:Destroy() end
 end)
 
 -- === 2. СОЗДАНИЕ ГЛАВНОГО GUI ===
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DuckKlientGui"; screenGui.ResetOnSpawn = false; screenGui.Parent = PlayerGui
+screenGui.Name = "DuckKlientGui"; screenGui.ResetOnSpawn = false; screenGui.Parent = targetParent
 
 local MainGradientScheme = ColorSequence.new({
     ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 170, 255)),
@@ -77,7 +82,7 @@ Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 4)
 local hpText = Instance.new("TextLabel")
 hpText.Size = UDim2.new(1, 0, 1, 0); hpText.BackgroundTransparency = 1; hpText.Text = "100%"; hpText.TextColor3 = Color3.fromRGB(255, 255, 255); hpText.Font = Enum.Font.GothamBold; hpText.TextSize = 10; hpText.ZIndex = 13; hpText.Parent = hpBg
 
--- === 4. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (ДРАГГЕР) ===
+-- === 4. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ ===
 local function makeDraggable(gui)
     local dragging, dragInput, dragStart, startPos
     gui.InputBegan:Connect(function(input)
@@ -99,11 +104,9 @@ local function makeDraggable(gui)
     end)
 end
 
--- Делаем окна перетаскиваемыми
 makeDraggable(mainFrame)
 makeDraggable(targetInfoFrame)
 
--- Открытие/Закрытие меню на правую скобку "]"
 UserInputService.InputBegan:Connect(function(input, gp) 
     if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end 
 end)
@@ -125,7 +128,7 @@ local function closeAllRightPanels()
 end
 
 -- === 6. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
-local Modules = { TargetInfo = false, AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
+local Modules = { TargetInfo = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
 local TargetMode = "All" 
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
@@ -136,11 +139,6 @@ local LastHitPlayer = nil
 local LastHitTime = 0
 local CurrentTargetPlr = nil
 local CarMaxPartsCache = {}
-
-local function updateTheme(color1, color2)
-    local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
-    mainBgGradient.Color = newGrad; sideGrad.Color = newGrad; pGrad1.Color = newGrad; pGrad2.Color = newGrad; pGrad4.Color = newGrad; tiGrad.Color = newGrad
-end
 
 -- === 7. ФУНКЦИИ КНОПОК GUI ===
 local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
@@ -196,19 +194,17 @@ createDropdown(TargetRightPanel, "Кого бить", 40, {{Name = "Никто",
 local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0, 0, 30); TargetInput.Position = UDim2.new(0.05, 0, 0, 80); TargetInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30); TargetInput.Text = "Ник (если выбран)"; TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200); TargetInput.Font = Enum.Font.Gotham; TargetInput.TextSize = 12; TargetInput.ZIndex = 13; TargetInput.ClearTextOnFocus = true; TargetInput.Parent = TargetRightPanel; Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
--- === 7. КНОПКИ ОСНОВНОГО МЕНЮ ===
+-- === 8. КНОПКИ ОСНОВНОГО МЕНЮ ===
 createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает ХП машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
 createModuleButton(visualPage, "Engine Chams", "Свечение самого мотора сквозь машину", function(state) Modules.EngineChams = state end)
 createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана", function(state) Modules.WeakSpot = state end)
 createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
 createModuleButton(visualPage, "Tracers", "Рисует линии до уязвимых точек", function(state) Modules.Tracers = state end)
-
 createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
 createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
-
 createModuleButton(visualPage, "Target Config", "ПКМ: Настроить авто-цель", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
--- === 8. ЯДРО ЧИТА (ЕСП, АНАЛИЗАТОР ХП И Т.Д.) ===
+-- === 9. ЯДРО ЧИТА ===
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
@@ -267,6 +263,13 @@ local function getSafePosition(obj)
     return nil
 end
 
+-- АНТИ-ПРИЗРАК ФИЛЬТР (Не цепляем машины в сейф-зоне)
+local function isGhostMode(carRoot)
+    if not carRoot then return true end
+    if carRoot.Transparency > 0.4 then return true end
+    return false
+end
+
 local function getCarHealth(carModel)
     if not carModel then return 100, 100 end
     
@@ -282,9 +285,7 @@ local function getCarHealth(carModel)
     
     local currentParts = 0
     for _, p in pairs(carModel:GetDescendants()) do
-        if p:IsA("BasePart") and p.Transparency < 1 then 
-            currentParts = currentParts + 1 
-        end
+        if p:IsA("BasePart") and p.Transparency < 1 then currentParts = currentParts + 1 end
     end
     
     if not CarMaxPartsCache[carModel] or currentParts > CarMaxPartsCache[carModel] then
@@ -345,13 +346,9 @@ local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     hpFill.Size = UDim2.new(hpPercent, 0, 1, 0)
     hpText.Text = "CAR HEALTH: " .. math.floor(hpPercent * 100) .. "%"
     
-    if hpPercent > 0.6 then
-        hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    elseif hpPercent > 0.3 then
-        hpFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-    else
-        hpFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    end
+    if hpPercent > 0.6 then hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    elseif hpPercent > 0.3 then hpFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
+    else hpFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0) end
 end
 
 local function spawnHitParticle(targetPos)
@@ -377,14 +374,18 @@ local function isPlayerTarget(plr)
     return false
 end
 
+-- === ОБНОВЛЕНИЕ КАЖДЫЙ КАДР ===
 RunService.RenderStepped:Connect(function()
-    if Modules.AutoEscape and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local myRoot = LocalPlayer.Character.HumanoidRootPart
-        myRoot.CFrame = CFrame.new(myRoot.Position.X, 1500, myRoot.Position.Z)
-        myRoot.AssemblyLinearVelocity = Vector3.zero
+    local myCar, myCarRoot, _ = getCarData(LocalPlayer)
+    
+    -- Вычисляем изменение ТВОЕЙ скорости для точного детекта удара
+    local myVelChange = 0
+    if myCarRoot then
+        local myCurrentVel = myCarRoot.AssemblyLinearVelocity
+        local myOldVel = PreviousVelocities[LocalPlayer] or myCurrentVel
+        myVelChange = (myOldVel - myCurrentVel).Magnitude
+        PreviousVelocities[LocalPlayer] = myCurrentVel
     end
-
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
@@ -402,20 +403,23 @@ RunService.RenderStepped:Connect(function()
         if carRoot and esp then
             local isT = isPlayerTarget(plr)
             
-            local currentVel = carRoot.AssemblyLinearVelocity.Magnitude
+            local currentVel = carRoot.AssemblyLinearVelocity
             local oldVel = PreviousVelocities[plr] or currentVel
-            local velChange = math.abs(oldVel - currentVel)
-
-            if velChange > 20 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 60 then
-                if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
-                if Modules.HitSound then playHitSound() end
-                
-                LastHitPlayer = plr
-                LastHitTime = tick()
+            local velChange = (oldVel - currentVel).Magnitude
+            
+            -- ДВОЙНОЙ ДЕТЕКТОР: Проверяем, что скорость изменилась и у врага, И У НАС, и мы не в сейф зоне
+            if velChange > 15 and myVelChange > 15 and myCarRoot and (myCarRoot.Position - carRoot.Position).Magnitude < 25 then
+                if not isGhostMode(carRoot) then
+                    if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
+                    if Modules.HitSound then playHitSound() end
+                    
+                    LastHitPlayer = plr
+                    LastHitTime = tick()
+                end
             end
             PreviousVelocities[plr] = currentVel
             
-            if isT then
+            if isT and not isGhostMode(carRoot) then
                 local weakSpotPos, aiAdvice = getWeakSpotData(carRoot, engine)
                 local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
                 
