@@ -67,8 +67,17 @@ targetName.Size = UDim2.new(0, 150, 0, 25); targetName.Position = UDim2.new(0, 9
 local targetAdvice = Instance.new("TextLabel")
 targetAdvice.Size = UDim2.new(0, 150, 0, 20); targetAdvice.Position = UDim2.new(0, 90, 0, 40); targetAdvice.BackgroundTransparency = 1; targetAdvice.Text = "Анализ..."; targetAdvice.TextColor3 = Color3.fromRGB(0, 255, 255); targetAdvice.Font = Enum.Font.Gotham; targetAdvice.TextSize = 12; targetAdvice.TextXAlignment = Enum.TextXAlignment.Left; targetAdvice.ZIndex = 11; targetAdvice.Parent = targetInfoFrame
 
-local targetHits = Instance.new("TextLabel")
-targetHits.Size = UDim2.new(0, 150, 0, 20); targetHits.Position = UDim2.new(0, 90, 0, 60); targetHits.BackgroundTransparency = 1; targetHits.Text = "Осталось ударов: ?"; targetHits.TextColor3 = Color3.fromRGB(255, 100, 100); targetHits.Font = Enum.Font.GothamBold; targetHits.TextSize = 12; targetHits.TextXAlignment = Enum.TextXAlignment.Left; targetHits.ZIndex = 11; targetHits.Parent = targetInfoFrame
+-- ПОЛОСКА ЗДОРОВЬЯ МАШИНЫ
+local hpBg = Instance.new("Frame")
+hpBg.Size = UDim2.new(0, 140, 0, 14); hpBg.Position = UDim2.new(0, 90, 0, 65); hpBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40); hpBg.BorderSizePixel = 0; hpBg.ZIndex = 11; hpBg.Parent = targetInfoFrame
+Instance.new("UICorner", hpBg).CornerRadius = UDim.new(0, 4)
+
+local hpFill = Instance.new("Frame")
+hpFill.Size = UDim2.new(1, 0, 1, 0); hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0); hpFill.BorderSizePixel = 0; hpFill.ZIndex = 12; hpFill.Parent = hpBg
+Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 4)
+
+local hpText = Instance.new("TextLabel")
+hpText.Size = UDim2.new(1, 0, 1, 0); hpText.BackgroundTransparency = 1; hpText.Text = "100%"; hpText.TextColor3 = Color3.fromRGB(255, 255, 255); hpText.Font = Enum.Font.GothamBold; hpText.TextSize = 10; hpText.ZIndex = 13; hpText.Parent = hpBg
 
 -- === 4. ПАНЕЛИ НАСТРОЕК СПРАВА ===
 local function createRightPanel(name, height)
@@ -93,7 +102,12 @@ local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
 local SoundConfig = { Id = "rbxassetid://130972023" } 
 local PreviousVelocities = {}
+
+-- ПЕРЕМЕННЫЕ ДЛЯ ФАЙТА И АНАЛИЗАТОРА ХП
+local LastHitPlayer = nil
+local LastHitTime = 0
 local CurrentTargetPlr = nil
+local CarMaxPartsCache = {} -- Кэш начального количества деталей машин для вычисления ХП
 
 local function updateTheme(color1, color2)
     local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
@@ -158,7 +172,7 @@ TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetI
 -- === 7. КНОПКИ ОСНОВНОГО МЕНЮ ===
 createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепорт вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
 
-createModuleButton(visualPage, "Target Info (AI Panel)", "Панель с инфой и анализом цели", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
+createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает инфу машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
 createModuleButton(visualPage, "Engine Chams", "Свечение самого мотора сквозь машину", function(state) Modules.EngineChams = state end)
 createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана", function(state) Modules.WeakSpot = state end)
 createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
@@ -166,7 +180,8 @@ createModuleButton(visualPage, "Tracers", "Рисует линии до уязв
 
 createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
 createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
-createModuleButton(visualPage, "Target Config", "ПКМ: Настроить сканер машин", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
+
+createModuleButton(visualPage, "Target Config", "ПКМ: Настроить авто-цель", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
 -- Перетаскивание меню
 local dragging, dragInput, dragStart, startPos
@@ -201,9 +216,11 @@ Players.PlayerAdded:Connect(createEspForPlayer)
 
 Players.PlayerRemoving:Connect(function(plr)
     if CurrentTargetPlr == plr then CurrentTargetPlr = nil; targetInfoFrame.Visible = false end
+    if LastHitPlayer == plr then LastHitPlayer = nil end
     if EspObjects[plr] then pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end); EspObjects[plr] = nil; PreviousVelocities[plr] = nil end
 end)
 
+-- ФУНКЦИИ АНАЛИЗА МАШИНЫ
 local function getCarData(plr)
     if not plr.Character then return nil, nil, nil end
     local hum = plr.Character:FindFirstChild("Humanoid")
@@ -217,7 +234,6 @@ local function getCarData(plr)
     return nil, nil, nil
 end
 
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ (ПОЛУЧЕНИЕ КООРДИНАТ ДЛЯ ЛЮБОГО ОБЪЕКТА)
 local function getSafePosition(obj)
     if not obj then return nil end
     if obj:IsA("BasePart") then return obj.Position end
@@ -234,7 +250,34 @@ local function getSafePosition(obj)
     return nil
 end
 
--- ИИ АНАЛИЗАТОР БРОНИ И УЯЗВИМОСТЕЙ
+-- АЛГОРИТМ ЗДОРОВЬЯ МАШИНЫ (Считаем по деталям или переменным)
+local function getCarHealth(carModel)
+    if not carModel then return 100, 100 end
+    
+    -- Ищем встроенные переменные
+    for _, v in pairs(carModel:GetDescendants()) do
+        if v:IsA("NumberValue") or v:IsA("IntValue") then
+            local name = string.lower(v.Name)
+            if name == "health" or name == "corehealth" then
+                local maxV = carModel:FindFirstChild("MaxHealth", true)
+                return v.Value, (maxV and maxV.Value) or 100
+            end
+        end
+    end
+    
+    -- Если переменных нет, считаем отвалившиеся детали машины
+    local currentParts = 0
+    for _, p in pairs(carModel:GetDescendants()) do
+        if p:IsA("BasePart") then currentParts = currentParts + 1 end
+    end
+    
+    if not CarMaxPartsCache[carModel] or currentParts > CarMaxPartsCache[carModel] then
+        CarMaxPartsCache[carModel] = currentParts
+    end
+    
+    return currentParts, CarMaxPartsCache[carModel]
+end
+
 local function getWeakSpotData(carRoot, enginePart)
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return carRoot.Position, "Нет данных" end
@@ -263,7 +306,8 @@ local function getWeakSpotData(carRoot, enginePart)
     return weakSpotPos, advice
 end
 
-local function updateTargetInfoPanel(plr, advice, health)
+-- ОБНОВЛЕНИЕ ПАНЕЛИ
+local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     if not Modules.TargetInfo then targetInfoFrame.Visible = false; return end
     targetInfoFrame.Visible = true
     
@@ -277,9 +321,23 @@ local function updateTargetInfoPanel(plr, advice, health)
     end
     
     targetAdvice.Text = "Анализ ИИ: " .. advice
-    local hitsLeft = math.ceil(health / 25)
-    if hitsLeft < 1 then hitsLeft = 1 end
-    targetHits.Text = "До взрыва мотора: ~" .. tostring(hitsLeft) .. " уд."
+    
+    -- ОБНОВЛЕНИЕ ПОЛОСКИ ХП МАШИНЫ
+    local hpPercent = 1
+    if maxHealth and maxHealth > 0 then
+        hpPercent = math.clamp(health / maxHealth, 0, 1)
+    end
+    
+    hpFill.Size = UDim2.new(hpPercent, 0, 1, 0)
+    hpText.Text = "CAR HEALTH: " .. math.floor(hpPercent * 100) .. "%"
+    
+    if hpPercent > 0.6 then
+        hpFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    elseif hpPercent > 0.3 then
+        hpFill.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
+    else
+        hpFill.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    end
 end
 
 local function spawnHitParticle(targetPos)
@@ -313,18 +371,14 @@ RunService.RenderStepped:Connect(function()
         myRoot.AssemblyLinearVelocity = Vector3.zero
     end
 
-    local bestTarget = nil
-    local shortestDistToCenter = math.huge
-    local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
         local car, carRoot, engine = getCarData(plr)
         local esp = EspObjects[plr]
-        local eHum = plr.Character and plr.Character:FindFirstChild("Humanoid")
         
-        -- ИСПРАВЛЕННАЯ ПОДСВЕТКА МОТОРА (Без крашей)
         if Modules.EngineChams and engine and (engine:IsA("BasePart") or engine:IsA("Model") or engine:IsA("Folder")) then
             local hl = engine:FindFirstChild("Duck_EngineChams")
             if not hl then hl = Instance.new("Highlight"); hl.Name = "Duck_EngineChams"; hl.FillColor = Color3.fromRGB(0, 255, 255); hl.OutlineColor = Color3.fromRGB(255, 255, 255); hl.FillTransparency = 0.2; hl.OutlineTransparency = 0; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent = engine end
@@ -332,15 +386,21 @@ RunService.RenderStepped:Connect(function()
             if engine and engine:FindFirstChild("Duck_EngineChams") then engine.Duck_EngineChams:Destroy() end
         end
         
-        if carRoot and esp and eHum then
+        if carRoot and esp then
             local isT = isPlayerTarget(plr)
             
             -- Детектор столкновения
             local currentVel = carRoot.AssemblyLinearVelocity.Magnitude
             local oldVel = PreviousVelocities[plr] or currentVel
-            if oldVel - currentVel > 40 then
+            local velChange = math.abs(oldVel - currentVel)
+
+            if velChange > 30 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 50 then
                 if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
                 if Modules.HitSound then playHitSound() end
+                
+                -- Захват цели при ударе
+                LastHitPlayer = plr
+                LastHitTime = tick()
             end
             PreviousVelocities[plr] = currentVel
             
@@ -349,13 +409,6 @@ RunService.RenderStepped:Connect(function()
                 local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
                 
                 if onScreen then
-                    -- Радар (Выбор цели для инфо-панели)
-                    local distToCenter = (Vector2.new(pos.X, pos.Y) - centerScreen).Magnitude
-                    if distToCenter < shortestDistToCenter then
-                        shortestDistToCenter = distToCenter
-                        bestTarget = plr
-                    end
-
                     if Modules.EngineEsp then
                         local distToMe = (carRoot.Position - Camera.CFrame.Position).Magnitude
                         local scaleFactor = 1000 / distToMe
@@ -385,12 +438,15 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ОБНОВЛЕНИЕ ПАНЕЛИ ИНФЫ: Работает для цели в прицеле
-    if bestTarget and bestTarget.Character and bestTarget.Character:FindFirstChild("Humanoid") then
-        local car, carRoot, engine = getCarData(bestTarget)
+    -- ОБНОВЛЕНИЕ ПАНЕЛИ ИНФЫ
+    if LastHitPlayer and (tick() - LastHitTime < 10) then
+        local car, carRoot, engine = getCarData(LastHitPlayer)
         if carRoot then
+            local currentHealth, maxHealth = getCarHealth(car)
             local _, advice = getWeakSpotData(carRoot, engine)
-            updateTargetInfoPanel(bestTarget, advice, bestTarget.Character.Humanoid.Health)
+            updateTargetInfoPanel(LastHitPlayer, advice, currentHealth, maxHealth)
+        else
+            targetInfoFrame.Visible = false
         end
     else
         targetInfoFrame.Visible = false
