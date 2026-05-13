@@ -47,7 +47,6 @@ titleLabel.Size = UDim2.new(1, -45, 0, 50); titleLabel.Position = UDim2.new(0, 4
 local contentFrame = Instance.new("Frame")
 contentFrame.Name = "Duck_Content"; contentFrame.Size = UDim2.new(1, -170, 1, -20); contentFrame.Position = UDim2.new(0, 160, 0, 10); contentFrame.BackgroundTransparency = 1; contentFrame.ZIndex = 11; contentFrame.Parent = mainFrame
 
-local carPage = Instance.new("ScrollingFrame"); carPage.Name="Duck_CarPage"; carPage.Size = UDim2.new(1, 0, 1, 0); carPage.BackgroundTransparency = 1; carPage.ScrollBarThickness = 2; carPage.Visible = false; carPage.Parent = contentFrame; Instance.new("UIListLayout", carPage).Padding = UDim.new(0, 10)
 local visualPage = Instance.new("ScrollingFrame"); visualPage.Name="Duck_VisPage"; visualPage.Size = UDim2.new(1, 0, 1, 0); visualPage.BackgroundTransparency = 1; visualPage.ScrollBarThickness = 2; visualPage.Visible = true; visualPage.Parent = contentFrame; Instance.new("UIListLayout", visualPage).Padding = UDim.new(0, 10)
 
 -- === 3. TARGET INFO ПАНЕЛЬ ===
@@ -78,7 +77,38 @@ Instance.new("UICorner", hpFill).CornerRadius = UDim.new(0, 4)
 local hpText = Instance.new("TextLabel")
 hpText.Size = UDim2.new(1, 0, 1, 0); hpText.BackgroundTransparency = 1; hpText.Text = "100%"; hpText.TextColor3 = Color3.fromRGB(255, 255, 255); hpText.Font = Enum.Font.GothamBold; hpText.TextSize = 10; hpText.ZIndex = 13; hpText.Parent = hpBg
 
--- === 4. ПАНЕЛИ НАСТРОЕК СПРАВА ===
+-- === 4. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (ДРАГГЕР) ===
+local function makeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = gui.Position
+            local c; c = UserInputService.InputEnded:Connect(function(e)
+                if e.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false; c:Disconnect() end
+            end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- Делаем окна перетаскиваемыми
+makeDraggable(mainFrame)
+makeDraggable(targetInfoFrame)
+
+-- Открытие/Закрытие меню на правую скобку "]"
+UserInputService.InputBegan:Connect(function(input, gp) 
+    if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end 
+end)
+
+-- === 5. ПАНЕЛИ НАСТРОЕК СПРАВА ===
 local function createRightPanel(name, height)
     local panel = Instance.new("Frame"); panel.Name = "Duck_" .. name; panel.Size = UDim2.new(0, 200, 0, height or 220); panel.Position = UDim2.new(1, 10, 0, 0); panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25); panel.Visible = false; panel.ZIndex = 10; panel.Parent = mainFrame; Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 8)
     local go = Instance.new("Frame"); go.Size = UDim2.new(1, 0, 1, 0); go.BackgroundColor3 = Color3.fromRGB(255, 255, 255); go.BackgroundTransparency = 0.85; go.ZIndex = 10; go.Parent = panel; Instance.new("UICorner", go).CornerRadius = UDim.new(0, 8)
@@ -94,7 +124,7 @@ local function closeAllRightPanels()
     ParticlesRightPanel.Visible = false; SoundRightPanel.Visible = false; TargetRightPanel.Visible = false
 end
 
--- === 5. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
+-- === 6. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
 local Modules = { TargetInfo = false, AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
 local TargetMode = "All" 
 local TargetPlayerName = ""
@@ -112,7 +142,7 @@ local function updateTheme(color1, color2)
     mainBgGradient.Color = newGrad; sideGrad.Color = newGrad; pGrad1.Color = newGrad; pGrad2.Color = newGrad; pGrad4.Color = newGrad; tiGrad.Color = newGrad
 end
 
--- === 6. ФУНКЦИИ GUI ===
+-- === 7. ФУНКЦИИ КНОПОК GUI ===
 local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
     local mainBtn = Instance.new("TextButton"); mainBtn.Size = UDim2.new(0.9, 0, 0, 30); mainBtn.Position = UDim2.new(0.05, 0, 0, yPos); mainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); mainBtn.Text = titleText .. ": " .. options[defaultIndex].Name; mainBtn.TextColor3 = Color3.fromRGB(255, 255, 255); mainBtn.Font = Enum.Font.GothamBold; mainBtn.TextSize = 12; mainBtn.ZIndex = 14; mainBtn.Parent = parent; Instance.new("UICorner", mainBtn).CornerRadius = UDim.new(0, 6)
     local dropFrame = Instance.new("Frame"); dropFrame.Size = UDim2.new(1, 0, 0, #options * 30); dropFrame.Position = UDim2.new(0, 0, 1, 2); dropFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); dropFrame.Visible = false; dropFrame.ZIndex = 20; dropFrame.Parent = mainBtn; Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 6)
@@ -146,19 +176,19 @@ end
 local function createTab(title, page, y)
     local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -25, 0, 35); btn.Position = UDim2.new(0, 15, 0, y); btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); btn.Text = title; btn.TextColor3 = Color3.fromRGB(150, 150, 150); btn.Font = Enum.Font.GothamBold; btn.TextSize = 14; btn.ZIndex = 12; btn.Parent = sidebar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     btn.MouseButton1Click:Connect(function()
-        carPage.Visible = false; visualPage.Visible = false; page.Visible = true; closeAllRightPanels()
+        visualPage.Visible = false; page.Visible = true; closeAllRightPanels()
         for _, v in pairs(sidebar:GetChildren()) do if v:IsA("TextButton") then v.BackgroundColor3 = Color3.fromRGB(20, 20, 20); v.TextColor3 = Color3.fromRGB(150, 150, 150) end end
         btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35); btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
 end
-createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
+createTab("Visuals", visualPage, 60)
 
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
 createDropdown(SoundRightPanel, "Звук", 40, {
     {Name="Колокольчик", Value="rbxassetid://130972023"}, 
-    {Name="Глухой Удар", Value="rbxassetid://5587422004"}, 
+    {Name="Мягкий Удар", Value="rbxassetid://12222084"}, 
     {Name="Металл", Value="rbxassetid://160432334"}
 }, 1, function(v) SoundConfig.Id = v end)
 
@@ -167,9 +197,7 @@ local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
 -- === 7. КНОПКИ ОСНОВНОГО МЕНЮ ===
-createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепорт вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
-
-createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает инфу машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
+createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает ХП машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
 createModuleButton(visualPage, "Engine Chams", "Свечение самого мотора сквозь машину", function(state) Modules.EngineChams = state end)
 createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана", function(state) Modules.WeakSpot = state end)
 createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
@@ -180,14 +208,7 @@ createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе
 
 createModuleButton(visualPage, "Target Config", "ПКМ: Настроить авто-цель", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
--- Перетаскивание меню
-local dragging, dragInput, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = input.Position; startPos = mainFrame.Position; local c; c = UserInputService.InputEnded:Connect(function(e) if e.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false; c:Disconnect() end end) end end)
-mainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
-UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart; mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
-UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end end)
-
--- === 8. ЯДРО ЧИТА ===
+-- === 8. ЯДРО ЧИТА (ЕСП, АНАЛИЗАТОР ХП И Т.Д.) ===
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
@@ -261,7 +282,9 @@ local function getCarHealth(carModel)
     
     local currentParts = 0
     for _, p in pairs(carModel:GetDescendants()) do
-        if p:IsA("BasePart") then currentParts = currentParts + 1 end
+        if p:IsA("BasePart") and p.Transparency < 1 then 
+            currentParts = currentParts + 1 
+        end
     end
     
     if not CarMaxPartsCache[carModel] or currentParts > CarMaxPartsCache[carModel] then
@@ -354,7 +377,6 @@ local function isPlayerTarget(plr)
     return false
 end
 
--- === ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ===
 RunService.RenderStepped:Connect(function()
     if Modules.AutoEscape and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local myRoot = LocalPlayer.Character.HumanoidRootPart
@@ -380,10 +402,9 @@ RunService.RenderStepped:Connect(function()
         if carRoot and esp then
             local isT = isPlayerTarget(plr)
             
-            -- ИСПРАВЛЕННЫЙ ВЕКТОРНЫЙ ДЕТЕКТОР УДАРА (МОМЕНТАЛЬНО РАБОТАЕТ ПРИ T-BONE)
-            local currentVel = carRoot.AssemblyLinearVelocity
+            local currentVel = carRoot.AssemblyLinearVelocity.Magnitude
             local oldVel = PreviousVelocities[plr] or currentVel
-            local velChange = (oldVel - currentVel).Magnitude
+            local velChange = math.abs(oldVel - currentVel)
 
             if velChange > 20 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 60 then
                 if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
