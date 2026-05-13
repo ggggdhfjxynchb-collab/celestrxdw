@@ -217,11 +217,30 @@ local function getCarData(plr)
     return nil, nil, nil
 end
 
+-- ИСПРАВЛЕННАЯ ФУНКЦИЯ (ПОЛУЧЕНИЕ КООРДИНАТ ДЛЯ ЛЮБОГО ОБЪЕКТА)
+local function getSafePosition(obj)
+    if not obj then return nil end
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        if obj.PrimaryPart then return obj.PrimaryPart.Position end
+        local cf = obj:GetBoundingBox()
+        return cf.Position
+    end
+    if obj:IsA("Folder") then
+        for _, v in pairs(obj:GetDescendants()) do
+            if v:IsA("BasePart") then return v.Position end
+        end
+    end
+    return nil
+end
+
+-- ИИ АНАЛИЗАТОР БРОНИ И УЯЗВИМОСТЕЙ
 local function getWeakSpotData(carRoot, enginePart)
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not myRoot then return carRoot.Position, "Нет данных" end
     
-    local engineOffset = enginePart and (enginePart.Position - carRoot.Position) or Vector3.zero
+    local enginePos = getSafePosition(enginePart)
+    local engineOffset = enginePos and (enginePos - carRoot.Position) or Vector3.zero
     local fwdDot = engineOffset:Dot(carRoot.CFrame.LookVector)
     
     local advice = ""
@@ -257,10 +276,10 @@ local function updateTargetInfoPanel(plr, advice, health)
         end)
     end
     
-    targetAdvice.Text = "Анализ: " .. advice
+    targetAdvice.Text = "Анализ ИИ: " .. advice
     local hitsLeft = math.ceil(health / 25)
     if hitsLeft < 1 then hitsLeft = 1 end
-    targetHits.Text = "До взрыва: ~" .. tostring(hitsLeft) .. " уд."
+    targetHits.Text = "До взрыва мотора: ~" .. tostring(hitsLeft) .. " уд."
 end
 
 local function spawnHitParticle(targetPos)
@@ -305,6 +324,7 @@ RunService.RenderStepped:Connect(function()
         local esp = EspObjects[plr]
         local eHum = plr.Character and plr.Character:FindFirstChild("Humanoid")
         
+        -- ИСПРАВЛЕННАЯ ПОДСВЕТКА МОТОРА (Без крашей)
         if Modules.EngineChams and engine and (engine:IsA("BasePart") or engine:IsA("Model") or engine:IsA("Folder")) then
             local hl = engine:FindFirstChild("Duck_EngineChams")
             if not hl then hl = Instance.new("Highlight"); hl.Name = "Duck_EngineChams"; hl.FillColor = Color3.fromRGB(0, 255, 255); hl.OutlineColor = Color3.fromRGB(255, 255, 255); hl.FillTransparency = 0.2; hl.OutlineTransparency = 0; hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent = engine end
@@ -329,7 +349,7 @@ RunService.RenderStepped:Connect(function()
                 local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
                 
                 if onScreen then
-                    -- ИСПРАВЛЕНИЕ: Выбираем цель, на которую мы смотрим (ближе к центру экрана)
+                    -- Радар (Выбор цели для инфо-панели)
                     local distToCenter = (Vector2.new(pos.X, pos.Y) - centerScreen).Magnitude
                     if distToCenter < shortestDistToCenter then
                         shortestDistToCenter = distToCenter
