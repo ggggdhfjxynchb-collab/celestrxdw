@@ -119,7 +119,7 @@ end
 local ParticlesRightPanel = createRightPanel("ParticlesConfig", 180)
 local SoundRightPanel = createRightPanel("SoundConfig", 100)
 local TargetRightPanel = createRightPanel("TargetConfig", 160)
-local HealthRightPanel = createRightPanel("HealthConfig", 100) -- Панель для настройки вида ХП
+local HealthRightPanel = createRightPanel("HealthConfig", 100) 
 
 local function closeAllRightPanels()
     ParticlesRightPanel.Visible = false; SoundRightPanel.Visible = false; TargetRightPanel.Visible = false; HealthRightPanel.Visible = false
@@ -131,11 +131,14 @@ local TargetMode = "All"
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
 local SoundConfig = { Id = "rbxassetid://130972023" } 
-local HealthConfig = { Style = "ESP" } -- "ESP" (полоска над машиной) или "GUI" (радар панель)
+local HealthConfig = { Style = "GUI" } -- "ESP" (полоска над машиной) или "GUI" (закрепленная панель)
 
 local PreviousVelocities = {}
-local CurrentTargetPlr = nil
+local PreviousCars = {}
 local CarMaxPartsCache = {}
+
+-- Переменная для захвата цели (держит цель до следующего удара или до взрыва машины)
+local LastHitPlayer = nil 
 
 local function updateTheme(color1, color2)
     local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
@@ -192,8 +195,7 @@ createDropdown(TargetRightPanel, "Кого бить", 40, {{Name = "Никто",
 local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0, 0, 30); TargetInput.Position = UDim2.new(0.05, 0, 0, 80); TargetInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30); TargetInput.Text = "Ник (если выбран)"; TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200); TargetInput.Font = Enum.Font.Gotham; TargetInput.TextSize = 12; TargetInput.ZIndex = 13; TargetInput.ClearTextOnFocus = true; TargetInput.Parent = TargetRightPanel; Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
--- Единая настройка для вида ХП
-createDropdown(HealthRightPanel, "Вид ХП", 40, {{Name="ESP Бар", Value="ESP"}, {Name="GUI Панель", Value="GUI"}}, 1, function(v) HealthConfig.Style = v end)
+createDropdown(HealthRightPanel, "Вид ХП", 40, {{Name="GUI Панель", Value="GUI"}, {Name="ESP Бар", Value="ESP"}}, 1, function(v) HealthConfig.Style = v end)
 
 -- === 8. КНОПКИ ОСНОВНОГО МЕНЮ ===
 createModuleButton(visualPage, "Car Health", "ЛКМ: Вкл ХП | ПКМ: Вид (ESP/GUI)", function(state) Modules.HealthDisplay = state; if not state then targetInfoFrame.Visible = false end end, function() closeAllRightPanels(); HealthRightPanel.Visible = true end)
@@ -214,7 +216,6 @@ local function createEspForPlayer(plr)
     local sTxt, nametag = pcall(function() return Drawing.new("Text") end); local sWeak, weakTxt = pcall(function() return Drawing.new("Text") end)
     local sCirc, weakCirc = pcall(function() return Drawing.new("Circle") end)
     
-    -- Линии для ESP Бара
     local sHpBg, hpBg = pcall(function() return Drawing.new("Line") end)
     local sHpVal, hpVal = pcall(function() return Drawing.new("Line") end)
     
@@ -249,13 +250,14 @@ local function hidePlayerEsp(plr)
 end
 
 Players.PlayerRemoving:Connect(function(plr)
-    if CurrentTargetPlr == plr then CurrentTargetPlr = nil; targetInfoFrame.Visible = false end
+    if LastHitPlayer == plr then LastHitPlayer = nil; targetInfoFrame.Visible = false end
     if EspObjects[plr] then 
         pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end)
         pcall(function() EspObjects[plr].HpBg:Remove(); EspObjects[plr].HpVal:Remove() end)
         EspObjects[plr] = nil 
     end
     PreviousVelocities[plr] = nil
+    PreviousCars[plr] = nil
 end)
 
 local function getCarData(plr)
@@ -398,14 +400,20 @@ end
 RunService.RenderStepped:Connect(function()
     local myRootPos = Camera.CFrame.Position
     local myCar, myCarRoot, _ = getCarData(LocalPlayer)
+    
+    -- Вычисляем нашу скорость для регистрации обоюдного удара
+    local myVelChange = 0
     if myCarRoot and myCarRoot:IsDescendantOf(workspace) then
         myRootPos = myCarRoot.Position
-    elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        myRootPos = LocalPlayer.Character.HumanoidRootPart.Position
+        local myCurVel = myCarRoot.AssemblyLinearVelocity
+        if PreviousCars[LocalPlayer] ~= myCar then PreviousVelocities[LocalPlayer] = myCurVel; PreviousCars[LocalPlayer] = myCar end
+        local myOldVel = PreviousVelocities[LocalPlayer] or myCurVel
+        myVelChange = (myOldVel - myCurVel).Magnitude
+        PreviousVelocities[LocalPlayer] = myCurVel
+    else
+        PreviousVelocities[LocalPlayer] = nil
+        PreviousCars[LocalPlayer] = nil
     end
-
-    local bestTarget = nil
-    local shortestDist = 300
 
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
@@ -416,6 +424,7 @@ RunService.RenderStepped:Connect(function()
             
             if not carRoot or not carRoot:IsDescendantOf(workspace) then
                 hidePlayerEsp(plr)
+                if LastHitPlayer == plr then LastHitPlayer = nil end -- Если цель уничтожена, сбрасываем ее
                 return
             end
             
@@ -430,17 +439,17 @@ RunService.RenderStepped:Connect(function()
                 local isT = isPlayerTarget(plr)
                 local distToMe = (myRootPos - carRoot.Position).Magnitude
                 
-                -- Радар (Ищем того, кто ближе к центру экрана для GUI)
-                if isT and distToMe < shortestDist then
-                    local pos, onScreen = Camera:WorldToViewportPoint(carRoot.Position)
-                    if onScreen then
-                        local centerScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                        local distToCenter = (Vector2.new(pos.X, pos.Y) - centerScreen).Magnitude
-                        if distToCenter < 250 then
-                            shortestDist = distToMe
-                            bestTarget = plr
-                        end
-                    end
+                local currentVel = carRoot.AssemblyLinearVelocity
+                if PreviousCars[plr] ~= car then PreviousVelocities[plr] = currentVel; PreviousCars[plr] = car end
+                local oldVel = PreviousVelocities[plr] or currentVel
+                local velChange = (oldVel - currentVel).Magnitude
+                PreviousVelocities[plr] = currentVel
+                
+                -- ДЕТЕКТОР ОБОЮДНОГО УДАРА (Захват цели)
+                if isT and velChange > 15 and myVelChange > 15 and distToMe < 35 then
+                    LastHitPlayer = plr -- ЗАПОМИНАЕМ ТОГО, С КЕМ СТОЛКНУЛИСЬ
+                    if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
+                    if Modules.HitSound then playHitSound() end
                 end
                 
                 if isT then
@@ -494,20 +503,20 @@ RunService.RenderStepped:Connect(function()
         end)
     end
 
-    -- Обновляем панель GUI (Только если выбран режим GUI)
-    if Modules.HealthDisplay and HealthConfig.Style == "GUI" and bestTarget then
+    -- ОБНОВЛЕНИЕ ПАНЕЛИ GUI (Держится до следующего удара или смерти цели)
+    if Modules.HealthDisplay and HealthConfig.Style == "GUI" and LastHitPlayer then
         pcall(function()
-            local car, carRoot, engine = getCarData(bestTarget)
+            local car, carRoot, engine = getCarData(LastHitPlayer)
             if carRoot and carRoot:IsDescendantOf(workspace) then
                 local currentHealth, maxHealth = getCarHealth(car)
                 local _, advice = getWeakSpotData(carRoot, engine)
-                updateTargetInfoPanel(bestTarget, advice, currentHealth, maxHealth)
+                updateTargetInfoPanel(LastHitPlayer, advice, currentHealth, maxHealth)
             else
                 targetInfoFrame.Visible = false
+                LastHitPlayer = nil -- Сбрасываем цель, если она уничтожена
             end
         end)
     else
         targetInfoFrame.Visible = false
-        CurrentTargetPlr = nil
     end
 end)
