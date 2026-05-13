@@ -2,6 +2,7 @@ local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -44,18 +45,52 @@ contentFrame.Name = "Content"; contentFrame.Size = UDim2.new(1, -170, 1, -20); c
 
 local carPage = Instance.new("ScrollingFrame"); carPage.Size = UDim2.new(1, 0, 1, 0); carPage.BackgroundTransparency = 1; carPage.ScrollBarThickness = 2; carPage.Visible = false; carPage.Parent = contentFrame; Instance.new("UIListLayout", carPage).Padding = UDim.new(0, 10)
 local visualPage = Instance.new("ScrollingFrame"); visualPage.Size = UDim2.new(1, 0, 1, 0); visualPage.BackgroundTransparency = 1; visualPage.ScrollBarThickness = 2; visualPage.Visible = true; visualPage.Parent = contentFrame; Instance.new("UIListLayout", visualPage).Padding = UDim.new(0, 10)
-local settingsPage = Instance.new("ScrollingFrame"); settingsPage.Size = UDim2.new(1, 0, 1, 0); settingsPage.BackgroundTransparency = 1; settingsPage.ScrollBarThickness = 2; settingsPage.Visible = false; settingsPage.Parent = contentFrame; Instance.new("UIListLayout", settingsPage).Padding = UDim.new(0, 10)
 
--- === 3. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
-local Modules = { CarSpeed = false, AutoEscape = false, EngineEsp = false, Tracers = false, EngineChams = false, Nametags = false, Fullbright = false }
+-- === 3. ПАНЕЛИ НАСТРОЕК СПРАВА ===
+local function createRightPanel(name, height)
+    local panel = Instance.new("Frame"); panel.Name = name; panel.Size = UDim2.new(0, 200, 0, height or 220); panel.Position = UDim2.new(1, 10, 0, 0); panel.BackgroundColor3 = Color3.fromRGB(25, 25, 25); panel.Visible = false; panel.ZIndex = 10; panel.Parent = mainFrame; Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 8)
+    local go = Instance.new("Frame"); go.Size = UDim2.new(1, 0, 1, 0); go.BackgroundColor3 = Color3.fromRGB(255, 255, 255); go.BackgroundTransparency = 0.85; go.ZIndex = 10; go.Parent = panel; Instance.new("UICorner", go).CornerRadius = UDim.new(0, 8)
+    local pg = Instance.new("UIGradient"); pg.Color = MainGradientScheme; pg.Rotation = 45; pg.Parent = go
+    return panel, pg
+end
+
+local ParticlesRightPanel, pGrad1 = createRightPanel("ParticlesConfig", 180)
+local SoundRightPanel, pGrad2 = createRightPanel("SoundConfig", 100)
+local SkyRightPanel, pGrad3 = createRightPanel("SkyConfig", 100)
+local TargetRightPanel, pGrad4 = createRightPanel("TargetConfig", 160)
+
+local function closeAllRightPanels()
+    ParticlesRightPanel.Visible = false; SoundRightPanel.Visible = false; SkyRightPanel.Visible = false; TargetRightPanel.Visible = false
+end
+
+-- === 4. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
+local Modules = { AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, Nametags = false, CustomSky = false, HitParticles = false, HitSound = false }
+local TargetMode = "None" 
+local TargetPlayerName = ""
+local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
+local SoundConfig = { Id = "rbxassetid://8111055570" } -- Metal Clank default
+local SkyConfig = { Id = "rbxassetid://159454299" } -- Galaxy default
+local PreviousHealths = {}
+local OriginalSky = nil
 
 local function updateTheme(color1, color2)
     local newGrad = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
-    mainBgGradient.Color = newGrad; sideGrad.Color = newGrad
+    mainBgGradient.Color = newGrad; sideGrad.Color = newGrad; pGrad1.Color = newGrad; pGrad2.Color = newGrad; pGrad3.Color = newGrad; pGrad4.Color = newGrad
 end
 
--- === 4. ФУНКЦИИ GUI ===
-local function createModuleButton(parent, title, description, lmbCallback)
+-- === 5. ФУНКЦИИ GUI ===
+local function createDropdown(parent, titleText, yPos, options, defaultIndex, callback)
+    local mainBtn = Instance.new("TextButton"); mainBtn.Size = UDim2.new(0.9, 0, 0, 30); mainBtn.Position = UDim2.new(0.05, 0, 0, yPos); mainBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); mainBtn.Text = titleText .. ": " .. options[defaultIndex].Name; mainBtn.TextColor3 = Color3.fromRGB(255, 255, 255); mainBtn.Font = Enum.Font.GothamBold; mainBtn.TextSize = 12; mainBtn.ZIndex = 14; mainBtn.Parent = parent; Instance.new("UICorner", mainBtn).CornerRadius = UDim.new(0, 6)
+    local dropFrame = Instance.new("Frame"); dropFrame.Size = UDim2.new(1, 0, 0, #options * 30); dropFrame.Position = UDim2.new(0, 0, 1, 2); dropFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); dropFrame.Visible = false; dropFrame.ZIndex = 20; dropFrame.Parent = mainBtn; Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIListLayout", dropFrame).SortOrder = Enum.SortOrder.LayoutOrder
+    mainBtn.MouseButton1Click:Connect(function() dropFrame.Visible = not dropFrame.Visible end)
+    for i, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton"); optBtn.Size = UDim2.new(1, 0, 0, 30); optBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 35); optBtn.Text = opt.Name; optBtn.TextColor3 = Color3.fromRGB(200, 200, 200); optBtn.Font = Enum.Font.Gotham; optBtn.TextSize = 12; optBtn.ZIndex = 21; optBtn.Parent = dropFrame
+        optBtn.MouseButton1Click:Connect(function() mainBtn.Text = titleText .. ": " .. opt.Name; dropFrame.Visible = false; callback(opt.Value) end)
+    end
+end
+
+local function createModuleButton(parent, title, description, lmbCallback, rmbCallback)
     local button = Instance.new("TextButton"); button.Size = UDim2.new(1, -10, 0, 60); button.BackgroundColor3 = Color3.fromRGB(25, 25, 25); button.Text = ""; button.AutoButtonColor = false; button.ZIndex = 12; button.Parent = parent; Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
     local uistroke = Instance.new("UIStroke"); uistroke.Thickness = 2; uistroke.Color = Color3.fromRGB(40, 40, 40); uistroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; uistroke.Parent = button
     local titleText = Instance.new("TextLabel"); titleText.Size = UDim2.new(1, -20, 0, 30); titleText.Position = UDim2.new(0, 10, 0, 5); titleText.BackgroundTransparency = 1; titleText.Text = title; titleText.TextColor3 = Color3.fromRGB(200, 200, 200); titleText.Font = Enum.Font.GothamBold; titleText.TextSize = 16; titleText.TextXAlignment = Enum.TextXAlignment.Left; titleText.ZIndex = 13; titleText.Parent = button
@@ -67,6 +102,8 @@ local function createModuleButton(parent, title, description, lmbCallback)
             uistroke.Color = active and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(40, 40, 40)
             titleText.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
             if lmbCallback then lmbCallback(active, uistroke) end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 and rmbCallback then
+            rmbCallback()
         end
     end)
     return button
@@ -75,25 +112,45 @@ end
 local function createTab(title, page, y)
     local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -25, 0, 35); btn.Position = UDim2.new(0, 15, 0, y); btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); btn.Text = title; btn.TextColor3 = Color3.fromRGB(150, 150, 150); btn.Font = Enum.Font.GothamBold; btn.TextSize = 14; btn.ZIndex = 12; btn.Parent = sidebar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     btn.MouseButton1Click:Connect(function()
-        carPage.Visible = false; visualPage.Visible = false; settingsPage.Visible = false; page.Visible = true
+        carPage.Visible = false; visualPage.Visible = false; page.Visible = true; closeAllRightPanels()
         for _, v in pairs(sidebar:GetChildren()) do if v:IsA("TextButton") then v.BackgroundColor3 = Color3.fromRGB(20, 20, 20); v.TextColor3 = Color3.fromRGB(150, 150, 150) end end
         btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35); btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
 end
-createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105); createTab("Settings", settingsPage, 150)
+createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
 
--- === 5. КНОПКИ ОСНОВНОГО МЕНЮ ===
+-- НАСТРОЙКИ ПАНЕЛЕЙ (ПКМ)
+createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
+createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
+
+createDropdown(SoundRightPanel, "Звук", 40, {{Name="Глухой Металл", Value="rbxassetid://8111055570"}, {Name="Взрыв", Value="rbxassetid://142070127"}, {Name="Bonk", Value="rbxassetid://1048033230"}}, 1, function(v) SoundConfig.Id = v end)
+createDropdown(SkyRightPanel, "Небо", 40, {{Name="Галактика", Value="rbxassetid://159454299"}, {Name="Закат", Value="rbxassetid://264906477"}, {Name="Неон", Value="rbxassetid://1417494030"}}, 1, function(v) SkyConfig.Id = v end)
+
+createDropdown(TargetRightPanel, "Кого бить", 40, {{Name = "Никто", Value = "None"}, {Name = "Все машины", Value = "All"}, {Name = "По нику", Value = "Player"}}, 1, function(v) TargetMode = v end)
+local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0, 0, 30); TargetInput.Position = UDim2.new(0.05, 0, 0, 80); TargetInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30); TargetInput.Text = "Ник (если выбран)"; TargetInput.TextColor3 = Color3.fromRGB(200, 200, 200); TargetInput.Font = Enum.Font.Gotham; TargetInput.TextSize = 12; TargetInput.ZIndex = 13; TargetInput.ClearTextOnFocus = true; TargetInput.Parent = TargetRightPanel; Instance.new("UICorner", TargetInput).CornerRadius = UDim.new(0, 6)
+TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
+
+-- === 6. КНОПКИ ОСНОВНОГО МЕНЮ ===
 createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепортирует вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
 
--- ВИЗУАЛЫ ДЛЯ МОТОРОВ
-createModuleButton(visualPage, "Engine Chams", "Подсвечивает мотор тачки сквозь стены", function(state) Modules.EngineChams = state end)
-createModuleButton(visualPage, "Engine ESP Box", "Рисует бокс вокруг мотора", function(state) Modules.EngineEsp = state end)
-createModuleButton(visualPage, "Nametags", "Показывает владельца тачки над мотором", function(state) Modules.Nametags = state end)
-createModuleButton(visualPage, "Tracers", "Рисует линии до моторов", function(state) Modules.Tracers = state end)
-createModuleButton(visualPage, "Fullbright", "Вечный день без теней", function(state) Modules.Fullbright = state end)
+createModuleButton(visualPage, "Weak Spot ESP (Авто-Цель)", "Показывает КУДА БИТЬ чтобы взорвать тачку", function(state) Modules.WeakSpot = state end)
+createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на машинах", function(state) Modules.EngineEsp = state end)
+createModuleButton(visualPage, "Tracers", "Рисует линии до уязвимых точек", function(state) Modules.Tracers = state end)
+createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
+createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Вкл звук удара | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
+createModuleButton(visualPage, "Custom Skybox", "ЛКМ: Изменить небо | ПКМ: Выбрать", function(state) 
+    Modules.CustomSky = state
+    if state then
+        OriginalSky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+        local newSky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", Lighting)
+        newSky.SkyboxBk = SkyConfig.Id; newSky.SkyboxDn = SkyConfig.Id; newSky.SkyboxFt = SkyConfig.Id; newSky.SkyboxLf = SkyConfig.Id; newSky.SkyboxRt = SkyConfig.Id; newSky.SkyboxUp = SkyConfig.Id
+    else
+        local current = Lighting:FindFirstChildOfClass("Sky")
+        if current then current:Destroy() end
+    end
+end, function() closeAllRightPanels(); SkyRightPanel.Visible = true end)
 
-createModuleButton(settingsPage, "Theme: Azure & Gold", "Лазурный и Желтый", function() updateTheme(Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 215, 0)) end)
-createModuleButton(settingsPage, "Theme: Toxic Slime", "Кислотный Зеленый", function() updateTheme(Color3.fromRGB(50, 255, 50), Color3.fromRGB(0, 50, 0)) end)
+createModuleButton(visualPage, "Target Config", "ПКМ: Настроить сканер машин", function(state) Modules.Target = state end, function() closeAllRightPanels(); TargetRightPanel.Visible = true end)
 
 -- Перетаскивание
 local dragging, dragInput, dragStart, startPos
@@ -102,21 +159,26 @@ mainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.Us
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart; mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end end)
 
--- === 6. ЯДРО ЧИТА (ПОИСК МОТОРОВ) ===
+-- === 7. ЯДРО ЧИТА (УМНЫЙ СКАНЕР WEAK SPOT) ===
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
     if plr == LocalPlayer then return end
-    local sBox, box = pcall(function() return Drawing.new("Square") end)
-    local sLine, tracer = pcall(function() return Drawing.new("Line") end)
-    local sTxt, nametag = pcall(function() return Drawing.new("Text") end)
+    local sBox, box = pcall(function() return Drawing.new("Square") end); local sLine, tracer = pcall(function() return Drawing.new("Line") end)
+    local sTxt, nametag = pcall(function() return Drawing.new("Text") end); local sWeak, weakTxt = pcall(function() return Drawing.new("Text") end)
+    local sCirc, weakCirc = pcall(function() return Drawing.new("Circle") end)
+    
     if not sBox or not sLine or not sTxt then return end
     
     box.Visible = false; box.Color = Color3.fromRGB(0, 200, 255); box.Thickness = 1.5; box.Filled = false; box.Transparency = 1
     tracer.Visible = false; tracer.Color = Color3.fromRGB(255, 255, 255); tracer.Thickness = 1; tracer.Transparency = 0.5
-    nametag.Visible = false; nametag.Color = Color3.fromRGB(255, 255, 255); nametag.Text = plr.Name; nametag.Size = 16; nametag.Center = true; nametag.Outline = true; nametag.Transparency = 1
+    nametag.Visible = false; nametag.Color = Color3.fromRGB(255, 255, 255); nametag.Size = 16; nametag.Center = true; nametag.Outline = true; nametag.Transparency = 1
+    
+    -- Визуалы Weak Spot
+    weakTxt.Visible = false; weakTxt.Color = Color3.fromRGB(255, 0, 0); weakTxt.Text = "[WEAK SPOT]"; weakTxt.Size = 18; weakTxt.Center = true; weakTxt.Outline = true; weakTxt.Transparency = 1
+    weakCirc.Visible = false; weakCirc.Color = Color3.fromRGB(255, 0, 0); weakCirc.Thickness = 2; weakCirc.Radius = 15; weakCirc.Filled = false; weakCirc.Transparency = 1
 
-    EspObjects[plr] = {Box = box, Tracer = tracer, Nametag = nametag}
+    EspObjects[plr] = {Box = box, Tracer = tracer, Nametag = nametag, WeakTxt = weakTxt, WeakCirc = weakCirc}
 end
 
 for _, plr in pairs(Players:GetPlayers()) do createEspForPlayer(plr) end
@@ -124,63 +186,67 @@ Players.PlayerAdded:Connect(createEspForPlayer)
 
 Players.PlayerRemoving:Connect(function(plr)
     if EspObjects[plr] then 
-        pcall(function() EspObjects[plr].Box:Remove() end)
-        pcall(function() EspObjects[plr].Tracer:Remove() end)
-        pcall(function() EspObjects[plr].Nametag:Remove() end)
-        EspObjects[plr] = nil
+        pcall(function() EspObjects[plr].Box:Remove(); EspObjects[plr].Tracer:Remove(); EspObjects[plr].Nametag:Remove(); EspObjects[plr].WeakTxt:Remove(); EspObjects[plr].WeakCirc:Remove() end)
+        EspObjects[plr] = nil; PreviousHealths[plr] = nil
     end
 end)
 
--- ИЩЕМ МОТОР ТАЧКИ
-local function getEngineFromPlayer(plr)
+-- НОВЫЙ АЛГОРИТМ ПОИСКА УЯЗВИМОСТИ (WEAK SPOT)
+local function getWeakSpot(plr)
     if not plr.Character then return nil end
     local hum = plr.Character:FindFirstChild("Humanoid")
     if hum and hum.SeatPart then
-        -- Если игрок сидит, находим его машину
         local car = hum.SeatPart:FindFirstAncestorOfClass("Model")
         if car then
-            -- Ищем мотор. В CC2 обычно это "Engine", "Core" или "Motor"
+            -- 1. Ищем деталь мотора по именам
             local engine = car:FindFirstChild("Engine", true) or car:FindFirstChild("Core", true) or car:FindFirstChild("Motor", true)
-            -- Если прям мотора нет, берем саму сидушку, чтобы хоть куда-то светить
-            return engine or hum.SeatPart 
+            if engine and engine:IsA("BasePart") then return engine.Position end
+            
+            -- 2. Если мотор скрыт, вычисляем капот (спереди от сиденья)
+            local seat = hum.SeatPart
+            local hoodPosition = seat.CFrame.Position + (seat.CFrame.LookVector * 5)
+            return hoodPosition
         end
     end
+    -- Если не в тачке, просто целимся в тело
+    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+    if root then return root.Position end
     return nil
 end
 
--- ПОДСВЕТКА МОТОРА (Chams)
-local function applyEngineChams(enginePart, plr)
-    if not enginePart then return end
-    local highlight = enginePart:FindFirstChild("DuckEngineChams")
-    if Modules.EngineChams then
-        if not highlight then
-            highlight = Instance.new("Highlight")
-            highlight.Name = "DuckEngineChams"
-            highlight.FillColor = Color3.fromRGB(0, 255, 255)
-            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-            highlight.FillTransparency = 0.3
-            highlight.OutlineTransparency = 0
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = enginePart
-        end
-    else
-        if highlight then highlight:Destroy() end
-    end
+local function spawnHitParticle(targetPos)
+    local part = Instance.new("Part"); part.Transparency = 1; part.Anchored = true; part.CanCollide = false; part.Position = targetPos; part.Parent = workspace
+    local att = Instance.new("Attachment", part); local pe = Instance.new("ParticleEmitter", att); pe.Texture = ParticleConfig.Texture; pe.Color = ColorSequence.new(ParticleConfig.Color); pe.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 6), NumberSequenceKeypoint.new(1, 0)}); pe.Speed = NumberRange.new(15, 30); pe.SpreadAngle = Vector2.new(360, 360); pe.Lifetime = NumberRange.new(0.5, 1); pe.LightEmission = 1; pe.ZOffset = 1; pe.Rate = 500
+    task.delay(0.5, function() pe.Enabled = false end); Debris:AddItem(part, 2)
+end
+
+local function playHitSound()
+    local snd = Instance.new("Sound")
+    snd.SoundId = SoundConfig.Id
+    snd.Volume = 2
+    snd.Parent = workspace
+    snd:Play()
+    Debris:AddItem(snd, 3)
+end
+
+local function isPlayerTarget(plr)
+    if TargetMode == "None" then return false end
+    if TargetMode == "All" then return true end
+    if TargetMode == "Player" and TargetPlayerName ~= "" and string.find(string.lower(plr.Name), TargetPlayerName) then return true end
+    return false
 end
 
 -- === ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ===
 RunService.RenderStepped:Connect(function()
-    -- Fullbright (Вечный день)
-    if Modules.Fullbright then
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-        Lighting.ColorShift_Bottom = Color3.fromRGB(255, 255, 255)
-        Lighting.ColorShift_Top = Color3.fromRGB(255, 255, 255)
+    if Modules.CustomSky then
+        local sky = Lighting:FindFirstChildOfClass("Sky")
+        if sky and sky.SkyboxBk ~= SkyConfig.Id then
+            sky.SkyboxBk = SkyConfig.Id; sky.SkyboxDn = SkyConfig.Id; sky.SkyboxFt = SkyConfig.Id; sky.SkyboxLf = SkyConfig.Id; sky.SkyboxRt = SkyConfig.Id; sky.SkyboxUp = SkyConfig.Id
+        end
     end
 
-    -- Авто-побег
     if Modules.AutoEscape and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local myRoot = LocalPlayer.Character.HumanoidRootPart
-        -- Если включен побег, просто висим высоко в небе
         myRoot.CFrame = CFrame.new(myRoot.Position.X, 1500, myRoot.Position.Z)
         myRoot.AssemblyLinearVelocity = Vector3.zero
     end
@@ -188,42 +254,56 @@ RunService.RenderStepped:Connect(function()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
-        local enginePart = getEngineFromPlayer(plr)
+        local weakSpotPos = getWeakSpot(plr)
+        local eChar = plr.Character
+        local eHum = eChar and eChar:FindFirstChild("Humanoid")
         
-        -- Применяем Chams к мотору
-        applyEngineChams(enginePart, plr)
-        
-        local esp = EspObjects[plr]
-        if esp then
-            if enginePart then
-                local pos, onScreen = Camera:WorldToViewportPoint(enginePart.Position)
+        if weakSpotPos and eHum and eHum.Health > 0 then
+            
+            -- HIT DETECTION (Партиклы + Звуки)
+            local oldHp = PreviousHealths[plr] or eHum.MaxHealth
+            if eHum.Health < oldHp then 
+                if Modules.HitParticles then spawnHitParticle(weakSpotPos) end
+                if Modules.HitSound then playHitSound() end
+            end
+            PreviousHealths[plr] = eHum.Health
+
+            local esp = EspObjects[plr]
+            if esp then
+                local pos, onScreen = Camera:WorldToViewportPoint(weakSpotPos)
                 
                 if onScreen then
-                    local dist = (enginePart.Position - Camera.CFrame.Position).Magnitude
+                    local dist = (weakSpotPos - Camera.CFrame.Position).Magnitude
                     
-                    -- Box (Вокруг мотора)
+                    -- WEAK SPOT (Прицел)
+                    if Modules.WeakSpot then
+                        esp.WeakCirc.Position = Vector2.new(pos.X, pos.Y)
+                        esp.WeakCirc.Visible = true
+                        esp.WeakTxt.Position = Vector2.new(pos.X, pos.Y - 25)
+                        esp.WeakTxt.Visible = true
+                    else
+                        esp.WeakCirc.Visible = false
+                        esp.WeakTxt.Visible = false
+                    end
+                    
+                    -- Box
                     if Modules.EngineEsp then
                         local scaleFactor = 1000 / dist
-                        local boxSize = Vector2.new(4 * scaleFactor, 4 * scaleFactor) -- Квадратный бокс
+                        local boxSize = Vector2.new(4 * scaleFactor, 4 * scaleFactor)
                         if boxSize.Y > 150 then boxSize = Vector2.new(150, 150) end
                         
                         esp.Box.Size = boxSize
                         esp.Box.Position = Vector2.new(pos.X - boxSize.X / 2, pos.Y - boxSize.Y / 2)
                         esp.Box.Visible = true
-                    else
-                        esp.Box.Visible = false
-                    end
-
-                    -- Nametags (Ник над мотором)
-                    if Modules.Nametags then
-                        esp.Nametag.Text = plr.Name .. " [Car]"
-                        esp.Nametag.Position = Vector2.new(pos.X, pos.Y - (esp.Box.Size.Y / 2) - 15)
+                        
+                        esp.Nametag.Text = plr.Name
+                        esp.Nametag.Position = Vector2.new(pos.X, pos.Y - (boxSize.Y / 2) - 15)
                         esp.Nametag.Visible = true
                     else
-                        esp.Nametag.Visible = false
+                        esp.Box.Visible = false; esp.Nametag.Visible = false
                     end
 
-                    -- Tracers (Линия до мотора)
+                    -- Tracers (Линии идут точно к Weak Spot)
                     if Modules.Tracers then
                         esp.Tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
                         esp.Tracer.To = Vector2.new(pos.X, pos.Y)
@@ -232,15 +312,12 @@ RunService.RenderStepped:Connect(function()
                         esp.Tracer.Visible = false
                     end
                 else
-                    esp.Box.Visible = false
-                    esp.Nametag.Visible = false
-                    esp.Tracer.Visible = false
+                    esp.Box.Visible = false; esp.Nametag.Visible = false; esp.Tracer.Visible = false; esp.WeakCirc.Visible = false; esp.WeakTxt.Visible = false
                 end
-            else
-                -- Если игрок не в тачке / мотор не найден
-                esp.Box.Visible = false
-                esp.Nametag.Visible = false
-                esp.Tracer.Visible = false
+            end
+        else
+            if EspObjects[plr] then
+                EspObjects[plr].Box.Visible = false; EspObjects[plr].Nametag.Visible = false; EspObjects[plr].Tracer.Visible = false; EspObjects[plr].WeakCirc.Visible = false; EspObjects[plr].WeakTxt.Visible = false
             end
         end
     end
