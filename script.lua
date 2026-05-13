@@ -6,7 +6,6 @@ local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- === 1. БЕЗОПАСНАЯ И СКРЫТАЯ ЗАГРУЗКА GUI ===
 -- Прячем GUI в CoreGui, чтобы игра (Car Crushers 2) его не видела и не крашилась
@@ -53,6 +52,7 @@ titleLabel.Size = UDim2.new(1, -45, 0, 50); titleLabel.Position = UDim2.new(0, 4
 local contentFrame = Instance.new("Frame")
 contentFrame.Name = "Duck_Content"; contentFrame.Size = UDim2.new(1, -170, 1, -20); contentFrame.Position = UDim2.new(0, 160, 0, 10); contentFrame.BackgroundTransparency = 1; contentFrame.ZIndex = 11; contentFrame.Parent = mainFrame
 
+local carPage = Instance.new("ScrollingFrame"); carPage.Name="Duck_CarPage"; carPage.Size = UDim2.new(1, 0, 1, 0); carPage.BackgroundTransparency = 1; carPage.ScrollBarThickness = 2; carPage.Visible = false; carPage.Parent = contentFrame; Instance.new("UIListLayout", carPage).Padding = UDim.new(0, 10)
 local visualPage = Instance.new("ScrollingFrame"); visualPage.Name="Duck_VisPage"; visualPage.Size = UDim2.new(1, 0, 1, 0); visualPage.BackgroundTransparency = 1; visualPage.ScrollBarThickness = 2; visualPage.Visible = true; visualPage.Parent = contentFrame; Instance.new("UIListLayout", visualPage).Padding = UDim.new(0, 10)
 
 -- === 3. TARGET INFO ПАНЕЛЬ ===
@@ -105,9 +105,11 @@ local function makeDraggable(gui)
     end)
 end
 
+-- Делаем окна перетаскиваемыми
 makeDraggable(mainFrame)
 makeDraggable(targetInfoFrame)
 
+-- Открытие/Закрытие меню на правую скобку "]"
 UserInputService.InputBegan:Connect(function(input, gp) 
     if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end 
 end)
@@ -129,7 +131,7 @@ local function closeAllRightPanels()
 end
 
 -- === 6. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ЧИТА ===
-local Modules = { TargetInfo = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
+local Modules = { TargetInfo = false, AutoEscape = false, EngineEsp = false, Tracers = false, WeakSpot = false, EngineChams = false, HitParticles = false, HitSound = false }
 local TargetMode = "All" 
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
@@ -180,17 +182,18 @@ end
 local function createTab(title, page, y)
     local btn = Instance.new("TextButton"); btn.Size = UDim2.new(1, -25, 0, 35); btn.Position = UDim2.new(0, 15, 0, y); btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); btn.Text = title; btn.TextColor3 = Color3.fromRGB(150, 150, 150); btn.Font = Enum.Font.GothamBold; btn.TextSize = 14; btn.ZIndex = 12; btn.Parent = sidebar; Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     btn.MouseButton1Click:Connect(function()
-        visualPage.Visible = false; page.Visible = true; closeAllRightPanels()
+        carPage.Visible = false; visualPage.Visible = false; page.Visible = true; closeAllRightPanels()
         for _, v in pairs(sidebar:GetChildren()) do if v:IsA("TextButton") then v.BackgroundColor3 = Color3.fromRGB(20, 20, 20); v.TextColor3 = Color3.fromRGB(150, 150, 150) end end
         btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35); btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
 end
-createTab("Visuals", visualPage, 60)
+createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
 
 -- НАСТРОЙКИ ПАНЕЛЕЙ
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
+-- ИСПРАВЛЕННЫЕ РАБОЧИЕ ЗВУКИ (Без ошибок в консоли)
 createDropdown(SoundRightPanel, "Звук", 40, {
     {Name="Колокольчик", Value="rbxassetid://130972023"}, 
     {Name="Мягкий Удар", Value="rbxassetid://12222084"}, 
@@ -202,6 +205,8 @@ local TargetInput = Instance.new("TextBox"); TargetInput.Size = UDim2.new(0.9, 0
 TargetInput.FocusLost:Connect(function() TargetPlayerName = string.lower(TargetInput.Text) end)
 
 -- === 8. КНОПКИ ОСНОВНОГО МЕНЮ ===
+createModuleButton(carPage, "Auto Escape (Meltdown)", "Телепорт вверх при взрыве ядра", function(s) Modules.AutoEscape = s end)
+
 createModuleButton(visualPage, "Target Info (AI Panel)", "Показывает ХП машины ПРИ ТАРАНЕ", function(state) Modules.TargetInfo = state; if not state then targetInfoFrame.Visible = false end end)
 createModuleButton(visualPage, "Engine Chams", "Свечение самого мотора сквозь машину", function(state) Modules.EngineChams = state end)
 createModuleButton(visualPage, "Weak Spot ESP", "Вычисляет идеальное место для тарана", function(state) Modules.WeakSpot = state end)
@@ -272,9 +277,11 @@ local function getSafePosition(obj)
     return nil
 end
 
+-- ИСПРАВЛЕННЫЙ АЛГОРИТМ ПОДСЧЕТА ХП (Только видимые, физические детали)
 local function getCarHealth(carModel)
     if not carModel then return 100, 100 end
     
+    -- Ищем встроенные значения ХП, если игра их предоставляет напрямую
     local hpVal = carModel:FindFirstChild("Health", true) or carModel:FindFirstChild("Durability", true)
     local maxHpVal = carModel:FindFirstChild("MaxHealth", true) or carModel:FindFirstChild("MaxDurability", true)
     
@@ -282,8 +289,10 @@ local function getCarHealth(carModel)
         return hpVal.Value, maxHpVal.Value
     end
     
+    -- Если значений нет, считаем оставшиеся "живые" куски тачки
     local currentParts = 0
     for _, p in pairs(carModel:GetDescendants()) do
+        -- Деталь считается живой, если она видимая
         if p:IsA("BasePart") and p.Transparency < 1 then 
             currentParts = currentParts + 1 
         end
@@ -292,6 +301,7 @@ local function getCarHealth(carModel)
     if not CarMaxPartsCache[carModel] then
         CarMaxPartsCache[carModel] = currentParts
     else
+        -- Если тачку починили (деталей стало больше), обновляем максимум
         if currentParts > CarMaxPartsCache[carModel] then
             CarMaxPartsCache[carModel] = currentParts
         end
@@ -343,6 +353,7 @@ local function updateTargetInfoPanel(plr, advice, health, maxHealth)
     
     targetAdvice.Text = "Анализ ИИ: " .. advice
     
+    -- Динамическая полоска здоровья
     local hpPercent = 1
     if maxHealth and maxHealth > 0 then
         hpPercent = math.clamp(health / maxHealth, 0, 1)
@@ -384,6 +395,12 @@ local function isPlayerTarget(plr)
 end
 
 RunService.RenderStepped:Connect(function()
+    if Modules.AutoEscape and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local myRoot = LocalPlayer.Character.HumanoidRootPart
+        myRoot.CFrame = CFrame.new(myRoot.Position.X, 1500, myRoot.Position.Z)
+        myRoot.AssemblyLinearVelocity = Vector3.zero
+    end
+
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
     for _, plr in pairs(Players:GetPlayers()) do
@@ -406,6 +423,7 @@ RunService.RenderStepped:Connect(function()
             local oldVel = PreviousVelocities[plr] or currentVel
             local velChange = math.abs(oldVel - currentVel)
 
+            -- Захват цели при резком столкновении машин
             if velChange > 20 and myRoot and (myRoot.Position - carRoot.Position).Magnitude < 60 then
                 if Modules.HitParticles then spawnHitParticle(carRoot.Position) end
                 if Modules.HitSound then playHitSound() end
@@ -449,6 +467,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- Обновляем панель инфы, если прошло меньше 10 секунд с последнего удара
     if LastHitPlayer and (tick() - LastHitTime < 10) then
         local car, carRoot, engine = getCarData(LastHitPlayer)
         if carRoot then
