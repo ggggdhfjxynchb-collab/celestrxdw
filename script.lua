@@ -38,12 +38,12 @@ Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 12)
 local sidebarGradientLine = Instance.new("Frame"); sidebarGradientLine.Size = UDim2.new(0, 4, 1, -20); sidebarGradientLine.Position = UDim2.new(0, 5, 0, 10); sidebarGradientLine.BorderSizePixel = 0; sidebarGradientLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255); sidebarGradientLine.ZIndex = 12; sidebarGradientLine.Parent = sidebar
 local sideGrad = Instance.new("UIGradient"); sideGrad.Color = MainGradientScheme; sideGrad.Rotation = 90; sideGrad.Parent = sidebarGradientLine
 
--- ЛОГОТИП ЧИТА
+-- ДОБАВЛЕН ЛОГОТИП ЧИТА
 local duckLogo = Instance.new("ImageLabel")
 duckLogo.Size = UDim2.new(0, 26, 0, 26)
 duckLogo.Position = UDim2.new(0, 12, 0, 12)
 duckLogo.BackgroundTransparency = 1
-duckLogo.Image = "rbxassetid://104689814642612"
+duckLogo.Image = "rbxassetid://132764620616937"
 duckLogo.ZIndex = 12
 duckLogo.Parent = sidebar
 
@@ -78,8 +78,7 @@ local Modules = { AutoEscape = false, EngineEsp = false, Tracers = false, WeakSp
 local TargetMode = "All" 
 local TargetPlayerName = ""
 local ParticleConfig = { Color = Color3.fromRGB(255, 50, 50), Texture = "rbxassetid://243098098" }
--- ИСПРАВЛЕНО: Рабочие ID звуков
-local SoundConfig = { Id = "rbxassetid://12222084" } 
+local SoundConfig = { Id = "rbxassetid://130972023" } -- Колокольчик по умолчанию
 local SkyConfig = { Id = "rbxassetid://159454299" }
 local PreviousVelocities = {}
 
@@ -128,8 +127,13 @@ createTab("Visuals", visualPage, 60); createTab("Car Mods", carPage, 105)
 createDropdown(ParticlesRightPanel, "Цвет", 40, {{Name="Красный", Value=Color3.fromRGB(255,0,0)}, {Name="Синий", Value=Color3.fromRGB(0,150,255)}, {Name="Желтый", Value=Color3.fromRGB(255,255,0)}}, 1, function(v) ParticleConfig.Color = v end)
 createDropdown(ParticlesRightPanel, "Тип", 80, {{Name="Искры", Value="rbxassetid://243098098"}, {Name="Звезды", Value="rbxassetid://2173499710"}}, 1, function(v) ParticleConfig.Texture = v end)
 
--- ИСПРАВЛЕНО: Рабочие звуки ударов
-createDropdown(SoundRightPanel, "Звук", 40, {{Name="Удар", Value="rbxassetid://12222084"}, {Name="Взрыв", Value="rbxassetid://142070127"}, {Name="Колокол", Value="rbxassetid://130972023"}}, 1, function(v) SoundConfig.Id = v end)
+-- ИСПРАВЛЕНЫ ЗВУКИ УДАРОВ (МЯГКИЕ И ТИХИЕ)
+createDropdown(SoundRightPanel, "Звук", 40, {
+    {Name="Колокольчик", Value="rbxassetid://130972023"}, 
+    {Name="Мягкий Хит", Value="rbxassetid://160432334"}, 
+    {Name="Сочный Бас", Value="rbxassetid://3751711202"}
+}, 1, function(v) SoundConfig.Id = v end)
+
 createDropdown(SkyRightPanel, "Небо", 40, {{Name="Галактика", Value="rbxassetid://159454299"}, {Name="Закат", Value="rbxassetid://264906477"}, {Name="Неон", Value="rbxassetid://1417494030"}}, 1, function(v) SkyConfig.Id = v end)
 
 createDropdown(TargetRightPanel, "Кого бить", 40, {{Name = "Никто", Value = "None"}, {Name = "Все машины", Value = "All"}, {Name = "По нику", Value = "Player"}}, 2, function(v) TargetMode = v end)
@@ -145,7 +149,7 @@ createModuleButton(visualPage, "Car Box ESP", "Рисует 2D боксы на �
 createModuleButton(visualPage, "Tracers", "Рисует линии до уязвимых точек", function(state) Modules.Tracers = state end)
 
 createModuleButton(visualPage, "Hit Particles", "ЛКМ: Вкл | ПКМ: Настройки", function(state) Modules.HitParticles = state end, function() closeAllRightPanels(); ParticlesRightPanel.Visible = true end)
-createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Звук при ударе | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
+createModuleButton(visualPage, "Hit Sounds", "ЛКМ: Приятный звук удара | ПКМ: Выбрать", function(state) Modules.HitSound = state end, function() closeAllRightPanels(); SoundRightPanel.Visible = true end)
 createModuleButton(visualPage, "Custom Skybox", "ЛКМ: Изменить небо | ПКМ: Выбрать", function(state) 
     Modules.CustomSky = state
     if state then
@@ -165,7 +169,7 @@ mainFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.Us
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart; mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 UserInputService.InputBegan:Connect(function(input, gp) if not gp and input.KeyCode == Enum.KeyCode.RightBracket then mainFrame.Visible = not mainFrame.Visible end end)
 
--- === 7. ЯДРО ЧИТА ===
+-- === 7. ЯДРО ЧИТА (АЛГОРИТМ УЯЗВИМОСТИ И ЗВУКИ) ===
 local EspObjects = {}
 
 local function createEspForPlayer(plr)
@@ -233,12 +237,12 @@ local function spawnHitParticle(targetPos)
     task.delay(0.5, function() pe.Enabled = false end); Debris:AddItem(part, 2)
 end
 
--- ИСПРАВЛЕННЫЙ ЗВУК ЧЕРЕЗ SOUND SERVICE (БЕЗ ОШИБОК)
+-- ИГРАЕТ МЯГКО И ТИХО
 local function playHitSound()
     pcall(function()
         local snd = Instance.new("Sound")
         snd.SoundId = SoundConfig.Id
-        snd.Volume = 3
+        snd.Volume = 0.8 -- ИСПРАВЛЕНО: Громкость снижена для комфорта ушей
         SoundService:PlayLocalSound(snd) 
         snd:Destroy()
     end)
@@ -272,7 +276,6 @@ RunService.RenderStepped:Connect(function()
         local car, carRoot, engine = getCarData(plr)
         local esp = EspObjects[plr]
         
-        -- ИСПРАВЛЕНИЕ ENGINE CHAMS (Теперь работает на Модели и Папки)
         if Modules.EngineChams and engine and (engine:IsA("BasePart") or engine:IsA("Model") or engine:IsA("Folder")) then
             local hl = engine:FindFirstChild("DuckEngineChams")
             if not hl then
@@ -291,7 +294,6 @@ RunService.RenderStepped:Connect(function()
             end
         end
         
-        -- ЛОГИКА УДАРОВ И ESP
         if carRoot and esp then
             local isT = isPlayerTarget(plr)
             
