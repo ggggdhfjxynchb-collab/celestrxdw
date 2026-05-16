@@ -1,31 +1,41 @@
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- === 1. ОЧИСТКА СТАРОГО GUI ===
+print("[DUCK SCANNER] Пытаюсь загрузить меню...")
+
+-- === 1. ЖЕЛЕЗОБЕТОННАЯ ЗАГРУЗКА GUI ===
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
 local targetParent = nil
+
+-- Пробуем все варианты по очереди
 pcall(function() targetParent = gethui() end)
 if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
-if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
+if not targetParent then targetParent = PlayerGui end
 
+print("[DUCK SCANNER] Меню загружается в: " .. tostring(targetParent))
+
+-- Удаляем старое, если есть
 pcall(function()
-    local oldGui = targetParent:FindFirstChild("DuckMinigameScanner")
-    if oldGui then oldGui:Destroy() end
+    for _, v in pairs(targetParent:GetChildren()) do
+        if v.Name == "DuckMinigameScanner" then v:Destroy() end
+    end
 end)
 
 -- === 2. СОЗДАНИЕ МЕНЮ ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DuckMinigameScanner"
-screenGui.ResetOnSpawn = false
+screenGui.ResetOnSpawn = false -- ЧТОБЫ НЕ ПРОПАДАЛО ПРИ СМЕРТИ
 screenGui.Parent = targetParent
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "ScannerFrame"
 mainFrame.Size = UDim2.new(0, 250, 0, 150)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -75) -- По центру экрана
+mainFrame.Position = UDim2.new(0.5, -125, 0.4, 0) -- По центру экрана
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Visible = true
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
@@ -37,10 +47,10 @@ uiStroke.Parent = mainFrame
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundTransparency = 1
-title.Text = "Duck Minigame Scanner"
+title.Text = "Duck Scanner (Нажми ']' чтобы скрыть)"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextSize = 12
 title.Parent = mainFrame
 
 local scanBtn = Instance.new("TextButton")
@@ -65,7 +75,7 @@ clearBtn.TextSize = 14
 clearBtn.Parent = mainFrame
 Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 6)
 
--- === 3. ПЕРЕТАСКИВАНИЕ МЕНЮ ===
+-- === 3. ПЕРЕТАСКИВАНИЕ И СКРЫТИЕ ===
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -85,7 +95,14 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- === 4. ЛОГИКА РЕНТГЕНА (СКАНЕРА) ===
+-- Скрыть/Показать на правую квадратную скобку "]"
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.RightBracket then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
+
+-- === 4. ЛОГИКА РЕНТГЕНА ===
 local activeHighlights = {}
 
 local function clearHighlights()
@@ -118,20 +135,20 @@ scanBtn.MouseButton1Click:Connect(function()
     local count = 0
     scanBtn.Text = "СКАНИРУЮ..."
     scanBtn.TextColor3 = Color3.fromRGB(255, 255, 0)
-    task.wait(0.1) -- Даем интерфейсу обновиться
+    task.wait(0.1) 
     
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") or obj:IsA("MeshPart") then
             -- Игнорируем игроков
             if not obj.Parent:FindFirstChild("Humanoid") then
                 local dist = (obj.Position - root.Position).Magnitude
-                if dist <= 50 then -- Ищем в радиусе 50 метров вокруг тебя
+                if dist <= 50 then 
                     
                     local isBomb = false
                     local isSafe = false
                     local hasHiddenData = false
 
-                    -- 1. Ищем в Атрибутах
+                    -- Ищем в Атрибутах
                     local attrs = obj:GetAttributes()
                     for name, value in pairs(attrs) do
                         local lowerName = string.lower(name)
@@ -140,11 +157,11 @@ scanBtn.MouseButton1Click:Connect(function()
                         elseif string.find(lowerName, "safe") or string.find(lowerName, "good") then
                             isSafe = true; hasHiddenData = true
                         else
-                            hasHiddenData = true -- Нашли что-то непонятное
+                            hasHiddenData = true
                         end
                     end
 
-                    -- 2. Ищем во вложенных значениях (Values)
+                    -- Ищем во Values
                     for _, child in pairs(obj:GetChildren()) do
                         if child:IsA("ValueBase") then
                             local lowerName = string.lower(child.Name)
@@ -156,7 +173,7 @@ scanBtn.MouseButton1Click:Connect(function()
                                 hasHiddenData = true
                             end
                         end
-                        -- 3. Ищем скрытые картинки (часто так прячут бомбы до клика)
+                        -- Ищем скрытые картинки
                         if child:IsA("SurfaceGui") or child:IsA("BillboardGui") or child:IsA("Decal") then
                             if child:IsA("Decal") and child.Transparency == 1 then
                                 hasHiddenData = true
@@ -169,14 +186,14 @@ scanBtn.MouseButton1Click:Connect(function()
                         end
                     end
 
-                    -- КРАСИМ ПЛИТКИ
+                    -- КРАСИМ
                     if hasHiddenData then
                         if isBomb then
-                            applyHighlight(obj, Color3.fromRGB(255, 0, 0)) -- КРАСНЫЙ (Бомба)
+                            applyHighlight(obj, Color3.fromRGB(255, 0, 0)) -- Красный
                         elseif isSafe then
-                            applyHighlight(obj, Color3.fromRGB(0, 255, 0)) -- ЗЕЛЕНЫЙ (Безопасно)
+                            applyHighlight(obj, Color3.fromRGB(0, 255, 0)) -- Зеленый
                         else
-                            applyHighlight(obj, Color3.fromRGB(0, 150, 255)) -- СИНИЙ (Скрытые данные найдены, но неизвестно что это)
+                            applyHighlight(obj, Color3.fromRGB(0, 150, 255)) -- Синий
                         end
                         count = count + 1
                     end
@@ -199,3 +216,5 @@ scanBtn.MouseButton1Click:Connect(function()
 end)
 
 clearBtn.MouseButton1Click:Connect(clearHighlights)
+
+print("[DUCK SCANNER] Успешно загружен! Если меню не видно, нажми ']'")
