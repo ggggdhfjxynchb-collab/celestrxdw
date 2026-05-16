@@ -3,30 +3,31 @@ local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- === БЕЗОПАСНАЯ ОЧИСТКА ===
+-- === 1. ОЧИСТКА СТАРОГО GUI ===
 local targetParent = nil
 pcall(function() targetParent = gethui() end)
-if not targetParent then pcall(function() targetParent = CoreGui end) end
+if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
 if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
 
 pcall(function()
-    local oldGui = targetParent:FindFirstChild("DuckXRay")
+    local oldGui = targetParent:FindFirstChild("DuckMinigameScanner")
     if oldGui then oldGui:Destroy() end
 end)
 
--- === СОЗДАНИЕ GUI ===
+-- === 2. СОЗДАНИЕ МЕНЮ ===
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DuckXRay"
+screenGui.Name = "DuckMinigameScanner"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = targetParent
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 120)
-mainFrame.Position = UDim2.new(0.5, -100, 0.8, -60)
+mainFrame.Name = "ScannerFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -75) -- По центру экрана
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local uiStroke = Instance.new("UIStroke")
 uiStroke.Color = Color3.fromRGB(0, 255, 150)
@@ -34,37 +35,37 @@ uiStroke.Thickness = 2
 uiStroke.Parent = mainFrame
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
+title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundTransparency = 1
-title.Text = "Duck X-Ray"
+title.Text = "Duck Minigame Scanner"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
+title.Font = Enum.Font.GothamBlack
 title.TextSize = 16
 title.Parent = mainFrame
 
 local scanBtn = Instance.new("TextButton")
-scanBtn.Size = UDim2.new(0.9, 0, 0, 40)
-scanBtn.Position = UDim2.new(0.05, 0, 0, 40)
+scanBtn.Size = UDim2.new(0.9, 0, 0, 45)
+scanBtn.Position = UDim2.new(0.05, 0, 0, 45)
 scanBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-scanBtn.Text = "SCAN BOARD (X-Ray)"
+scanBtn.Text = "СКАНИРОВАТЬ ПЛИТКИ"
 scanBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
-scanBtn.Font = Enum.Font.GothamBlack
+scanBtn.Font = Enum.Font.GothamBold
 scanBtn.TextSize = 14
 scanBtn.Parent = mainFrame
 Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
 
 local clearBtn = Instance.new("TextButton")
-clearBtn.Size = UDim2.new(0.9, 0, 0, 25)
-clearBtn.Position = UDim2.new(0.05, 0, 0, 85)
+clearBtn.Size = UDim2.new(0.9, 0, 0, 30)
+clearBtn.Position = UDim2.new(0.05, 0, 0, 105)
 clearBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
-clearBtn.Text = "Clear ESP"
+clearBtn.Text = "Очистить подсветку"
 clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearBtn.Font = Enum.Font.Gotham
-clearBtn.TextSize = 12
+clearBtn.TextSize = 14
 clearBtn.Parent = mainFrame
 Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 6)
 
--- Перетаскивание
+-- === 3. ПЕРЕТАСКИВАНИЕ МЕНЮ ===
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -84,7 +85,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- === ЛОГИКА РЕНТГЕНА ===
+-- === 4. ЛОГИКА РЕНТГЕНА (СКАНЕРА) ===
 local activeHighlights = {}
 
 local function clearHighlights()
@@ -99,85 +100,85 @@ local function applyHighlight(part, color)
     hl.Parent = part
     hl.FillColor = color
     hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-    hl.FillTransparency = 0.5
-    hl.OutlineTransparency = 0
+    hl.FillTransparency = 0.4
+    hl.OutlineTransparency = 0.1
     table.insert(activeHighlights, hl)
 end
 
 scanBtn.MouseButton1Click:Connect(function()
     clearHighlights()
     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    if not root then 
+        scanBtn.Text = "ОШИБКА: ПЕРСОНАЖ НЕ НАЙДЕН"
+        task.wait(2)
+        scanBtn.Text = "СКАНИРОВАТЬ ПЛИТКИ"
+        return 
+    end
 
-    local radius = 30 -- Ищем детали стола в радиусе 30 стадов
     local count = 0
-
-    for _, part in pairs(workspace:GetDescendants()) do
-        if part:IsA("BasePart") then
-            -- Проверяем, близко ли деталь
-            if (part.Position - root.Position).Magnitude <= radius then
-                -- Фильтруем: нам нужны только квадратные плитки стола (игнорим пол, стены и игроков)
-                if part.Size.Y < 2 and part.Size.X > 0.5 and part.Size.Z > 0.5 and not part.Parent:FindFirstChild("Humanoid") then
+    scanBtn.Text = "СКАНИРУЮ..."
+    scanBtn.TextColor3 = Color3.fromRGB(255, 255, 0)
+    task.wait(0.1) -- Даем интерфейсу обновиться
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+            -- Игнорируем игроков
+            if not obj.Parent:FindFirstChild("Humanoid") then
+                local dist = (obj.Position - root.Position).Magnitude
+                if dist <= 50 then -- Ищем в радиусе 50 метров вокруг тебя
                     
                     local isBomb = false
                     local isSafe = false
-                    local hasData = false
+                    local hasHiddenData = false
 
-                    -- ШАГ 1: Сканируем Атрибуты
-                    local attributes = part:GetAttributes()
-                    for name, value in pairs(attributes) do
-                        local lowName = string.lower(name)
-                        if string.find(lowName, "bomb") or string.find(lowName, "bad") or string.find(lowName, "mine") then
-                            isBomb = (value == true or value == 1)
-                            hasData = true
-                        elseif string.find(lowName, "safe") or string.find(lowName, "good") or string.find(lowName, "reward") then
-                            isSafe = (value == true or value == 1)
-                            hasData = true
+                    -- 1. Ищем в Атрибутах
+                    local attrs = obj:GetAttributes()
+                    for name, value in pairs(attrs) do
+                        local lowerName = string.lower(name)
+                        if string.find(lowerName, "bomb") or string.find(lowerName, "bad") or string.find(lowerName, "mine") then
+                            isBomb = true; hasHiddenData = true
+                        elseif string.find(lowerName, "safe") or string.find(lowerName, "good") then
+                            isSafe = true; hasHiddenData = true
+                        else
+                            hasHiddenData = true -- Нашли что-то непонятное
                         end
                     end
 
-                    -- ШАГ 2: Сканируем вложенные Value (BoolValue, IntValue, StringValue)
-                    for _, child in pairs(part:GetChildren()) do
+                    -- 2. Ищем во вложенных значениях (Values)
+                    for _, child in pairs(obj:GetChildren()) do
                         if child:IsA("ValueBase") then
-                            local lowName = string.lower(child.Name)
-                            if string.find(lowName, "bomb") or string.find(lowName, "bad") or string.find(lowName, "mine") then
-                                isBomb = (child.Value == true or child.Value == 1 or child.Value == "true")
-                                hasData = true
-                            elseif string.find(lowName, "safe") or string.find(lowName, "good") then
-                                isSafe = (child.Value == true or child.Value == 1)
-                                hasData = true
+                            local lowerName = string.lower(child.Name)
+                            if string.find(lowerName, "bomb") or string.find(lowerName, "bad") then
+                                isBomb = true; hasHiddenData = true
+                            elseif string.find(lowerName, "safe") or string.find(lowerName, "good") then
+                                isSafe = true; hasHiddenData = true
+                            else
+                                hasHiddenData = true
                             end
                         end
-                        -- ШАГ 3: Сканируем картинки (Decal / SurfaceGui)
-                        if child:IsA("SurfaceGui") or child:IsA("Decal") then
-                            for _, uiElement in pairs(child:GetDescendants()) do
-                                if uiElement:IsA("ImageLabel") or uiElement:IsA("Decal") then
-                                    local tex = uiElement.Image or uiElement.Texture
-                                    -- Если есть картинка бомбы, но она скрыта
-                                    if tex and tex ~= "" and uiElement.Visible == false then
-                                        -- Помечаем как подозрительную (вероятно бомба)
-                                        isBomb = true
-                                        hasData = true
-                                    end
+                        -- 3. Ищем скрытые картинки (часто так прячут бомбы до клика)
+                        if child:IsA("SurfaceGui") or child:IsA("BillboardGui") or child:IsA("Decal") then
+                            if child:IsA("Decal") and child.Transparency == 1 then
+                                hasHiddenData = true
+                            end
+                            for _, elem in pairs(child:GetDescendants()) do
+                                if (elem:IsA("ImageLabel") or elem:IsA("ImageButton")) and not elem.Visible then
+                                    hasHiddenData = true
                                 end
                             end
                         end
                     end
 
                     -- КРАСИМ ПЛИТКИ
-                    -- Если нашли инфу: Зеленый = безопасно, Красный = бомба
-                    if hasData then
+                    if hasHiddenData then
                         if isBomb then
-                            applyHighlight(part, Color3.fromRGB(255, 0, 0)) -- КРАСНЫЙ (БОМБА)
+                            applyHighlight(obj, Color3.fromRGB(255, 0, 0)) -- КРАСНЫЙ (Бомба)
+                        elseif isSafe then
+                            applyHighlight(obj, Color3.fromRGB(0, 255, 0)) -- ЗЕЛЕНЫЙ (Безопасно)
                         else
-                            applyHighlight(part, Color3.fromRGB(0, 255, 0)) -- ЗЕЛЕНЫЙ (СЕЙФ)
+                            applyHighlight(obj, Color3.fromRGB(0, 150, 255)) -- СИНИЙ (Скрытые данные найдены, но неизвестно что это)
                         end
                         count = count + 1
-                    else
-                        -- Если это деталь стола, но инфы в ней НЕТ вообще
-                        -- Красим в желтый (означает, что данные лежат на сервере)
-                        -- Раскомментируй строку ниже, если хочешь видеть желтые плитки
-                        -- applyHighlight(part, Color3.fromRGB(255, 255, 0)) 
                     end
                 end
             end
@@ -185,16 +186,16 @@ scanBtn.MouseButton1Click:Connect(function()
     end
     
     if count == 0 then
-        scanBtn.Text = "DATA HIDDEN ON SERVER"
-        scanBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-        task.wait(2)
-        scanBtn.Text = "SCAN BOARD (X-Ray)"
-        scanBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
+        scanBtn.Text = "СЕРВЕРНАЯ ИГРА (ДАННЫХ НЕТ)"
+        scanBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
     else
-        scanBtn.Text = "FOUND " .. count .. " TILES!"
-        task.wait(2)
-        scanBtn.Text = "SCAN BOARD (X-Ray)"
+        scanBtn.Text = "НАЙДЕНО ДАННЫХ: " .. count
+        scanBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
     end
+    
+    task.wait(3)
+    scanBtn.Text = "СКАНИРОВАТЬ ПЛИТКИ"
+    scanBtn.TextColor3 = Color3.fromRGB(0, 255, 150)
 end)
 
 clearBtn.MouseButton1Click:Connect(clearHighlights)
