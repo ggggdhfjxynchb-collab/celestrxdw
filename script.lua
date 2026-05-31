@@ -24,8 +24,8 @@ local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
-    -- НОВОЕ: НАСТРОЙКИ КРУГА FOV
-    FOV = { Enabled = true, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
+    -- НАСТРОЙКИ КРУГА FOV
+    FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
@@ -44,7 +44,9 @@ local Mono = {
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
     TimeOfDay = "Default", 
-    Weather = "None",      
+    
+    WeatherEnabled = false,
+    WeatherType = "Rain 🌧️",      
     WeatherEmoji = "💸",
     
     MenuOpen = true
@@ -88,7 +90,7 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
 
--- === НОВОЕ: КРУГ FOV НА ЭКРАНЕ ===
+-- === КРУГ FOV НА ЭКРАНЕ ===
 local fovFrame = Instance.new("Frame", screenGui)
 fovFrame.BackgroundTransparency = 1
 fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -118,13 +120,14 @@ task.spawn(function()
     while true do
         task.wait(0.08) 
         pcall(function()
-            if Mono.Weather ~= "None" then
+            if Mono.WeatherEnabled then
+                local isRain = (Mono.WeatherType == "Rain 🌧️")
                 local wDrop = Instance.new("TextLabel", weatherContainer)
                 wDrop.BackgroundTransparency = 1
                 wDrop.Size = UDim2.new(0, 30, 0, 30)
                 wDrop.Position = UDim2.new(math.random(), 0, -0.1, 0)
-                wDrop.Text = (Mono.Weather == "Rain 🌧️") and "💧" or Mono.WeatherEmoji
-                wDrop.TextSize = (Mono.Weather == "Rain 🌧️") and math.random(15, 20) or math.random(20, 35)
+                wDrop.Text = isRain and "💧" or Mono.WeatherEmoji
+                wDrop.TextSize = isRain and math.random(15, 20) or math.random(20, 35)
                 wDrop.TextTransparency = 0.2
                 
                 local duration = math.random(30, 60) / 10 
@@ -275,6 +278,7 @@ local function updateHUD()
         if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
         if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
         if Mono.TintEnabled then addActiveFeature("Screen Tint") end
+        if Mono.WeatherEnabled then addActiveFeature("Weather") end
 
         local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
         TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
@@ -288,6 +292,7 @@ mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
+-- Идеальное закругление без выпираний
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
@@ -386,7 +391,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.Padding = UDim.new(0, 8) 
+    pLayout.Padding = UDim.new(0, 8) -- Чуть отступа чтобы скроллбар не наезжал
     
     Pages[name] = page
 
@@ -444,7 +449,7 @@ local function createSubInput(parent, text, defaultText, callback)
     local lbl = Instance.new("TextLabel", frame)
     lbl.Size = UDim2.new(0.6, 0, 1, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text = "    ↳ " .. text
+    lbl.Text = "    -> " .. text
     lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 12
@@ -478,7 +483,7 @@ local function createSubColorPicker(parent, text, defaultColor, callback)
     lbl.Size = UDim2.new(0.6, 0, 0, 20)
     lbl.Position = UDim2.new(0, 0, 0, 5)
     lbl.BackgroundTransparency = 1
-    lbl.Text = "    ↳ " .. text
+    lbl.Text = "    -> " .. text
     lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 12
@@ -783,7 +788,8 @@ local function SaveConfig()
             Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
             Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
             Time = Mono.TimeOfDay,
-            Weather = Mono.Weather,
+            WeatherEnabled = Mono.WeatherEnabled,
+            WeatherType = Mono.WeatherType,
             WeathEmoji = Mono.WeatherEmoji
         }
         if writefile then
@@ -806,7 +812,8 @@ local function LoadConfig()
             Mono.KillColor = Color3.new(decoded.Kill_R or 1, decoded.Kill_G or 0, decoded.Kill_B or 0)
             Mono.TintColor = Color3.new(decoded.Tint_R or 1, decoded.Tint_G or 1, decoded.Tint_B or 1)
             Mono.TimeOfDay = decoded.Time or "Default"
-            Mono.Weather = decoded.Weather or "None"
+            Mono.WeatherEnabled = decoded.WeatherEnabled or false
+            Mono.WeatherType = decoded.WeatherType or "Rain 🌧️"
             Mono.WeatherEmoji = decoded.WeathEmoji or "💸"
             showNotification("📂 Config Loaded! Re-open tabs.", Color3.fromRGB(0, 255, 100))
         end
@@ -820,7 +827,7 @@ createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Ai
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
--- НОВОЕ: Настройка круга FOV во вкладке Combat
+-- ДОБАВЛЕНА НАСТРОЙКА КРУГА FOV
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end)
     local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end)
@@ -860,8 +867,13 @@ end, function(container)
 end)
 
 createDropdown(worldPage, "Time of Day", {"Default", "Day ☀️", "Night 🌙"}, 1, function(val) Mono.TimeOfDay = val end)
-createDropdown(worldPage, "Weather Event", {"None", "Rain 🌧️", "Custom Snow ❄️"}, 1, function(val) Mono.Weather = val end)
-createSubInput(worldPage, "Custom Snow Emoji", Mono.WeatherEmoji, function(val) Mono.WeatherEmoji = val end)
+
+-- ИСПРАВЛЕНА ПОГОДА (КНОПКА С ШЕСТЕРЕНКОЙ И CUSTOM EMOJI)
+createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, function(s) Mono.WeatherEnabled = s end, function(container)
+    local h1 = createSubInput(container, "1=Rain, 2=Custom", "1", function(val) Mono.WeatherType = (val == "1") and "Rain 🌧️" or "Custom ❄️" end)
+    local h2 = createSubInput(container, "Custom Emoji", Mono.WeatherEmoji, function(val) Mono.WeatherEmoji = val end)
+    return h1 + h2 + 5
+end)
 
 -- 4. SETTINGS
 createButton(settingsPage, "💾 Save Configuration", SaveConfig)
@@ -988,8 +1000,8 @@ local function getClosestVisibleEnemy()
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     
-                    -- НОВОЕ: Проверка радиуса FOV для Аимбота
-                    if dist <= Mono.FOV.Radius then 
+                    -- ЕСЛИ FOV ВЫКЛЮЧЕН, ТО ПРИЦЕЛ РАБОТАЕТ НА ВЕСЬ ЭКРАН, ИНАЧЕ ТОЛЬКО ВНУТРИ КРУГА
+                    if (not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius) then
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
                         local result = workspace:Raycast(origin, dir, GlobalRayParams)
@@ -1171,7 +1183,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
     pcall(function()
         updateESP()
         
-        -- НОВОЕ: Отрисовка круга FOV на экране
+        -- ОТРИСОВКА КРУГА ПРИЦЕЛА НА ЭКРАНЕ
         if Mono.FOV.Enabled then
             fovFrame.Visible = true
             fovFrame.Size = UDim2.new(0, Mono.FOV.Radius * 2, 0, Mono.FOV.Radius * 2)
@@ -1204,7 +1216,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
                     
-                    -- НОВОЕ: Проверка радиуса FOV для Авто-тапа
                     local char = targetPlayer.Character
                     local targetPart = char and getBestTargetPart(char)
                     if targetPart then
@@ -1212,7 +1223,8 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
-                        if onScreen and dist <= Mono.FOV.Radius then
+                        -- ЛОГИКА FOV ДЛЯ АВТО-ТАПА (ЕСЛИ ВЫКЛЮЧЕН = РАБОТАЕТ ВЕЗДЕ)
+                        if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
                             LastTargetHit = targetPlayer
                             LastTargetTime = tick()
                             
