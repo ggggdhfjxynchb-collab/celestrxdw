@@ -23,7 +23,7 @@ local Mono = {
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     ESP = { Enabled = false, MaxDistance = 350 },
     TeamCheck = false,
-    ShootFlash = true,
+    KillEffect = true,
     TargetObj = "None", 
     MenuOpen = true
 }
@@ -32,6 +32,10 @@ local LastShootTime = 0
 local BindWait = nil 
 local DeadCache = {} 
 
+-- Система отслеживания для кастомных смертей
+local LastTargetHit = nil
+local LastTargetTime = 0
+
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MonogrammaKlient"
@@ -39,12 +43,7 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
 
-local LavenderGradient = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), 
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
-})
-
--- === ЭФФЕКТ ВЫСТРЕЛА (FLASH) ===
+-- === ЭФФЕКТ УБИЙСТВА (FLASH + ЛАВАНДА) ===
 local flashFrame = Instance.new("Frame")
 flashFrame.Size = UDim2.new(1, 0, 1, 0)
 flashFrame.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
@@ -53,10 +52,33 @@ flashFrame.BorderSizePixel = 0
 flashFrame.ZIndex = 9999 
 flashFrame.Parent = screenGui
 
-local function doShootFlash()
-    if Mono.ShootFlash then
-        flashFrame.BackgroundTransparency = 0.7
-        TweenService:Create(flashFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+local function doKillEffect()
+    if not Mono.KillEffect then return end
+    
+    flashFrame.BackgroundTransparency = 0.7
+    TweenService:Create(flashFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    
+    for i = 1, 15 do
+        local lav = Instance.new("TextLabel", screenGui)
+        lav.Text = "💜"
+        lav.BackgroundTransparency = 1
+        lav.Size = UDim2.new(0, 40, 0, 40)
+        lav.Position = UDim2.new(0.5, -20, 0.5, -20)
+        lav.TextSize = math.random(20, 45)
+        lav.ZIndex = 10000
+        
+        local angle = math.rad(math.random(0, 360))
+        local distance = math.random(100, 600)
+        local targetX = 0.5 + (math.cos(angle) * (distance / Camera.ViewportSize.X))
+        local targetY = 0.5 + (math.sin(angle) * (distance / Camera.ViewportSize.Y))
+        
+        local ts = TweenService:Create(lav, TweenInfo.new(math.random(5, 10)/10, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+            Position = UDim2.new(targetX, -20, targetY, -20),
+            TextTransparency = 1,
+            Rotation = math.random(-360, 360)
+        })
+        ts:Play()
+        game.Debris:AddItem(lav, 1.5)
     end
 end
 
@@ -125,14 +147,27 @@ local function updateHUD()
     TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 480, 0, 320)
 mainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) 
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Белый фон для градиента
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+
+-- ЛАВАНДОВО-ЧЕРНЫЙ ГРАДИЕНТ
+local bgGradient = Instance.new("UIGradient", mainFrame)
+bgGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(130, 80, 200)), -- Насыщенный лавандовый
+    ColorSequenceKeypoint.new(0.70, Color3.fromRGB(15, 15, 15)),   -- Черный (Темно-серый)
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 10))
+})
+bgGradient.Rotation = 45
+
+-- Аниматор размера меню
+local uiScale = Instance.new("UIScale", mainFrame)
+uiScale.Scale = 1
 
 local unlockMouseBtn = Instance.new("TextButton")
 unlockMouseBtn.Size = UDim2.new(0, 0, 0, 0)
@@ -142,11 +177,10 @@ unlockMouseBtn.Modal = true
 unlockMouseBtn.Parent = mainFrame
 
 local uiStroke = Instance.new("UIStroke", mainFrame)
-uiStroke.Thickness = 2
-local strokeGrad = Instance.new("UIGradient", uiStroke)
-strokeGrad.Color = LavenderGradient
-strokeGrad.Rotation = 45
+uiStroke.Thickness = 1
+uiStroke.Color = Color3.fromRGB(180, 130, 255)
 
+-- Шапка
 local header = Instance.new("Frame", mainFrame)
 header.Size = UDim2.new(1, 0, 0, 40)
 header.BackgroundTransparency = 1
@@ -156,7 +190,7 @@ logoText.Size = UDim2.new(0, 40, 0, 40)
 logoText.Position = UDim2.new(0, 5, 0, 0)
 logoText.BackgroundTransparency = 1
 logoText.Text = "⬟"
-logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
+logoText.TextColor3 = Color3.fromRGB(255, 255, 255)
 logoText.Font = Enum.Font.GothamBlack
 logoText.TextSize = 24
 
@@ -164,7 +198,7 @@ local logoDot = Instance.new("TextLabel", logoText)
 logoDot.Size = UDim2.new(1, 0, 1, 0)
 logoDot.BackgroundTransparency = 1
 logoDot.Text = "•"
-logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
+logoDot.TextColor3 = Color3.fromRGB(180, 130, 255)
 logoDot.Font = Enum.Font.GothamBlack
 logoDot.TextSize = 14
 
@@ -172,30 +206,24 @@ local title = Instance.new("TextLabel", header)
 title.Size = UDim2.new(1, -50, 1, 0)
 title.Position = UDim2.new(0, 45, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "MONOGRAMMA  |  Press ']' to hide"
-title.TextColor3 = Color3.fromRGB(230, 230, 255)
+title.Text = "MONOGRAMMA  |  Press RShift"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 
 local headerLine = Instance.new("Frame", mainFrame)
-headerLine.Size = UDim2.new(1, 0, 0, 2)
+headerLine.Size = UDim2.new(1, 0, 0, 1)
 headerLine.Position = UDim2.new(0, 0, 0, 40)
+headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 headerLine.BorderSizePixel = 0
-local lineGrad = Instance.new("UIGradient", headerLine)
-lineGrad.Color = LavenderGradient
+headerLine.BackgroundTransparency = 0.5
 
 -- ПАНЕЛЬ НАВИГАЦИИ (СЛЕВА)
 local sidebar = Instance.new("Frame", mainFrame)
-sidebar.Size = UDim2.new(0, 130, 1, -42)
-sidebar.Position = UDim2.new(0, 0, 0, 42)
-sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
-local sidebarCover = Instance.new("Frame", sidebar)
-sidebarCover.Size = UDim2.new(0, 10, 1, 0)
-sidebarCover.Position = UDim2.new(1, -10, 0, 0)
-sidebarCover.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-sidebarCover.BorderSizePixel = 0
+sidebar.Size = UDim2.new(0, 130, 1, -41)
+sidebar.Position = UDim2.new(0, 0, 0, 41)
+sidebar.BackgroundTransparency = 1 -- Прозрачный, чтобы видеть градиент
 
 local sidebarList = Instance.new("UIListLayout", sidebar)
 sidebarList.Padding = UDim.new(0, 5)
@@ -207,8 +235,8 @@ tabPadding.PaddingTop = UDim.new(0, 10)
 
 -- ЗОНА КОНТЕНТА (СПРАВА)
 local contentArea = Instance.new("Frame", mainFrame)
-contentArea.Size = UDim2.new(1, -140, 1, -42)
-contentArea.Position = UDim2.new(0, 140, 0, 42)
+contentArea.Size = UDim2.new(1, -140, 1, -41)
+contentArea.Position = UDim2.new(0, 140, 0, 41)
 contentArea.BackgroundTransparency = 1
 
 local Pages = {}
@@ -217,9 +245,10 @@ local activeBtn = nil
 local function createTab(name, icon)
     local btn = Instance.new("TextButton", sidebar)
     btn.Size = UDim2.new(0.9, 0, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    btn.BackgroundTransparency = 0.5
     btn.Text = " " .. icon .. " " .. name
-    btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
     btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -233,6 +262,10 @@ local function createTab(name, icon)
     page.ScrollBarImageColor3 = Color3.fromRGB(180, 130, 255)
     page.Visible = false
     
+    -- ИСПРАВЛЕНИЕ: Автоматический размер контента, чтобы кнопки не уезжали
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
     local pLayout = Instance.new("UIListLayout", page)
     pLayout.Padding = UDim.new(0, 10)
     
@@ -240,8 +273,8 @@ local function createTab(name, icon)
 
     btn.MouseButton1Click:Connect(function()
         if activeBtn then
-            activeBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-            activeBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+            activeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+            activeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
         for _, p in pairs(Pages) do p.Visible = false end
         
@@ -262,7 +295,8 @@ local function createToggle(parent, text, defaultState, onToggle)
     local frame = Instance.new("Frame", parent)
     frame.Name = text
     frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -296,7 +330,8 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     local frame = Instance.new("Frame", parent)
     frame.Name = text
     frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -352,7 +387,8 @@ end
 local function createDropdown(parent, text, options, defaultIndex, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
     frame.ClipsDescendants = true
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
@@ -393,6 +429,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback)
         local optBtn = Instance.new("TextButton", dropList)
         optBtn.Size = UDim2.new(1, 0, 0, 30)
         optBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        optBtn.BackgroundTransparency = 0.2
         optBtn.BorderSizePixel = 0
         optBtn.Text = "   " .. opt
         optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -434,7 +471,7 @@ createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamChec
 -- Вкладка VISUALS
 createToggle(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
 createDropdown(visualsPage, "Target Obj", {"None", "Moon 🌙", "Butterflies 🦋", "Lavender 💜", "Bananas 🍌"}, 1, function(val) Mono.TargetObj = val end)
-createToggle(visualsPage, "Shoot Flash Effect", Mono.ShootFlash, function(s) Mono.ShootFlash = s end)
+createToggle(visualsPage, "Kill Effect (Flash & Lavender)", Mono.KillEffect, function(s) Mono.KillEffect = s end)
 
 updateHUD() 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
@@ -462,12 +499,8 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- === ОБРАБОТКА НАЖАТИЙ ===
+-- === ОБРАБОТКА НАЖАТИЙ & АНИМАЦИЯ МЕНЮ ===
 UserInputService.InputBegan:Connect(function(input, gp)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and not gp then
-        task.spawn(doShootFlash)
-    end
-
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
             BindWait(input.KeyCode)
@@ -492,17 +525,27 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
 
-    if input.KeyCode == Enum.KeyCode.RightBracket then
+    -- Открытие/Закрытие на Правый Shift
+    if input.KeyCode == Enum.KeyCode.RightShift then
         Mono.MenuOpen = not Mono.MenuOpen
-        mainFrame.Visible = Mono.MenuOpen
         unlockMouseBtn.Modal = Mono.MenuOpen
+        
+        if Mono.MenuOpen then
+            mainFrame.Visible = true
+            TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        else
+            local tw = TweenService:Create(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
+            tw:Play()
+            tw.Completed:Connect(function()
+                if not Mono.MenuOpen then mainFrame.Visible = false end
+            end)
+        end
     end
 end)
 
 -- === 4. ЯДРО ЧИТА ===
 
 local function simulateClick()
-    task.spawn(doShootFlash)
     if mouse1click then
         mouse1click()
     else
@@ -519,7 +562,6 @@ local function isEnemy(plr)
     return true
 end
 
--- === ИСПРАВЛЕННЫЙ ДЕТЕКТОР СМЕРТИ ТИММЕЙТОВ ===
 local function showDeathNotification(name)
     local notif = Instance.new("TextLabel", screenGui)
     notif.Text = name .. " умер !"
@@ -619,21 +661,32 @@ local function updateESP()
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
-        -- СТРОГИЙ ДЕТЕКТОР СМЕРТИ ТОЛЬКО ДЛЯ ТИММЕЙТОВ
-        local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
-        if isTeammate and char then
+        -- КАСТОМНЫЙ ДЕТЕКТОР СМЕРТЕЙ
+        local isDead = false
+        if char then
             local hum = char:FindFirstChild("Humanoid")
-            if hum then
-                if hum.Health <= 0 and not DeadCache[plr] then
-                    DeadCache[plr] = true
-                    showDeathNotification(plr.Name)
-                elseif hum.Health > 0 then
-                    DeadCache[plr] = false
-                end
-            end
+            if hum and hum.Health <= 0 then isDead = true end
+            if not char.Parent then isDead = true end -- Если игрушка просто удаляет модель
+        else
+            isDead = true
         end
 
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+        if isDead and not DeadCache[plr] then
+            DeadCache[plr] = true
+            if isEnem then
+                -- Если мы по нему недавно стреляли/наводились, вызываем эффект
+                if LastTargetHit == plr and (tick() - LastTargetTime < 3) then
+                    doKillEffect()
+                end
+            else
+                local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
+                if isTeammate then showDeathNotification(plr.Name) end
+            end
+        elseif not isDead then
+            DeadCache[plr] = false
+        end
+
+        if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
             
             local distToPlayer = (char.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
@@ -726,6 +779,12 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         local target = getClosestVisibleEnemy()
         if target then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+            -- Обновляем логгер целей для эффекта убийства
+            local targetPlayer = getPlayerFromPart(target)
+            if targetPlayer then
+                LastTargetHit = targetPlayer
+                LastTargetTime = tick()
+            end
         end
     end
 
@@ -734,6 +793,10 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         if hitResult and hitResult.Instance then
             local targetPlayer = getPlayerFromPart(hitResult.Instance)
             if targetPlayer and isEnemy(targetPlayer) then
+                -- Обновляем логгер целей
+                LastTargetHit = targetPlayer
+                LastTargetTime = tick()
+                
                 if tick() - LastShootTime > Mono.AutoTap.Delay then
                     LastShootTime = tick()
                     simulateClick()
