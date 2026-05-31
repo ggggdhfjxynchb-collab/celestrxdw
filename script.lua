@@ -36,6 +36,7 @@ local DeadCache = {}
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
 
 local LavenderGradient = ColorSequence.new({
@@ -43,23 +44,23 @@ local LavenderGradient = ColorSequence.new({
     ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
 })
 
--- ИСПРАВЛЕННЫЙ ЭФФЕКТ ВЫСТРЕЛА (FLASH)
+-- === ЭФФЕКТ ВЫСТРЕЛА (FLASH) ===
 local flashFrame = Instance.new("Frame")
 flashFrame.Size = UDim2.new(1, 0, 1, 0)
 flashFrame.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 flashFrame.BackgroundTransparency = 1
 flashFrame.BorderSizePixel = 0
-flashFrame.ZIndex = 9999 -- Поверх всего экрана
+flashFrame.ZIndex = 9999 
 flashFrame.Parent = screenGui
 
 local function doShootFlash()
     if Mono.ShootFlash then
-        flashFrame.BackgroundTransparency = 0.6
+        flashFrame.BackgroundTransparency = 0.7
         TweenService:Create(flashFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end
 end
 
--- ДИНАМИЧНЫЙ STATUS HUD
+-- === ДИНАМИЧНЫЙ STATUS HUD ===
 local hudFrame = Instance.new("Frame")
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
 hudFrame.Position = UDim2.new(1, -160, 0, 10)
@@ -116,7 +117,7 @@ local function updateHUD()
     if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
     if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
     if Mono.TargetObj ~= "None" then 
-        local objName = Mono.TargetObj:gsub(" .*", "") -- Убираем смайлик из названия для HUD
+        local objName = Mono.TargetObj:gsub(" .*", "") 
         addActiveFeature("Obj: " .. objName) 
     end
 
@@ -124,10 +125,10 @@ local function updateHUD()
     TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
 end
 
--- ГЛАВНОЕ МЕНЮ
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 360)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -180)
+mainFrame.Size = UDim2.new(0, 480, 0, 320)
+mainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) 
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -159,6 +160,14 @@ logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
 logoText.Font = Enum.Font.GothamBlack
 logoText.TextSize = 24
 
+local logoDot = Instance.new("TextLabel", logoText)
+logoDot.Size = UDim2.new(1, 0, 1, 0)
+logoDot.BackgroundTransparency = 1
+logoDot.Text = "•"
+logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
+logoDot.Font = Enum.Font.GothamBlack
+logoDot.TextSize = 14
+
 local title = Instance.new("TextLabel", header)
 title.Size = UDim2.new(1, -50, 1, 0)
 title.Position = UDim2.new(0, 45, 0, 0)
@@ -170,23 +179,85 @@ title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 
 local headerLine = Instance.new("Frame", mainFrame)
-headerLine.Size = UDim2.new(1, -20, 0, 2)
-headerLine.Position = UDim2.new(0, 10, 0, 40)
+headerLine.Size = UDim2.new(1, 0, 0, 2)
+headerLine.Position = UDim2.new(0, 0, 0, 40)
 headerLine.BorderSizePixel = 0
 local lineGrad = Instance.new("UIGradient", headerLine)
 lineGrad.Color = LavenderGradient
 
-local content = Instance.new("ScrollingFrame", mainFrame)
-content.Size = UDim2.new(1, -20, 1, -60)
-content.Position = UDim2.new(0, 10, 0, 50)
-content.BackgroundTransparency = 1
-content.ScrollBarThickness = 2
-content.ScrollBarImageColor3 = Color3.fromRGB(180, 130, 255)
-local listLayout = Instance.new("UIListLayout", content)
-listLayout.Padding = UDim.new(0, 10)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+-- ПАНЕЛЬ НАВИГАЦИИ (СЛЕВА)
+local sidebar = Instance.new("Frame", mainFrame)
+sidebar.Size = UDim2.new(0, 130, 1, -42)
+sidebar.Position = UDim2.new(0, 0, 0, 42)
+sidebar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+local sidebarCover = Instance.new("Frame", sidebar)
+sidebarCover.Size = UDim2.new(0, 10, 1, 0)
+sidebarCover.Position = UDim2.new(1, -10, 0, 0)
+sidebarCover.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+sidebarCover.BorderSizePixel = 0
 
--- === ФУНКЦИИ GUI ===
+local sidebarList = Instance.new("UIListLayout", sidebar)
+sidebarList.Padding = UDim.new(0, 5)
+sidebarList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+sidebarList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local tabPadding = Instance.new("UIPadding", sidebar)
+tabPadding.PaddingTop = UDim.new(0, 10)
+
+-- ЗОНА КОНТЕНТА (СПРАВА)
+local contentArea = Instance.new("Frame", mainFrame)
+contentArea.Size = UDim2.new(1, -140, 1, -42)
+contentArea.Position = UDim2.new(0, 140, 0, 42)
+contentArea.BackgroundTransparency = 1
+
+local Pages = {}
+local activeBtn = nil
+
+local function createTab(name, icon)
+    local btn = Instance.new("TextButton", sidebar)
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    btn.Text = " " .. icon .. " " .. name
+    btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local page = Instance.new("ScrollingFrame", contentArea)
+    page.Size = UDim2.new(1, -10, 1, -10)
+    page.Position = UDim2.new(0, 0, 0, 10)
+    page.BackgroundTransparency = 1
+    page.ScrollBarThickness = 2
+    page.ScrollBarImageColor3 = Color3.fromRGB(180, 130, 255)
+    page.Visible = false
+    
+    local pLayout = Instance.new("UIListLayout", page)
+    pLayout.Padding = UDim.new(0, 10)
+    
+    Pages[name] = page
+
+    btn.MouseButton1Click:Connect(function()
+        if activeBtn then
+            activeBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+            activeBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end
+        for _, p in pairs(Pages) do p.Visible = false end
+        
+        btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        page.Visible = true
+        activeBtn = btn
+    end)
+
+    return page, btn
+end
+
+local combatPage, combatBtn = createTab("Combat", "⚔️")
+local visualsPage, visualsBtn = createTab("Visuals", "👁️")
+
+-- === ФУНКЦИИ GUI ДЛЯ ВКЛАДОК ===
 local function createToggle(parent, text, defaultState, onToggle)
     local frame = Instance.new("Frame", parent)
     frame.Name = text
@@ -241,7 +312,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     local status = Instance.new("Frame", frame)
     status.Name = "Status"
     status.Size = UDim2.new(0, 14, 0, 14)
-    status.Position = UDim2.new(0, 200, 0.5, -7)
+    status.Position = UDim2.new(0, 180, 0.5, -7)
     status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
     
@@ -278,7 +349,6 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 end
 
--- НОВОЕ ВЫПАДАЮЩЕЕ МЕНЮ (DROPDOWN)
 local function createDropdown(parent, text, options, defaultIndex, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 35)
@@ -344,29 +414,35 @@ local function createDropdown(parent, text, options, defaultIndex, callback)
 end
 
 local function setToggleStateUI(frameName, state)
-    local frame = content:FindFirstChild(frameName)
-    if frame then
-        local status = frame:FindFirstChild("Status")
-        local btn = frame:FindFirstChild("MainBtn")
-        if status and btn then
-            status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-            btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    for _, v in pairs(contentArea:GetDescendants()) do
+        if v:IsA("Frame") and v.Name == frameName then
+            local status = v:FindFirstChild("Status")
+            local btn = v:FindFirstChild("MainBtn")
+            if status and btn then
+                status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+                btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+            end
         end
     end
 end
 
--- Создаем элементы меню
-createToggleWithBind(content, "Aimbot (Toggle Key)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
-createToggleWithBind(content, "Auto Tap (Toggle Key)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
-createToggle(content, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
-createToggle(content, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
--- Выпадающее меню с новыми нормальными эмодзи
-createDropdown(content, "Target Obj", {"None", "Moon 🌙", "Butterflies 🦋", "Lavender 💜", "Bananas 🍌"}, 1, function(val) Mono.TargetObj = val end)
-createToggle(content, "Shoot Flash Effect", Mono.ShootFlash, function(s) Mono.ShootFlash = s end)
+-- Вкладка COMBAT
+createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
+createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
+createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
+
+-- Вкладка VISUALS
+createToggle(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
+createDropdown(visualsPage, "Target Obj", {"None", "Moon 🌙", "Butterflies 🦋", "Lavender 💜", "Bananas 🍌"}, 1, function(val) Mono.TargetObj = val end)
+createToggle(visualsPage, "Shoot Flash Effect", Mono.ShootFlash, function(s) Mono.ShootFlash = s end)
 
 updateHUD() 
+combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+combatPage.Visible = true
+activeBtn = combatBtn
 
--- Перетаскивание меню
+-- === ПЕРЕТАСКИВАНИЕ ===
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -386,8 +462,12 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Бинды 
+-- === ОБРАБОТКА НАЖАТИЙ ===
 UserInputService.InputBegan:Connect(function(input, gp)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and not gp then
+        task.spawn(doShootFlash)
+    end
+
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
             BindWait(input.KeyCode)
@@ -402,13 +482,13 @@ UserInputService.InputBegan:Connect(function(input, gp)
 
     if key == Mono.Aimbot.Key then
         Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
-        setToggleStateUI("Aimbot (Toggle Key)", Mono.Aimbot.Enabled)
+        setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
         updateHUD()
     end
 
     if key == Mono.AutoTap.Key then
         Mono.AutoTap.Enabled = not Mono.AutoTap.Enabled
-        setToggleStateUI("Auto Tap (Toggle Key)", Mono.AutoTap.Enabled)
+        setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
         updateHUD()
     end
 
@@ -422,7 +502,7 @@ end)
 -- === 4. ЯДРО ЧИТА ===
 
 local function simulateClick()
-    task.spawn(doShootFlash) -- Запускаем эффект ДО выстрела, чтобы не блочился
+    task.spawn(doShootFlash)
     if mouse1click then
         mouse1click()
     else
@@ -439,6 +519,7 @@ local function isEnemy(plr)
     return true
 end
 
+-- === ИСПРАВЛЕННЫЙ ДЕТЕКТОР СМЕРТИ ТИММЕЙТОВ ===
 local function showDeathNotification(name)
     local notif = Instance.new("TextLabel", screenGui)
     notif.Text = name .. " умер !"
@@ -449,7 +530,7 @@ local function showDeathNotification(name)
     notif.Font = Enum.Font.GothamBlack
     notif.TextSize = 22
     
-    local ts = game:GetService("TweenService")
+    local ts = TweenService
     ts:Create(notif, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -150, 0.65, 0), TextTransparency = 1}):Play()
     game.Debris:AddItem(notif, 3)
 end
@@ -538,7 +619,9 @@ local function updateESP()
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
-        if not isEnem and char then
+        -- СТРОГИЙ ДЕТЕКТОР СМЕРТИ ТОЛЬКО ДЛЯ ТИММЕЙТОВ
+        local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
+        if isTeammate and char then
             local hum = char:FindFirstChild("Humanoid")
             if hum then
                 if hum.Health <= 0 and not DeadCache[plr] then
@@ -588,20 +671,18 @@ local function updateESP()
                 end
             end
 
-            -- TARGET OBJ LOGIC (ИСПОЛЬЗУЕМ РЕАЛЬНЫЕ МЕТРЫ ДЛЯ РАЗМЕРА)
             if Mono.TargetObj ~= "None" and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
                     espCache[plr].Orbits = {}
                     for i=1, 3 do
                         local bb = Instance.new("BillboardGui")
-                        -- ЗАДАЕМ РАЗМЕР В СТАДАХ (2x2 метра), ЧТОБЫ УМЕНЬШАЛИСЬ ВДАЛИ
                         bb.Size = UDim2.new(2, 0, 2, 0) 
                         bb.AlwaysOnTop = true
                         local tl = Instance.new("TextLabel", bb)
                         tl.Size = UDim2.new(1, 0, 1, 0)
                         tl.BackgroundTransparency = 1
-                        tl.TextScaled = true -- Авто-подбор размера шрифта под стады
+                        tl.TextScaled = true 
                         table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
                     end
                 end
