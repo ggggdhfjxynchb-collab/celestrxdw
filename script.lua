@@ -12,123 +12,187 @@ if not targetParent then pcall(function() targetParent = game:GetService("CoreGu
 if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
 
 pcall(function()
-    local oldGui = targetParent:FindFirstChild("DuckShooterKlient")
+    local oldGui = targetParent:FindFirstChild("MonogrammaKlient")
     if oldGui then oldGui:Destroy() end
 end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
-local Duck = {
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Smoothness = 0.5, TargetPart = "Head" },
-    Triggerbot = { Enabled = false, Delay = 0.05 },
-    ESP = { Enabled = true },
-    Friends = {},
+local Mono = {
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, TargetPart = "Head" },
+    AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
+    ESP = { Enabled = false },
     MenuOpen = true
 }
 
 local LastShootTime = 0
+local BindingAimbot = false
+local BindingAutoTap = false
 
--- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
+-- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА (ЛАВАНДОВЫЙ СТИЛЬ) ===
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DuckShooterKlient"
+screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = targetParent
 
+-- Цветовая схема Monogramma
+local LavenderGradient = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), -- Светло-лавандовый
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   -- Темно-фиолетовый
+})
+
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 450, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -225, 0.5, -150)
-mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+mainFrame.Size = UDim2.new(0, 400, 0, 280)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -140)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) -- Темно-фиолетовый фон
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-local uiStroke = Instance.new("UIStroke", mainFrame); uiStroke.Color = Color3.fromRGB(0, 170, 255); uiStroke.Thickness = 2
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
--- МАГИЯ РАЗБЛОКИРОВКИ МЫШИ (MODAL)
+-- Разблокировка мыши
 local unlockMouseBtn = Instance.new("TextButton")
 unlockMouseBtn.Size = UDim2.new(0, 0, 0, 0)
 unlockMouseBtn.BackgroundTransparency = 1
 unlockMouseBtn.Text = ""
-unlockMouseBtn.Modal = true -- Это свойство отвязывает мышь от центра экрана, пока меню открыто
+unlockMouseBtn.Modal = true
 unlockMouseBtn.Parent = mainFrame
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
+-- Обводка
+local uiStroke = Instance.new("UIStroke", mainFrame)
+uiStroke.Thickness = 2
+local strokeGrad = Instance.new("UIGradient", uiStroke)
+strokeGrad.Color = LavenderGradient
+strokeGrad.Rotation = 45
+
+-- Шапка
+local header = Instance.new("Frame", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 40)
+header.BackgroundTransparency = 1
+
+local logoText = Instance.new("TextLabel", header)
+logoText.Size = UDim2.new(0, 40, 0, 40)
+logoText.Position = UDim2.new(0, 5, 0, 0)
+logoText.BackgroundTransparency = 1
+logoText.Text = "⬟" -- Символ пентагона
+logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
+logoText.Font = Enum.Font.GothamBlack
+logoText.TextSize = 24
+
+local logoDot = Instance.new("TextLabel", logoText)
+logoDot.Size = UDim2.new(1, 0, 1, 0)
+logoDot.BackgroundTransparency = 1
+logoDot.Text = "•"
+logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
+logoDot.Font = Enum.Font.GothamBlack
+logoDot.TextSize = 14
+
+-- ТУТ МОЖЕШЬ ВСТАВИТЬ СВОЮ КАРТИНКУ ПЕНТАГОНА
+local logoImage = Instance.new("ImageLabel", header)
+logoImage.Size = UDim2.new(0, 26, 0, 26)
+logoImage.Position = UDim2.new(0, 12, 0, 7)
+logoImage.BackgroundTransparency = 1
+logoImage.Image = "" -- ВСТАВЬ СЮДА ID КАРТИНКИ (например: "rbxassetid://12345678")
+logoImage.ZIndex = 2
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -50, 1, 0)
+title.Position = UDim2.new(0, 45, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "  DUCK SHOOTER KLIENT [Press P]"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBlack
+title.Text = "MONOGRAMMA  |  Press ']' to hide"
+title.TextColor3 = Color3.fromRGB(230, 230, 255)
+title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = mainFrame
 
-local tabContainer = Instance.new("Frame")
-tabContainer.Size = UDim2.new(0, 120, 1, -30)
-tabContainer.Position = UDim2.new(0, 0, 0, 30)
-tabContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-tabContainer.BorderSizePixel = 0
-tabContainer.Parent = mainFrame
+-- Линия под шапкой
+local headerLine = Instance.new("Frame", mainFrame)
+headerLine.Size = UDim2.new(1, -20, 0, 2)
+headerLine.Position = UDim2.new(0, 10, 0, 40)
+headerLine.BorderSizePixel = 0
+local lineGrad = Instance.new("UIGradient", headerLine)
+lineGrad.Color = LavenderGradient
 
-local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, -120, 1, -30)
-contentContainer.Position = UDim2.new(0, 120, 0, 30)
-contentContainer.BackgroundTransparency = 1
-contentContainer.Parent = mainFrame
+-- Контейнер контента
+local content = Instance.new("ScrollingFrame", mainFrame)
+content.Size = UDim2.new(1, -20, 1, -60)
+content.Position = UDim2.new(0, 10, 0, 50)
+content.BackgroundTransparency = 1
+content.ScrollBarThickness = 2
+content.ScrollBarImageColor3 = Color3.fromRGB(180, 130, 255)
+local listLayout = Instance.new("UIListLayout", content)
+listLayout.Padding = UDim.new(0, 10)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local function createToggle(parent, yPos, text, defaultState, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 30); btn.Position = UDim2.new(0.05, 0, 0, yPos); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); btn.Text = ""; btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    local lbl = Instance.new("TextLabel", btn); lbl.Size = UDim2.new(1, -40, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.BackgroundTransparency = 1; lbl.Text = text; lbl.TextColor3 = Color3.fromRGB(200, 200, 200); lbl.Font = Enum.Font.Gotham; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left
-    local status = Instance.new("Frame", btn); status.Size = UDim2.new(0, 16, 0, 16); status.Position = UDim2.new(1, -26, 0.5, -8); status.BackgroundColor3 = defaultState and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50); Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+-- === ФУНКЦИИ GUI ===
+local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, onBind)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 200, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = "  " .. text
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 14
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+
+    local status = Instance.new("Frame", frame)
+    status.Size = UDim2.new(0, 16, 0, 16)
+    status.Position = UDim2.new(0, 200, 0.5, -8)
+    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+    
+    local bindBtn = Instance.new("TextButton", frame)
+    bindBtn.Size = UDim2.new(0, 100, 0, 26)
+    bindBtn.Position = UDim2.new(1, -110, 0.5, -13)
+    bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    bindBtn.Text = defaultBind and defaultBind.Name or "None"
+    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindBtn.Font = Enum.Font.Gotham
+    bindBtn.TextSize = 12
+    Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
+
     local state = defaultState
     btn.MouseButton1Click:Connect(function()
         state = not state
-        status.BackgroundColor3 = state and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50)
-        lbl.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        callback(state)
+        status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        onToggle(state)
     end)
-    return btn
+
+    bindBtn.MouseButton1Click:Connect(function()
+        bindBtn.Text = "..."
+        onBind(bindBtn)
+    end)
 end
 
--- Вкладка: Combat
-local combatPage = Instance.new("Frame", contentContainer); combatPage.Size = UDim2.new(1, 0, 1, 0); combatPage.BackgroundTransparency = 1
-createToggle(combatPage, 10, "Auto Aim", Duck.Aimbot.Enabled, function(s) Duck.Aimbot.Enabled = s end)
-createToggle(combatPage, 50, "Auto Shoot (Triggerbot)", Duck.Triggerbot.Enabled, function(s) Duck.Triggerbot.Enabled = s end)
+-- Создаем элементы
+createToggleWithBind(content, "Aimbot (Auto-Aim)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, 
+    function(s) Mono.Aimbot.Enabled = s end,
+    function(btn) BindingAimbot = true; btn.Text = "Press Key..." end
+)
 
-local bindBtn = Instance.new("TextButton", combatPage); bindBtn.Size = UDim2.new(0.9, 0, 0, 30); bindBtn.Position = UDim2.new(0.05, 0, 0, 90); bindBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30); bindBtn.Text = "Aim Bind: " .. Duck.Aimbot.Key.Name; bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255); bindBtn.Font = Enum.Font.Gotham; bindBtn.TextSize = 12; Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
-local binding = false
-bindBtn.MouseButton1Click:Connect(function() bindBtn.Text = "Press any key..."; binding = true end)
+createToggleWithBind(content, "Auto Tap (Auto Shoot)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, 
+    function(s) Mono.AutoTap.Enabled = s end,
+    function(btn) BindingAutoTap = true; btn.Text = "Press Key..." end
+)
 
--- Вкладка: Visuals & Friends
-local visPage = Instance.new("Frame", contentContainer); visPage.Size = UDim2.new(1, 0, 1, 0); visPage.BackgroundTransparency = 1; visPage.Visible = false
-createToggle(visPage, 10, "Player ESP", Duck.ESP.Enabled, function(s) Duck.ESP.Enabled = s end)
+local espFrame = Instance.new("Frame", content)
+espFrame.Size = UDim2.new(1, 0, 0, 40); espFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35); Instance.new("UICorner", espFrame).CornerRadius = UDim.new(0, 6)
+local espBtn = Instance.new("TextButton", espFrame)
+espBtn.Size = UDim2.new(1, 0, 1, 0); espBtn.BackgroundTransparency = 1; espBtn.Text = "  Wallhack (ESP)"; espBtn.TextColor3 = Color3.fromRGB(200, 200, 200); espBtn.Font = Enum.Font.GothamMedium; espBtn.TextSize = 14; espBtn.TextXAlignment = Enum.TextXAlignment.Left
+local espStatus = Instance.new("Frame", espFrame)
+espStatus.Size = UDim2.new(0, 16, 0, 16); espStatus.Position = UDim2.new(1, -30, 0.5, -8); espStatus.BackgroundColor3 = Color3.fromRGB(60, 60, 70); Instance.new("UICorner", espStatus).CornerRadius = UDim.new(1, 0)
 
-local friendInput = Instance.new("TextBox", visPage); friendInput.Size = UDim2.new(0.9, 0, 0, 30); friendInput.Position = UDim2.new(0.05, 0, 0, 50); friendInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40); friendInput.Text = "Enter friend's exact name..."; friendInput.TextColor3 = Color3.fromRGB(200, 200, 200); friendInput.Font = Enum.Font.Gotham; friendInput.TextSize = 12; friendInput.ClearTextOnFocus = true; Instance.new("UICorner", friendInput).CornerRadius = UDim.new(0, 4)
-local addFriendBtn = Instance.new("TextButton", visPage); addFriendBtn.Size = UDim2.new(0.9, 0, 0, 30); addFriendBtn.Position = UDim2.new(0.05, 0, 0, 90); addFriendBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255); addFriendBtn.Text = "Add Friend"; addFriendBtn.TextColor3 = Color3.fromRGB(255, 255, 255); addFriendBtn.Font = Enum.Font.GothamBold; addFriendBtn.TextSize = 12; Instance.new("UICorner", addFriendBtn).CornerRadius = UDim.new(0, 4)
-local friendsListLbl = Instance.new("TextLabel", visPage); friendsListLbl.Size = UDim2.new(0.9, 0, 0, 100); friendsListLbl.Position = UDim2.new(0.05, 0, 0, 130); friendsListLbl.BackgroundTransparency = 1; friendsListLbl.Text = "Friends: None"; friendsListLbl.TextColor3 = Color3.fromRGB(0, 255, 100); friendsListLbl.Font = Enum.Font.Gotham; friendsListLbl.TextSize = 12; friendsListLbl.TextYAlignment = Enum.TextYAlignment.Top; friendsListLbl.TextWrapped = true
-
-addFriendBtn.MouseButton1Click:Connect(function()
-    local name = friendInput.Text
-    if name ~= "" and name ~= LocalPlayer.Name then
-        Duck.Friends[string.lower(name)] = true
-        friendInput.Text = ""
-        local fStr = "Friends: "
-        for f, _ in pairs(Duck.Friends) do fStr = fStr .. f .. ", " end
-        friendsListLbl.Text = fStr
-    end
+espBtn.MouseButton1Click:Connect(function()
+    Mono.ESP.Enabled = not Mono.ESP.Enabled
+    espStatus.BackgroundColor3 = Mono.ESP.Enabled and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    espBtn.TextColor3 = Mono.ESP.Enabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
 end)
 
--- Вкладки кнопок
-local function createTabBtn(yPos, text, page)
-    local btn = Instance.new("TextButton", tabContainer); btn.Size = UDim2.new(1, 0, 0, 40); btn.Position = UDim2.new(0, 0, 0, yPos); btn.BackgroundTransparency = 1; btn.Text = text; btn.TextColor3 = Color3.fromRGB(200, 200, 200); btn.Font = Enum.Font.GothamBold; btn.TextSize = 12
-    btn.MouseButton1Click:Connect(function()
-        combatPage.Visible = false; visPage.Visible = false; page.Visible = true
-    end)
-end
-createTabBtn(0, "Combat", combatPage)
-createTabBtn(40, "Visuals & Friends", visPage)
-
--- Перетаскивание меню
+-- Перетаскивание
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -148,38 +212,48 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Горячие клавиши (Открытие меню и бинд аима)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if binding and input.UserInputType == Enum.UserInputType.Keyboard then
-        Duck.Aimbot.Key = input.KeyCode
-        bindBtn.Text = "Aim Bind: " .. Duck.Aimbot.Key.Name
-        binding = false
+-- Обработка биндов и скрытия меню
+UserInputService.InputBegan:Connect(function(input, gp)
+    if BindingAimbot and input.UserInputType == Enum.UserInputType.Keyboard then
+        Mono.Aimbot.Key = input.KeyCode
+        BindingAimbot = false
+        -- Обновляем текст кнопки вручную через поиск
+        for _, v in pairs(content:GetChildren()) do
+            if v:IsA("Frame") and v:FindFirstChild("TextButton") and v.TextButton.Text == "  Aimbot (Auto-Aim)" then
+                v:GetChildren()[3].Text = input.KeyCode.Name
+            end
+        end
         return
     end
 
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.P then
-        Duck.MenuOpen = not Duck.MenuOpen
-        mainFrame.Visible = Duck.MenuOpen
+    if BindingAutoTap and input.UserInputType == Enum.UserInputType.Keyboard then
+        Mono.AutoTap.Key = input.KeyCode
+        BindingAutoTap = false
+        for _, v in pairs(content:GetChildren()) do
+            if v:IsA("Frame") and v:FindFirstChild("TextButton") and v.TextButton.Text == "  Auto Tap (Auto Shoot)" then
+                v:GetChildren()[3].Text = input.KeyCode.Name
+            end
+        end
+        return
+    end
+
+    if not gp and input.KeyCode == Enum.KeyCode.RightBracket then
+        Mono.MenuOpen = not Mono.MenuOpen
+        mainFrame.Visible = Mono.MenuOpen
+        unlockMouseBtn.Modal = Mono.MenuOpen
     end
 end)
 
 -- === 4. ЯДРО ЧИТА (АЛГОРИТМЫ) ===
 
--- Проверка: друг ли это?
-local function isFriend(plr)
-    return Duck.Friends[string.lower(plr.Name)] or Duck.Friends[string.lower(plr.DisplayName)]
-end
-
--- Проверка: враг ли это? (Команды и Друзья)
+-- Проверка: враг ли это?
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    if isFriend(plr) then return false end
-    -- Если игра командная и вы в одной команде
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then return false end
     return true
 end
 
--- Проверка: Виден ли игрок за стеной (Visibility Check)
+-- Проверка: Виден ли игрок (Raycast)
 local function isVisible(targetPart)
     local origin = Camera.CFrame.Position
     local direction = (targetPart.Position - origin).Unit * 1000
@@ -191,26 +265,26 @@ local function isVisible(targetPart)
     local result = workspace:Raycast(origin, direction, rayParams)
     if result and result.Instance then
         if result.Instance:IsDescendantOf(targetPart.Parent) then
-            return true -- Луч попал во врага (стен нет)
+            return true -- Стен нет
         end
     end
-    return false -- Луч попал в стену
+    return false -- Спрятался
 end
 
--- Найти ближайшего врага к центру экрана
-local function getClosestPlayerToCrosshair()
+-- Поиск цели
+local function getClosestVisibleEnemy()
     local closestTarget = nil
     local shortestDistance = math.huge
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, plr in pairs(Players:GetPlayers()) do
-        if isEnemy(plr) and plr.Character and plr.Character:FindFirstChild(Duck.Aimbot.TargetPart) and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local targetPart = plr.Character[Duck.Aimbot.TargetPart]
+        if isEnemy(plr) and plr.Character and plr.Character:FindFirstChild(Mono.Aimbot.TargetPart) and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            local targetPart = plr.Character[Mono.Aimbot.TargetPart]
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
             if onScreen then
                 local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                if dist < shortestDistance and dist < 200 then -- 200 = радиус захвата (FOV)
+                if dist < shortestDistance and dist < 300 then
                     if isVisible(targetPart) then
                         shortestDistance = dist
                         closestTarget = targetPart
@@ -232,24 +306,23 @@ local function updateESP()
         local char = plr.Character
         if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
             
-            local isFr = isFriend(plr)
-            local isEn = isEnemy(plr)
-            
-            if Duck.ESP.Enabled and (isFr or isEn) then
+            if Mono.ESP.Enabled and isEnemy(plr) then
                 if not espCache[plr] then
                     local hl = Instance.new("Highlight")
-                    hl.Name = "DuckESP"
-                    hl.FillTransparency = 0.6
-                    hl.OutlineTransparency = 0.1
+                    hl.Name = "MonoESP"
+                    hl.FillColor = Color3.fromRGB(180, 130, 255)
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0.2
                     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                     
                     local bb = Instance.new("BillboardGui")
-                    bb.Name = "DuckName"
+                    bb.Name = "MonoName"
                     bb.Size = UDim2.new(0, 100, 0, 20)
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 10; tl.TextStrokeTransparency = 0
+                    tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
                     
                     espCache[plr] = {Highlight = hl, Billboard = bb, Text = tl}
                 end
@@ -257,15 +330,9 @@ local function updateESP()
                 local esp = espCache[plr]
                 esp.Highlight.Parent = char
                 esp.Billboard.Parent = char.HumanoidRootPart
-                
-                -- Друзья зеленые, Враги красные
-                local color = isFr and Color3.fromRGB(0, 255, 100) or Color3.fromRGB(255, 50, 50)
-                esp.Highlight.FillColor = color
-                esp.Highlight.OutlineColor = color
                 esp.Text.Text = plr.Name
-                esp.Text.TextColor3 = color
+                esp.Text.TextColor3 = Color3.fromRGB(180, 130, 255)
             else
-                -- Если ESP выключен или это тиммейт
                 if espCache[plr] then
                     espCache[plr].Highlight.Parent = nil
                     espCache[plr].Billboard.Parent = nil
@@ -280,42 +347,34 @@ local function updateESP()
     end
 end
 
--- === 5. ОСНОВНОЙ ЦИКЛ ОБНОВЛЕНИЯ ===
+-- === ОСНОВНОЙ ЦИКЛ ===
 RunService.RenderStepped:Connect(function()
-    -- 1. Обновляем ESP
+    -- 1. Отрисовка ESP
     updateESP()
 
-    -- 2. AUTO AIM (Аимбот)
-    if Duck.Aimbot.Enabled and UserInputService:IsKeyDown(Duck.Aimbot.Key) then
-        local target = getClosestPlayerToCrosshair()
+    -- 2. AIMBOT
+    if Mono.Aimbot.Enabled and UserInputService:IsKeyDown(Mono.Aimbot.Key) then
+        local target = getClosestVisibleEnemy()
         if target then
-            -- Плавно наводим камеру на цель
-            local currentCFrame = Camera.CFrame
-            local targetCFrame = CFrame.new(currentCFrame.Position, target.Position)
-            Camera.CFrame = currentCFrame:Lerp(targetCFrame, Duck.Aimbot.Smoothness)
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
         end
     end
 
-    -- 3. AUTO SHOOT (Triggerbot)
-    if Duck.Triggerbot.Enabled then
-        local target = Mouse.Target
-        if target and target.Parent then
-            -- Если мышка смотрит на игрока
-            local model = target.Parent
-            if not model:FindFirstChild("Humanoid") then model = target.Parent.Parent end -- Защита от шляп/брони
+    -- 3. AUTO TAP
+    if Mono.AutoTap.Enabled and UserInputService:IsKeyDown(Mono.AutoTap.Key) then
+        local target = getClosestVisibleEnemy()
+        -- Если цель найдена рядом с прицелом (почти смотрим на нее)
+        if target then
+            local pos, _ = Camera:WorldToViewportPoint(target.Position)
+            local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
             
-            if model and model:FindFirstChild("Humanoid") then
-                local plr = Players:GetPlayerFromCharacter(model)
-                if plr and isEnemy(plr) then
-                    -- Проверяем кулдаун выстрела, чтобы не крашнуть клиент спамом
-                    if tick() - LastShootTime > Duck.Triggerbot.Delay then
-                        LastShootTime = tick()
-                        -- Эмулируем нажатие левой кнопки мыши (Только для мощных экзекуторов!)
-                        if mouse1click then
-                            mouse1click()
-                        else
-                            warn("Твой инжектор не поддерживает mouse1click! Triggerbot не сработает.")
-                        end
+            -- Триггерим выстрел только если прицел прямо на враге (радиус 30)
+            if dist < 30 then
+                if tick() - LastShootTime > Mono.AutoTap.Delay then
+                    LastShootTime = tick()
+                    if mouse1click then
+                        mouse1click()
                     end
                 end
             end
