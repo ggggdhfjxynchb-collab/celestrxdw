@@ -19,7 +19,7 @@ pcall(function()
     if oldGui then oldGui:Destroy() end
 end)
 
--- === 2. НАСТРОЙКИ ЧИТА ===
+-- === 2. НАСТРОЙКИ ЧИТА (ВСЕ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ) ===
 local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
@@ -31,18 +31,17 @@ local Mono = {
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     
-    KillEffect = true,
+    KillEffect = false, -- ТЕПЕРЬ ВЫКЛЮЧЕНО
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
     
-    TeammateNotifs = true,
+    TeammateNotifs = false, -- ТЕПЕРЬ ВЫКЛЮЧЕНО
     DeathNotifDistance = 150, 
     
-    -- НОВЫЕ НАСТРОЙКИ МИРА
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
-    TimeOfDay = "Default", -- Default, Day ☀️, Night 🌙
-    Weather = "None",      -- None, Rain 🌧️, Custom Snow ❄️
+    TimeOfDay = "Default", 
+    Weather = "None",      
     WeatherEmoji = "💸",
     
     MenuOpen = true
@@ -86,18 +85,13 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
 
-local LavenderGradient = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), 
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
-})
-
--- === НОВОЕ: ЭФФЕКТЫ МИРА (ЗАТЕМНЕНИЕ И ПОГОДА) ===
+-- === ЭФФЕКТЫ МИРА ===
 local tintFrame = Instance.new("Frame", screenGui)
 tintFrame.Size = UDim2.new(1, 0, 1, 0)
 tintFrame.BackgroundColor3 = Mono.TintColor
 tintFrame.BackgroundTransparency = 1
 tintFrame.BorderSizePixel = 0
-tintFrame.ZIndex = -100 -- Самый задний фон интерфейса
+tintFrame.ZIndex = -100 
 
 local weatherContainer = Instance.new("Frame", screenGui)
 weatherContainer.Size = UDim2.new(1, 0, 1, 0)
@@ -107,20 +101,19 @@ weatherContainer.ClipsDescendants = true
 
 task.spawn(function()
     while true do
-        task.wait(0.08) -- Скорость спавна частиц погоды
+        task.wait(0.08) 
         pcall(function()
             if Mono.Weather ~= "None" then
                 local wDrop = Instance.new("TextLabel", weatherContainer)
                 wDrop.BackgroundTransparency = 1
                 wDrop.Size = UDim2.new(0, 30, 0, 30)
-                -- Рандомная позиция сверху
                 wDrop.Position = UDim2.new(math.random(), 0, -0.1, 0)
                 wDrop.Text = (Mono.Weather == "Rain 🌧️") and "💧" or Mono.WeatherEmoji
                 wDrop.TextSize = (Mono.Weather == "Rain 🌧️") and math.random(15, 20) or math.random(20, 35)
                 wDrop.TextTransparency = 0.2
                 
-                local duration = math.random(30, 60) / 10 -- Падение 3-6 сек
-                local targetX = wDrop.Position.X.Scale + (math.random(-10, 10)/100) -- Легкий ветер
+                local duration = math.random(30, 60) / 10 
+                local targetX = wDrop.Position.X.Scale + (math.random(-10, 10)/100) 
                 
                 local ts = TweenService:Create(wDrop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
                     Position = UDim2.new(targetX, 0, 1.1, 0),
@@ -219,7 +212,7 @@ hudFrame.BackgroundTransparency = 0.2
 hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
 hudFrame.Parent = screenGui
-Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
 
 local hudList = Instance.new("UIListLayout", hudFrame)
 hudList.Padding = UDim.new(0, 5)
@@ -273,13 +266,14 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
+-- === ГЛАВНОЕ МЕНЮ С ИДЕАЛЬНЫМИ ЗАКРУГЛЕНИЯМИ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
+-- Идеальное закругление без выпираний
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
@@ -334,6 +328,7 @@ headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 headerLine.BorderSizePixel = 0
 headerLine.BackgroundTransparency = 0.5
 
+-- Прозрачный сайдбар, убран уродливый sidebarCover!
 local sidebar = Instance.new("Frame", mainFrame)
 sidebar.Size = UDim2.new(0, 130, 1, -41)
 sidebar.Position = UDim2.new(0, 0, 0, 41)
@@ -377,7 +372,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.Padding = UDim.new(0, 10)
+    pLayout.Padding = UDim.new(0, 8) -- Чуть отступа чтобы скроллбар не наезжал
     
     Pages[name] = page
 
@@ -685,7 +680,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     container.Size = UDim2.new(1, 0, 0, 35) 
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
-    container.ClipsDescendants = true
+    container.ClipsDescendants = true -- СПРЯТАТЬ ВСЕ ВНУТРИ
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -716,8 +711,9 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
 
+    -- Фикс высоты, чтобы компоненты внутри не сжимались, когда контейнер закрыт
     local settingsFrame = Instance.new("Frame", container)
-    settingsFrame.Size = UDim2.new(1, 0, 1, -35)
+    settingsFrame.Size = UDim2.new(1, 0, 0, 200) 
     settingsFrame.Position = UDim2.new(0, 0, 0, 35)
     settingsFrame.BackgroundTransparency = 1
     
@@ -778,7 +774,7 @@ local function SaveConfig()
         }
         if writefile then
             writefile(cfgName, HttpService:JSONEncode(data))
-            showNotification("☠️ Config Saved!", Color3.fromRGB(0, 255, 100))
+            showNotification("💾 Config Saved!", Color3.fromRGB(0, 255, 100))
         end
     end)
 end
@@ -797,7 +793,7 @@ local function LoadConfig()
             Mono.TimeOfDay = decoded.Time or "Default"
             Mono.Weather = decoded.Weather or "None"
             Mono.WeatherEmoji = decoded.WeathEmoji or "💸"
-            showNotification("☠️ Config Loaded! Re-open tabs.", Color3.fromRGB(0, 255, 100))
+            showNotification("📂 Config Loaded! Re-open tabs.", Color3.fromRGB(0, 255, 100))
         end
     end)
 end
@@ -835,7 +831,8 @@ end)
 -- 3. WORLD
 createToggleWithSettings(worldPage, "Screen Tint", Mono.TintEnabled, function(s) 
     Mono.TintEnabled = s 
-    tintFrame.BackgroundTransparency = s and 0.5 or 1
+    -- 0.85 делает оттенок очень мягким и не бьющим по глазам
+    tintFrame.BackgroundTransparency = s and 0.85 or 1
 end, function(container)
     local h1 = createSubColorPicker(container, "Tint Color", Mono.TintColor, function(c) Mono.TintColor = c; tintFrame.BackgroundColor3 = c end)
     return h1
@@ -1151,7 +1148,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
     pcall(function()
         updateESP()
         
-        -- Обновление времени суток
         if Mono.TimeOfDay == "Day ☀️" then
             Lighting.ClockTime = 14
         elseif Mono.TimeOfDay == "Night 🌙" then
