@@ -23,7 +23,7 @@ local Mono = {
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
     ESP = { Enabled = false, MaxDistance = 350 },
-    ESPColor = Color3.fromRGB(180, 130, 255), -- НЕЗАВИСИМЫЙ ЦВЕТ ESP
+    ESPColor = Color3.fromRGB(180, 130, 255),
     
     TeamCheck = false,
     TargetObjEnabled = false,
@@ -34,17 +34,37 @@ local Mono = {
     KillColor = Color3.fromRGB(255, 50, 50), 
     
     TeammateNotifs = true,
-    DeathNotifDistance = 150, -- ДИСТАНЦИЯ В СТАДАХ ДЛЯ СМЕРТЕЙ
+    DeathNotifDistance = 150, 
     
     MenuOpen = true
 }
 
 local LastShootTime = 0
 local BindWait = nil 
-local PlayerData = {} -- УМНЫЙ КЭШ ПОЗИЦИЙ
+local PlayerData = {} 
 
 local LastTargetHit = nil
 local LastTargetTime = 0
+
+-- === ОПТИМИЗАЦИЯ: ГЛОБАЛЬНЫЙ КЭШ ЛУЧЕЙ (БЕЗ ЛАГОВ) ===
+local GlobalRayParams = RaycastParams.new()
+GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
+GlobalRayParams.IgnoreWater = true
+
+-- Обновляем игнор-лист оружия только 1 раз в секунду в отдельном потоке
+task.spawn(function()
+    while true do
+        local ignoreList = {LocalPlayer.Character, Camera}
+        for _, v in pairs(workspace:GetChildren()) do
+            local name = string.lower(v.Name)
+            if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
+                table.insert(ignoreList, v)
+            end
+        end
+        GlobalRayParams.FilterDescendantsInstances = ignoreList
+        task.wait(1)
+    end
+end)
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
@@ -60,30 +80,33 @@ local LavenderGradient = ColorSequence.new({
 
 -- === КОНТЕЙНЕР ДЛЯ УВЕДОМЛЕНИЙ О СМЕРТИ ===
 local notifContainer = Instance.new("Frame", screenGui)
-notifContainer.Size = UDim2.new(0, 300, 0, 200)
-notifContainer.Position = UDim2.new(0.5, -150, 0.7, 0)
+notifContainer.Size = UDim2.new(0, 400, 0, 300)
+notifContainer.Position = UDim2.new(0.5, -200, 0.12, 0)
 notifContainer.BackgroundTransparency = 1
 local notifLayout = Instance.new("UIListLayout", notifContainer)
-notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+notifLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-notifLayout.Padding = UDim.new(0, 5)
+notifLayout.Padding = UDim.new(0, 8)
 
 local function showDeathNotification(name)
     local notif = Instance.new("TextLabel")
-    notif.Text = name .. " умер !"
+    notif.Text = "☠️ " .. name .. " УМЕР" 
     notif.TextColor3 = Mono.KillColor
-    notif.Size = UDim2.new(1, 0, 0, 30)
+    notif.Size = UDim2.new(1, 0, 0, 40)
     notif.BackgroundTransparency = 1
     notif.Font = Enum.Font.GothamBlack
-    notif.TextSize = 18
+    notif.TextSize = 26 
+    
+    notif.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    notif.TextStrokeTransparency = 1 
     notif.TextTransparency = 1
     notif.Parent = notifContainer
     
     local ts = TweenService
-    ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0}):Play()
     
-    task.delay(2.5, function()
-        local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1})
+    task.delay(3, function()
+        local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
         fade:Play()
         fade.Completed:Connect(function() notif:Destroy() end)
     end)
@@ -592,11 +615,12 @@ createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamChec
 -- Вкладка VISUALS
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
     local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end)
-    return h1
+    local h2 = createSubInput(container, "Max Distance", tostring(Mono.ESP.MaxDistance), function(val) Mono.ESP.MaxDistance = tonumber(val) or 350 end)
+    return h1 + h2 + 5
 end)
 
 createToggleWithSettings(visualsPage, "Teammate Death Notifs", Mono.TeammateNotifs, function(s) Mono.TeammateNotifs = s end, function(container)
-    local h1 = createSubInput(container, "Max Studs", tostring(Mono.DeathNotifDistance), function(val) Mono.DeathNotifDistance = tonumber(val) or 150 end)
+    local h1 = createSubInput(container, "Max Distance", tostring(Mono.DeathNotifDistance), function(val) Mono.DeathNotifDistance = tonumber(val) or 150 end)
     return h1
 end)
 
@@ -680,7 +704,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА ===
+-- === 4. ЯДРО ЧИТА С ОПТИМИЗАЦИЕЙ ===
 
 local function simulateClick()
     if mouse1click then
@@ -703,22 +727,28 @@ local function getBestTargetPart(char)
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
 
+local GlobalRayParams = RaycastParams.new()
+GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
+GlobalRayParams.IgnoreWater = true
+
+task.spawn(function()
+    while true do
+        local ignoreList = {LocalPlayer.Character, Camera}
+        for _, v in pairs(workspace:GetChildren()) do
+            local name = string.lower(v.Name)
+            if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
+                table.insert(ignoreList, v)
+            end
+        end
+        GlobalRayParams.FilterDescendantsInstances = ignoreList
+        task.wait(1)
+    end
+end)
+
 local function raycastFromCamera()
     local origin = Camera.CFrame.Position
     local direction = Camera.CFrame.LookVector * 1500 
-    
-    local rayParams = RaycastParams.new()
-    local ignoreList = {LocalPlayer.Character, Camera}
-    for _, v in pairs(workspace:GetChildren()) do
-        if v.Name:lower():match("viewmodel") or v.Name:lower():match("arm") or v.Name:lower():match("gun") then
-            table.insert(ignoreList, v)
-        end
-    end
-    rayParams.FilterDescendantsInstances = ignoreList
-    rayParams.FilterType = Enum.RaycastFilterType.Exclude
-    rayParams.IgnoreWater = true
-
-    return workspace:Raycast(origin, direction, rayParams)
+    return workspace:Raycast(origin, direction, GlobalRayParams)
 end
 
 local function getPlayerFromPart(part)
@@ -746,10 +776,7 @@ local function getClosestVisibleEnemy()
                     if dist < 400 then 
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
-                        local params = RaycastParams.new()
-                        params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-                        params.FilterType = Enum.RaycastFilterType.Exclude
-                        local result = workspace:Raycast(origin, dir, params)
+                        local result = workspace:Raycast(origin, dir, GlobalRayParams)
                         
                         if result and result.Instance and result.Instance:IsDescendantOf(char) then
                             if dist < shortestDistance then
@@ -765,7 +792,23 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- === ESP & ВИЗУАЛЫ С УМНЫМ КЭШЕМ ===
+-- ОЧИСТКА ПАМЯТИ ПРИ ВЫХОДЕ ИГРОКОВ (FPS FIX)
+Players.PlayerRemoving:Connect(function(plr)
+    if espCache[plr] then
+        if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
+        if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
+        if espCache[plr].Orbits then
+            for _, orb in ipairs(espCache[plr].Orbits) do
+                orb.gui:Destroy()
+            end
+        end
+        espCache[plr] = nil
+    end
+    DeadCache[plr] = nil
+    PlayerData[plr] = nil
+end)
+
+-- ESP & ВИЗУАЛЫ С УМНЫМ КЭШЕМ
 local espCache = {}
 
 local function updateESP()
@@ -775,7 +818,6 @@ local function updateESP()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
-        -- Инициализация кэша для игрока
         if not PlayerData[plr] then
             PlayerData[plr] = { isDead = false, lastPos = Vector3.zero }
         end
@@ -783,12 +825,10 @@ local function updateESP()
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
-        -- Запоминаем последнюю позицию, пока игрок жив
         if char and char:FindFirstChild("HumanoidRootPart") then
             PlayerData[plr].lastPos = char.HumanoidRootPart.Position
         end
         
-        -- Проверка на смерть
         local isDead = false
         if char then
             local hum = char:FindFirstChild("Humanoid")
@@ -798,12 +838,10 @@ local function updateESP()
             isDead = true
         end
 
-        -- Логика уведомлений о смерти (срабатывает ровно 1 раз)
         if isDead then
             if PlayerData[plr].isDead == false then
                 PlayerData[plr].isDead = true
                 
-                -- Проверяем дистанцию до места смерти
                 local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
                 
                 if isEnem then
@@ -811,7 +849,6 @@ local function updateESP()
                         doKillEffect()
                     end
                 else
-                    -- Тиммейт умер: проверяем радиус из настроек
                     if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then
                         showDeathNotification(plr.Name)
                     end
@@ -821,7 +858,6 @@ local function updateESP()
             PlayerData[plr].isDead = false
         end
 
-        -- Отрисовка ESP
         if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
             local distToPlayer = (char.HumanoidRootPart.Position - camPos).Magnitude
             
@@ -847,21 +883,27 @@ local function updateESP()
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
                     espCache[plr].Text = tl
+                    
+                    hl.Parent = char
+                    bb.Parent = char.HumanoidRootPart
                 end
                 
-                espCache[plr].Highlight.Parent = char
-                espCache[plr].Billboard.Parent = char.HumanoidRootPart
+                espCache[plr].Highlight.Enabled = true
+                espCache[plr].Billboard.Enabled = true
+                
+                if espCache[plr].Highlight.Parent ~= char then espCache[plr].Highlight.Parent = char end
+                if espCache[plr].Billboard.Parent ~= char.HumanoidRootPart then espCache[plr].Billboard.Parent = char.HumanoidRootPart end
+                
                 espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
                 espCache[plr].Highlight.FillColor = Mono.ESPColor
                 espCache[plr].Text.TextColor3 = Mono.ESPColor
             else
                 if espCache[plr] and espCache[plr].Highlight then
-                    espCache[plr].Highlight.Parent = nil
-                    espCache[plr].Billboard.Parent = nil
+                    espCache[plr].Highlight.Enabled = false
+                    espCache[plr].Billboard.Enabled = false
                 end
             end
 
-            -- Отрисовка Орбит
             if Mono.TargetObjEnabled and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
@@ -874,12 +916,14 @@ local function updateESP()
                         tl.Size = UDim2.new(1, 0, 1, 0)
                         tl.BackgroundTransparency = 1
                         tl.TextScaled = true 
+                        bb.Parent = char.HumanoidRootPart
                         table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
                     end
                 end
 
                 for i, orb in ipairs(espCache[plr].Orbits) do
-                    orb.gui.Parent = char.HumanoidRootPart
+                    orb.gui.Enabled = true
+                    if orb.gui.Parent ~= char.HumanoidRootPart then orb.gui.Parent = char.HumanoidRootPart end
                     orb.text.Text = Mono.OrbitEmoji
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
@@ -888,19 +932,19 @@ local function updateESP()
             else
                 if espCache[plr] and espCache[plr].Orbits then
                     for _, orb in ipairs(espCache[plr].Orbits) do
-                        orb.gui.Parent = nil
+                        orb.gui.Enabled = false
                     end
                 end
             end
         else
             if espCache[plr] then
                 if espCache[plr].Highlight then
-                    espCache[plr].Highlight.Parent = nil
-                    espCache[plr].Billboard.Parent = nil
+                    espCache[plr].Highlight.Enabled = false
+                    espCache[plr].Billboard.Enabled = false
                 end
                 if espCache[plr].Orbits then
                     for _, orb in ipairs(espCache[plr].Orbits) do
-                        orb.gui.Parent = nil
+                        orb.gui.Enabled = false
                     end
                 end
             end
