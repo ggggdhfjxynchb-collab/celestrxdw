@@ -25,8 +25,7 @@ local Mono = {
 }
 
 local LastShootTime = 0
-local BindingAimbot = false
-local BindingAutoTap = false
+local BindWait = nil -- Глобальная переменная для ожидания нажатия клавиши
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА (ЛАВАНДОВЫЙ СТИЛЬ) ===
 local screenGui = Instance.new("ScreenGui")
@@ -36,14 +35,14 @@ screenGui.Parent = targetParent
 
 -- Цветовая схема Monogramma
 local LavenderGradient = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), -- Светло-лавандовый
-    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   -- Темно-фиолетовый
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), 
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
 })
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 400, 0, 280)
 mainFrame.Position = UDim2.new(0.5, -200, 0.5, -140)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) -- Темно-фиолетовый фон
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) 
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
@@ -72,7 +71,7 @@ local logoText = Instance.new("TextLabel", header)
 logoText.Size = UDim2.new(0, 40, 0, 40)
 logoText.Position = UDim2.new(0, 5, 0, 0)
 logoText.BackgroundTransparency = 1
-logoText.Text = "⬟" -- Символ пентагона
+logoText.Text = "⬟"
 logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
 logoText.Font = Enum.Font.GothamBlack
 logoText.TextSize = 24
@@ -85,12 +84,11 @@ logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
 logoDot.Font = Enum.Font.GothamBlack
 logoDot.TextSize = 14
 
--- ТУТ МОЖЕШЬ ВСТАВИТЬ СВОЮ КАРТИНКУ ПЕНТАГОНА
 local logoImage = Instance.new("ImageLabel", header)
 logoImage.Size = UDim2.new(0, 26, 0, 26)
 logoImage.Position = UDim2.new(0, 12, 0, 7)
 logoImage.BackgroundTransparency = 1
-logoImage.Image = "" -- ВСТАВЬ СЮДА ID КАРТИНКИ (например: "rbxassetid://12345678")
+logoImage.Image = "" -- ВСТАВЬ СЮДА ID КАРТИНКИ ПЕНТАГОНА
 logoImage.ZIndex = 2
 
 local title = Instance.new("TextLabel", header)
@@ -123,7 +121,9 @@ listLayout.Padding = UDim.new(0, 10)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- === ФУНКЦИИ GUI ===
-local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, onBind)
+
+-- ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ТОГГЛА И БИНДА
+local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 40)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
@@ -163,20 +163,24 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
+        if BindWait then return end -- Нельзя биндить две кнопки одновременно
         bindBtn.Text = "..."
-        onBind(bindBtn)
+        -- Создаем функцию ожидания, которая выполнится при нажатии клавиши
+        BindWait = function(key)
+            bindTable[bindKeyName] = key
+            bindBtn.Text = key.Name
+            BindWait = nil
+        end
     end)
 end
 
--- Создаем элементы
+-- Создаем элементы интерфейса
 createToggleWithBind(content, "Aimbot (Auto-Aim)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, 
-    function(s) Mono.Aimbot.Enabled = s end,
-    function(btn) BindingAimbot = true; btn.Text = "Press Key..." end
+    function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key"
 )
 
 createToggleWithBind(content, "Auto Tap (Auto Shoot)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, 
-    function(s) Mono.AutoTap.Enabled = s end,
-    function(btn) BindingAutoTap = true; btn.Text = "Press Key..." end
+    function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key"
 )
 
 local espFrame = Instance.new("Frame", content)
@@ -212,31 +216,17 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Обработка биндов и скрытия меню
+-- ИСПРАВЛЕННАЯ ОБРАБОТКА КЛАВИАТУРЫ
 UserInputService.InputBegan:Connect(function(input, gp)
-    if BindingAimbot and input.UserInputType == Enum.UserInputType.Keyboard then
-        Mono.Aimbot.Key = input.KeyCode
-        BindingAimbot = false
-        -- Обновляем текст кнопки вручную через поиск
-        for _, v in pairs(content:GetChildren()) do
-            if v:IsA("Frame") and v:FindFirstChild("TextButton") and v.TextButton.Text == "  Aimbot (Auto-Aim)" then
-                v:GetChildren()[3].Text = input.KeyCode.Name
-            end
+    -- Если мы сейчас биндим клавишу
+    if BindWait and input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
+            BindWait(input.KeyCode)
         end
         return
     end
 
-    if BindingAutoTap and input.UserInputType == Enum.UserInputType.Keyboard then
-        Mono.AutoTap.Key = input.KeyCode
-        BindingAutoTap = false
-        for _, v in pairs(content:GetChildren()) do
-            if v:IsA("Frame") and v:FindFirstChild("TextButton") and v.TextButton.Text == "  Auto Tap (Auto Shoot)" then
-                v:GetChildren()[3].Text = input.KeyCode.Name
-            end
-        end
-        return
-    end
-
+    -- Открытие/закрытие меню
     if not gp and input.KeyCode == Enum.KeyCode.RightBracket then
         Mono.MenuOpen = not Mono.MenuOpen
         mainFrame.Visible = Mono.MenuOpen
@@ -363,7 +353,7 @@ RunService.RenderStepped:Connect(function()
     -- 3. AUTO TAP
     if Mono.AutoTap.Enabled and UserInputService:IsKeyDown(Mono.AutoTap.Key) then
         local target = getClosestVisibleEnemy()
-        -- Если цель найдена рядом с прицелом (почти смотрим на нее)
+        -- Если цель найдена
         if target then
             local pos, _ = Camera:WorldToViewportPoint(target.Position)
             local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
