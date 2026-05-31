@@ -24,6 +24,9 @@ local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
+    -- НОВОЕ: НАСТРОЙКИ КРУГА FOV
+    FOV = { Enabled = true, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
+    
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
     TeamCheck = false,
@@ -31,11 +34,11 @@ local Mono = {
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     
-    KillEffect = false, -- ТЕПЕРЬ ВЫКЛЮЧЕНО
+    KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
     
-    TeammateNotifs = false, -- ТЕПЕРЬ ВЫКЛЮЧЕНО
+    TeammateNotifs = false,
     DeathNotifDistance = 150, 
     
     TintEnabled = false,
@@ -84,6 +87,18 @@ screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
+
+-- === НОВОЕ: КРУГ FOV НА ЭКРАНЕ ===
+local fovFrame = Instance.new("Frame", screenGui)
+fovFrame.BackgroundTransparency = 1
+fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+fovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+fovFrame.ZIndex = 50
+local fovCorner = Instance.new("UICorner", fovFrame)
+fovCorner.CornerRadius = UDim.new(1, 0)
+local fovStroke = Instance.new("UIStroke", fovFrame)
+fovStroke.Thickness = 1.5
+fovStroke.Color = Mono.FOV.Color
 
 -- === ЭФФЕКТЫ МИРА ===
 local tintFrame = Instance.new("Frame", screenGui)
@@ -273,7 +288,6 @@ mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
--- Идеальное закругление без выпираний
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
@@ -328,7 +342,7 @@ headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 headerLine.BorderSizePixel = 0
 headerLine.BackgroundTransparency = 0.5
 
--- Прозрачный сайдбар, убран уродливый sidebarCover!
+-- Прозрачный сайдбар
 local sidebar = Instance.new("Frame", mainFrame)
 sidebar.Size = UDim2.new(0, 130, 1, -41)
 sidebar.Position = UDim2.new(0, 0, 0, 41)
@@ -372,7 +386,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.Padding = UDim.new(0, 8) -- Чуть отступа чтобы скроллбар не наезжал
+    pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
 
@@ -680,7 +694,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     container.Size = UDim2.new(1, 0, 0, 35) 
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
-    container.ClipsDescendants = true -- СПРЯТАТЬ ВСЕ ВНУТРИ
+    container.ClipsDescendants = true 
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -711,7 +725,6 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
 
-    -- Фикс высоты, чтобы компоненты внутри не сжимались, когда контейнер закрыт
     local settingsFrame = Instance.new("Frame", container)
     settingsFrame.Size = UDim2.new(1, 0, 0, 200) 
     settingsFrame.Position = UDim2.new(0, 0, 0, 35)
@@ -763,6 +776,7 @@ local function SaveConfig()
         local data = {
             TeamCheck = Mono.TeamCheck,
             MaxDist = Mono.ESP.MaxDistance,
+            FOVRad = Mono.FOV.Radius,
             ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
             ObjEmoji = Mono.OrbitEmoji,
             KillEmoji = Mono.KillEmoji,
@@ -785,6 +799,7 @@ local function LoadConfig()
             local decoded = HttpService:JSONDecode(readfile(cfgName))
             Mono.TeamCheck = decoded.TeamCheck or false
             Mono.ESP.MaxDistance = decoded.MaxDist or 350
+            Mono.FOV.Radius = decoded.FOVRad or 150
             Mono.ESPColor = Color3.new(decoded.ESP_R or 1, decoded.ESP_G or 1, decoded.ESP_B or 1)
             Mono.OrbitEmoji = decoded.ObjEmoji or "🦋"
             Mono.KillEmoji = decoded.KillEmoji or "💀"
@@ -804,6 +819,13 @@ end
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
+
+-- НОВОЕ: Настройка круга FOV во вкладке Combat
+createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
+    local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end)
+    local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end)
+    return h1 + h2 + 5
+end)
 
 -- 2. VISUALS
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
@@ -831,7 +853,6 @@ end)
 -- 3. WORLD
 createToggleWithSettings(worldPage, "Screen Tint", Mono.TintEnabled, function(s) 
     Mono.TintEnabled = s 
-    -- 0.85 делает оттенок очень мягким и не бьющим по глазам
     tintFrame.BackgroundTransparency = s and 0.85 or 1
 end, function(container)
     local h1 = createSubColorPicker(container, "Tint Color", Mono.TintColor, function(c) Mono.TintColor = c; tintFrame.BackgroundColor3 = c end)
@@ -966,7 +987,9 @@ local function getClosestVisibleEnemy()
                 local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < 400 then 
+                    
+                    -- НОВОЕ: Проверка радиуса FOV для Аимбота
+                    if dist <= Mono.FOV.Radius then 
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
                         local result = workspace:Raycast(origin, dir, GlobalRayParams)
@@ -1148,6 +1171,15 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
     pcall(function()
         updateESP()
         
+        -- НОВОЕ: Отрисовка круга FOV на экране
+        if Mono.FOV.Enabled then
+            fovFrame.Visible = true
+            fovFrame.Size = UDim2.new(0, Mono.FOV.Radius * 2, 0, Mono.FOV.Radius * 2)
+            fovStroke.Color = Mono.FOV.Color
+        else
+            fovFrame.Visible = false
+        end
+        
         if Mono.TimeOfDay == "Day ☀️" then
             Lighting.ClockTime = 14
         elseif Mono.TimeOfDay == "Night 🌙" then
@@ -1171,12 +1203,24 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
-                    LastTargetHit = targetPlayer
-                    LastTargetTime = tick()
                     
-                    if tick() - LastShootTime > Mono.AutoTap.Delay then
-                        LastShootTime = tick()
-                        simulateClick()
+                    -- НОВОЕ: Проверка радиуса FOV для Авто-тапа
+                    local char = targetPlayer.Character
+                    local targetPart = char and getBestTargetPart(char)
+                    if targetPart then
+                        local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        
+                        if onScreen and dist <= Mono.FOV.Radius then
+                            LastTargetHit = targetPlayer
+                            LastTargetTime = tick()
+                            
+                            if tick() - LastShootTime > Mono.AutoTap.Delay then
+                                LastShootTime = tick()
+                                simulateClick()
+                            end
+                        end
                     end
                 end
             end
