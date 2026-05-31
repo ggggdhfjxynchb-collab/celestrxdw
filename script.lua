@@ -18,28 +18,15 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
-    -- По умолчанию Аимбот на букву C
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, TargetPart = "Head" },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
-    ESP = { Enabled = false },
+    ESP = { Enabled = false, MaxDistance = 350 }, -- Максимальная дистанция для Wallhack
     TeamCheck = false,
     MenuOpen = true
 }
 
 local LastShootTime = 0
 local BindWait = nil 
-
--- Функция для проверки нажатия (поддерживает и клавиатуру, и мышь)
-local function isBindPressed(bind)
-    if typeof(bind) == "EnumItem" then
-        if bind.EnumType == Enum.KeyCode then
-            return UserInputService:IsKeyDown(bind)
-        elseif bind.EnumType == Enum.UserInputType then
-            return UserInputService:IsMouseButtonPressed(bind)
-        end
-    end
-    return false
-end
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
@@ -86,14 +73,6 @@ logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
 logoText.Font = Enum.Font.GothamBlack
 logoText.TextSize = 24
 
-local logoDot = Instance.new("TextLabel", logoText)
-logoDot.Size = UDim2.new(1, 0, 1, 0)
-logoDot.BackgroundTransparency = 1
-logoDot.Text = "•"
-logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
-logoDot.Font = Enum.Font.GothamBlack
-logoDot.TextSize = 14
-
 local logoImage = Instance.new("ImageLabel", header)
 logoImage.Size = UDim2.new(0, 26, 0, 26)
 logoImage.Position = UDim2.new(0, 12, 0, 7)
@@ -131,20 +110,23 @@ listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 -- === ФУНКЦИИ GUI ===
 local function createToggle(parent, text, defaultState, onToggle)
     local frame = Instance.new("Frame", parent)
+    frame.Name = text
     frame.Size = UDim2.new(1, 0, 0, 40)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
+    btn.Name = "MainBtn"
     btn.Size = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
     btn.Text = "  " .. text
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.GothamMedium
     btn.TextSize = 14
     btn.TextXAlignment = Enum.TextXAlignment.Left
 
     local status = Instance.new("Frame", frame)
+    status.Name = "Status"
     status.Size = UDim2.new(0, 16, 0, 16)
     status.Position = UDim2.new(1, -30, 0.5, -8)
     status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
@@ -161,20 +143,23 @@ end
 
 local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName)
     local frame = Instance.new("Frame", parent)
+    frame.Name = text
     frame.Size = UDim2.new(1, 0, 0, 40)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
+    btn.Name = "MainBtn"
     btn.Size = UDim2.new(0, 200, 1, 0)
     btn.BackgroundTransparency = 1
     btn.Text = "  " .. text
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.GothamMedium
     btn.TextSize = 14
     btn.TextXAlignment = Enum.TextXAlignment.Left
 
     local status = Instance.new("Frame", frame)
+    status.Name = "Status"
     status.Size = UDim2.new(0, 16, 0, 16)
     status.Position = UDim2.new(0, 200, 0.5, -8)
     status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
@@ -212,9 +197,22 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 end
 
+-- Функция для обновления визуала UI извне (когда нажимаем бинд)
+local function setToggleStateUI(frameName, state)
+    local frame = content:FindFirstChild(frameName)
+    if frame then
+        local status = frame:FindFirstChild("Status")
+        local btn = frame:FindFirstChild("MainBtn")
+        if status and btn then
+            status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+            btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        end
+    end
+end
+
 -- Меню
-createToggleWithBind(content, "Aimbot (Hold Key)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
-createToggleWithBind(content, "Auto Tap (Hold Key)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
+createToggleWithBind(content, "Aimbot (Toggle Key)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
+createToggleWithBind(content, "Auto Tap (Toggle Key)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(content, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
 createToggle(content, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
@@ -238,8 +236,9 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Бинды (Поддержка Клавиатуры и Мыши)
+-- Бинды (Обработка нажатий как тумблеров)
 UserInputService.InputBegan:Connect(function(input, gp)
+    -- Режим назначения кнопки
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
             BindWait(input.KeyCode)
@@ -249,7 +248,25 @@ UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
 
-    if not gp and input.KeyCode == Enum.KeyCode.RightBracket then
+    if gp then return end
+
+    -- Проверяем что именно нажато (клавиатура или мышь)
+    local key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode or input.UserInputType
+
+    -- Тоггл Аимбота
+    if key == Mono.Aimbot.Key then
+        Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
+        setToggleStateUI("Aimbot (Toggle Key)", Mono.Aimbot.Enabled)
+    end
+
+    -- Тоггл Авто-Тапа
+    if key == Mono.AutoTap.Key then
+        Mono.AutoTap.Enabled = not Mono.AutoTap.Enabled
+        setToggleStateUI("Auto Tap (Toggle Key)", Mono.AutoTap.Enabled)
+    end
+
+    -- Скрытие меню
+    if input.KeyCode == Enum.KeyCode.RightBracket then
         Mono.MenuOpen = not Mono.MenuOpen
         mainFrame.Visible = Mono.MenuOpen
         unlockMouseBtn.Modal = Mono.MenuOpen
@@ -319,7 +336,7 @@ local function getClosestVisibleEnemy()
                 local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < 400 then -- РАДИУС ЗАХВАТА УВЕЛИЧЕН
+                    if dist < 400 then 
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
                         local params = RaycastParams.new()
@@ -349,7 +366,12 @@ local function updateESP()
         
         local char = plr.Character
         if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-            if Mono.ESP.Enabled and isEnemy(plr) then
+            
+            -- Вычисляем дистанцию до игрока
+            local distToPlayer = (char.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
+            
+            -- Ограничение дистанции ESP в 350 стадов
+            if Mono.ESP.Enabled and isEnemy(plr) and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then
                     local hl = Instance.new("Highlight")
                     hl.Name = "MonoESP"
@@ -373,7 +395,8 @@ local function updateESP()
                 local esp = espCache[plr]
                 esp.Highlight.Parent = char
                 esp.Billboard.Parent = char.HumanoidRootPart
-                esp.Text.Text = plr.Name
+                -- Показываем ник и расстояние
+                esp.Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
                 esp.Text.TextColor3 = Color3.fromRGB(180, 130, 255)
             else
                 if espCache[plr] then
@@ -394,16 +417,16 @@ end
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     updateESP()
 
-    -- AIMBOT (Проверяем удержание клавиши)
-    if Mono.Aimbot.Enabled and isBindPressed(Mono.Aimbot.Key) then
+    -- AIMBOT (Теперь работает как Тумблер)
+    if Mono.Aimbot.Enabled then
         local target = getClosestVisibleEnemy()
         if target then
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
         end
     end
 
-    -- TRIGGERBOT (Проверяем удержание клавиши)
-    if Mono.AutoTap.Enabled and isBindPressed(Mono.AutoTap.Key) then
+    -- TRIGGERBOT (Теперь работает как Тумблер)
+    if Mono.AutoTap.Enabled then
         local hitResult = raycastFromCamera()
         if hitResult and hitResult.Instance then
             local targetPlayer = getPlayerFromPart(hitResult.Instance)
