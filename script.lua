@@ -46,22 +46,28 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- === ОПТИМИЗАЦИЯ: ГЛОБАЛЬНЫЙ КЭШ ЛУЧЕЙ (БЕЗ ЛАГОВ) ===
+-- === ОПТИМИЗАЦИЯ И ANTI-CRASH ЛУЧЕЙ ===
 local GlobalRayParams = RaycastParams.new()
 GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
 GlobalRayParams.IgnoreWater = true
 
--- Обновляем игнор-лист оружия только 1 раз в секунду в отдельном потоке
 task.spawn(function()
     while true do
-        local ignoreList = {LocalPlayer.Character, Camera}
-        for _, v in pairs(workspace:GetChildren()) do
-            local name = string.lower(v.Name)
-            if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
-                table.insert(ignoreList, v)
+        pcall(function()
+            local ignoreList = {}
+            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
+            if Camera then table.insert(ignoreList, Camera) end
+            
+            for _, v in pairs(workspace:GetChildren()) do
+                if v and v.Name then
+                    local name = string.lower(v.Name)
+                    if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
+                        table.insert(ignoreList, v)
+                    end
+                end
             end
-        end
-        GlobalRayParams.FilterDescendantsInstances = ignoreList
+            GlobalRayParams.FilterDescendantsInstances = ignoreList
+        end)
         task.wait(1)
     end
 end)
@@ -89,26 +95,30 @@ notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 notifLayout.Padding = UDim.new(0, 8)
 
 local function showDeathNotification(name)
-    local notif = Instance.new("TextLabel")
-    notif.Text = "☠️ " .. name .. " УМЕР" 
-    notif.TextColor3 = Mono.KillColor
-    notif.Size = UDim2.new(1, 0, 0, 40)
-    notif.BackgroundTransparency = 1
-    notif.Font = Enum.Font.GothamBlack
-    notif.TextSize = 26 
-    
-    notif.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    notif.TextStrokeTransparency = 1 
-    notif.TextTransparency = 1
-    notif.Parent = notifContainer
-    
-    local ts = TweenService
-    ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0}):Play()
-    
-    task.delay(3, function()
-        local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
-        fade:Play()
-        fade.Completed:Connect(function() notif:Destroy() end)
+    pcall(function()
+        local notif = Instance.new("TextLabel")
+        notif.Text = "☠️ " .. name .. " УМЕР" 
+        notif.TextColor3 = Mono.KillColor
+        notif.Size = UDim2.new(1, 0, 0, 40)
+        notif.BackgroundTransparency = 1
+        notif.Font = Enum.Font.GothamBlack
+        notif.TextSize = 26 
+        
+        notif.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+        notif.TextStrokeTransparency = 1 
+        notif.TextTransparency = 1
+        notif.Parent = notifContainer
+        
+        local ts = TweenService
+        ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0}):Play()
+        
+        task.delay(3, function()
+            pcall(function()
+                local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
+                fade:Play()
+                fade.Completed:Connect(function() notif:Destroy() end)
+            end)
+        end)
     end)
 end
 
@@ -122,34 +132,36 @@ flashFrame.ZIndex = 9999
 flashFrame.Parent = screenGui
 
 local function doKillEffect()
-    if not Mono.KillEffect then return end
-    
-    flashFrame.BackgroundColor3 = Mono.KillColor
-    flashFrame.BackgroundTransparency = 0.3
-    TweenService:Create(flashFrame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    
-    for i = 1, 25 do
-        local emoji = Instance.new("TextLabel", screenGui)
-        emoji.Text = Mono.KillEmoji
-        emoji.BackgroundTransparency = 1
-        emoji.Size = UDim2.new(0, 50, 0, 50)
-        emoji.Position = UDim2.new(0.5, -25, 0.5, -25)
-        emoji.TextSize = math.random(25, 60)
-        emoji.ZIndex = 10000
+    pcall(function()
+        if not Mono.KillEffect then return end
         
-        local angle = math.rad(math.random(0, 360))
-        local distance = math.random(150, 800)
-        local targetX = 0.5 + (math.cos(angle) * (distance / Camera.ViewportSize.X))
-        local targetY = 0.5 + (math.sin(angle) * (distance / Camera.ViewportSize.Y))
+        flashFrame.BackgroundColor3 = Mono.KillColor
+        flashFrame.BackgroundTransparency = 0.3
+        TweenService:Create(flashFrame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
         
-        local ts = TweenService:Create(emoji, TweenInfo.new(math.random(6, 12)/10, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
-            Position = UDim2.new(targetX, -25, targetY, -25),
-            TextTransparency = 1,
-            Rotation = math.random(-360, 360)
-        })
-        ts:Play()
-        game.Debris:AddItem(emoji, 1.5)
-    end
+        for i = 1, 25 do
+            local emoji = Instance.new("TextLabel", screenGui)
+            emoji.Text = Mono.KillEmoji
+            emoji.BackgroundTransparency = 1
+            emoji.Size = UDim2.new(0, 50, 0, 50)
+            emoji.Position = UDim2.new(0.5, -25, 0.5, -25)
+            emoji.TextSize = math.random(25, 60)
+            emoji.ZIndex = 10000
+            
+            local angle = math.rad(math.random(0, 360))
+            local distance = math.random(150, 800)
+            local targetX = 0.5 + (math.cos(angle) * (distance / Camera.ViewportSize.X))
+            local targetY = 0.5 + (math.sin(angle) * (distance / Camera.ViewportSize.Y))
+            
+            local ts = TweenService:Create(emoji, TweenInfo.new(math.random(6, 12)/10, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+                Position = UDim2.new(targetX, -25, targetY, -25),
+                TextTransparency = 1,
+                Rotation = math.random(-360, 360)
+            })
+            ts:Play()
+            game.Debris:AddItem(emoji, 1.5)
+        end
+    end)
 end
 
 -- === ДИНАМИЧНЫЙ STATUS HUD ===
@@ -179,39 +191,41 @@ hudTitle.TextSize = 12
 hudTitle.Parent = hudFrame
 
 local function updateHUD()
-    for _, v in pairs(hudFrame:GetChildren()) do
-        if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end
-    end
+    pcall(function()
+        for _, v in pairs(hudFrame:GetChildren()) do
+            if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end
+        end
 
-    local activeCount = 0
+        local activeCount = 0
 
-    local function addActiveFeature(name)
-        activeCount = activeCount + 1
-        local lbl = Instance.new("TextLabel")
-        lbl.Name = "1_" .. name
-        lbl.Size = UDim2.new(1, -20, 0, 20)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = name
-        lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-        lbl.Font = Enum.Font.GothamMedium
-        lbl.TextSize = 12
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = hudFrame
-        
-        local dot = Instance.new("Frame", lbl)
-        dot.Size = UDim2.new(0, 6, 0, 6)
-        dot.Position = UDim2.new(1, -10, 0.5, -3)
-        dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
-        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-    end
+        local function addActiveFeature(name)
+            activeCount = activeCount + 1
+            local lbl = Instance.new("TextLabel")
+            lbl.Name = "1_" .. name
+            lbl.Size = UDim2.new(1, -20, 0, 20)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.TextSize = 12
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Parent = hudFrame
+            
+            local dot = Instance.new("Frame", lbl)
+            dot.Size = UDim2.new(0, 6, 0, 6)
+            dot.Position = UDim2.new(1, -10, 0.5, -3)
+            dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        end
 
-    if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
-    if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
-    if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
-    if Mono.TargetObjEnabled then addActiveFeature("Orbits: " .. Mono.OrbitEmoji) end
+        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
+        if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
+        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
+        if Mono.TargetObjEnabled then addActiveFeature("Orbits: " .. Mono.OrbitEmoji) end
 
-    local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
-    TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
+        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
+        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
+    end)
 end
 
 -- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
@@ -595,16 +609,18 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
 end
 
 local function setToggleStateUI(frameName, state)
-    for _, v in pairs(contentArea:GetDescendants()) do
-        if v:IsA("Frame") and v.Name == frameName then
-            local status = v:FindFirstChild("Status", true)
-            local btn = v:FindFirstChild("MainBtn", true)
-            if status and btn then
-                status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-                btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    pcall(function()
+        for _, v in pairs(contentArea:GetDescendants()) do
+            if v:IsA("Frame") and v.Name == frameName then
+                local status = v:FindFirstChild("Status", true)
+                local btn = v:FindFirstChild("MainBtn", true)
+                if status and btn then
+                    status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+                    btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+                end
             end
         end
-    end
+    end)
 end
 
 -- Вкладка COMBAT
@@ -704,7 +720,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА С ОПТИМИЗАЦИЕЙ ===
+-- === 4. ЯДРО ЧИТА ===
 
 local function simulateClick()
     if mouse1click then
@@ -726,24 +742,6 @@ end
 local function getBestTargetPart(char)
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
-
-local GlobalRayParams = RaycastParams.new()
-GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
-GlobalRayParams.IgnoreWater = true
-
-task.spawn(function()
-    while true do
-        local ignoreList = {LocalPlayer.Character, Camera}
-        for _, v in pairs(workspace:GetChildren()) do
-            local name = string.lower(v.Name)
-            if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
-                table.insert(ignoreList, v)
-            end
-        end
-        GlobalRayParams.FilterDescendantsInstances = ignoreList
-        task.wait(1)
-    end
-end)
 
 local function raycastFromCamera()
     local origin = Camera.CFrame.Position
@@ -792,20 +790,22 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ОЧИСТКА ПАМЯТИ ПРИ ВЫХОДЕ ИГРОКОВ (FPS FIX)
+-- ОЧИСТКА ПАМЯТИ ПРИ ВЫХОДЕ ИГРОКОВ
 Players.PlayerRemoving:Connect(function(plr)
-    if espCache[plr] then
-        if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
-        if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
-        if espCache[plr].Orbits then
-            for _, orb in ipairs(espCache[plr].Orbits) do
-                orb.gui:Destroy()
+    pcall(function()
+        if espCache[plr] then
+            if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
+            if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
+            if espCache[plr].Orbits then
+                for _, orb in ipairs(espCache[plr].Orbits) do
+                    orb.gui:Destroy()
+                end
             end
+            espCache[plr] = nil
         end
-        espCache[plr] = nil
-    end
-    DeadCache[plr] = nil
-    PlayerData[plr] = nil
+        DeadCache[plr] = nil
+        PlayerData[plr] = nil
+    end)
 end)
 
 -- ESP & ВИЗУАЛЫ С УМНЫМ КЭШЕМ
@@ -954,33 +954,35 @@ end
 
 -- === ОСНОВНОЙ ЦИКЛ ===
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
-    updateESP()
+    pcall(function()
+        updateESP()
 
-    if Mono.Aimbot.Enabled then
-        local target = getClosestVisibleEnemy()
-        if target then
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-            local targetPlayer = getPlayerFromPart(target)
-            if targetPlayer then
-                LastTargetHit = targetPlayer
-                LastTargetTime = tick()
-            end
-        end
-    end
-
-    if Mono.AutoTap.Enabled then
-        local hitResult = raycastFromCamera()
-        if hitResult and hitResult.Instance then
-            local targetPlayer = getPlayerFromPart(hitResult.Instance)
-            if targetPlayer and isEnemy(targetPlayer) then
-                LastTargetHit = targetPlayer
-                LastTargetTime = tick()
-                
-                if tick() - LastShootTime > Mono.AutoTap.Delay then
-                    LastShootTime = tick()
-                    simulateClick()
+        if Mono.Aimbot.Enabled then
+            local target = getClosestVisibleEnemy()
+            if target then
+                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+                local targetPlayer = getPlayerFromPart(target)
+                if targetPlayer then
+                    LastTargetHit = targetPlayer
+                    LastTargetTime = tick()
                 end
             end
         end
-    end
+
+        if Mono.AutoTap.Enabled then
+            local hitResult = raycastFromCamera()
+            if hitResult and hitResult.Instance then
+                local targetPlayer = getPlayerFromPart(hitResult.Instance)
+                if targetPlayer and isEnemy(targetPlayer) then
+                    LastTargetHit = targetPlayer
+                    LastTargetTime = tick()
+                    
+                    if tick() - LastShootTime > Mono.AutoTap.Delay then
+                        LastShootTime = tick()
+                        simulateClick()
+                    end
+                end
+            end
+        end
+    end)
 end)
