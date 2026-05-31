@@ -31,6 +31,7 @@ local Mono = {
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(180, 130, 255), 
     
+    TeammateNotifs = true, -- Новый тумблер для смертей тиммейтов
     MenuOpen = true
 }
 
@@ -150,7 +151,7 @@ local function updateHUD()
     TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
 end
 
--- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 480, 0, 320)
 mainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
@@ -270,7 +271,7 @@ end
 local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 
--- === ФУНКЦИИ GUI: SUB-МЕНЮ ===
+-- === ФУНКЦИИ GUI ===
 local function createSubInput(parent, text, defaultText, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -301,7 +302,7 @@ local function createSubInput(parent, text, defaultText, callback)
         callback(box.Text)
         updateHUD()
     end)
-    return 35 -- Возвращаем высоту для расчетов
+    return 35
 end
 
 local function createSubColorPicker(parent, text, defaultColor, callback)
@@ -365,7 +366,6 @@ local function createSubColorPicker(parent, text, defaultColor, callback)
     return 50
 end
 
--- === ОСНОВНЫЕ ФУНКЦИИ GUI ===
 local function createToggle(parent, text, defaultState, onToggle)
     local frame = Instance.new("Frame", parent)
     frame.Name = text
@@ -459,7 +459,6 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 end
 
--- НОВАЯ ФУНКЦИЯ: TOGGLE С НАСТРОЙКАМИ (ШЕСТЕРЕНКА)
 local function createToggleWithSettings(parent, text, defaultState, onToggle, buildSettingsFunc)
     local container = Instance.new("Frame", parent)
     container.Name = text
@@ -505,7 +504,6 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     local sLayout = Instance.new("UIListLayout", settingsFrame)
     sLayout.Padding = UDim.new(0, 5)
     
-    -- Вызываем функцию построения настроек и получаем высоту
     local totalSettingsHeight = buildSettingsFunc(settingsFrame)
 
     local state = defaultState
@@ -539,8 +537,6 @@ local function setToggleStateUI(frameName, state)
     end
 end
 
--- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
-
 -- Вкладка COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
@@ -548,16 +544,15 @@ createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamChec
 
 -- Вкладка VISUALS
 createToggle(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
+createToggle(visualsPage, "Teammate Death Notifs", Mono.TeammateNotifs, function(s) Mono.TeammateNotifs = s end)
 
--- Орбиты с настройками внутри
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
-    local h1 = createSubInput(container, "Custom Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end)
+    local h1 = createSubInput(container, "Orbit Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end)
     return h1
 end)
 
--- Эффект убийства с настройками внутри
 createToggleWithSettings(visualsPage, "Kill Effect", Mono.KillEffect, function(s) Mono.KillEffect = s end, function(container)
-    local h1 = createSubInput(container, "Custom Emoji", Mono.KillEmoji, function(val) Mono.KillEmoji = val end)
+    local h1 = createSubInput(container, "Kill Emoji", Mono.KillEmoji, function(val) Mono.KillEmoji = val end)
     local h2 = createSubColorPicker(container, "Flash Color", Mono.KillColor, function(c) Mono.KillColor = c end)
     return h1 + h2 + 5
 end)
@@ -752,17 +747,22 @@ local function updateESP()
             isDead = true
         end
 
-        if isDead and not DeadCache[plr] then
-            DeadCache[plr] = true
-            if isEnem then
+        if isDead then
+            if DeadCache[plr] == false then
+                DeadCache[plr] = true
+                
                 if LastTargetHit == plr and (tick() - LastTargetTime < 3) then
                     doKillEffect()
                 end
-            else
-                local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
-                if isTeammate then showDeathNotification(plr.Name) end
+                
+                if Mono.TeammateNotifs then
+                    local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
+                    if isTeammate then showDeathNotification(plr.Name) end
+                end
+            elseif DeadCache[plr] == nil then
+                DeadCache[plr] = true
             end
-        elseif not isDead then
+        else
             DeadCache[plr] = false
         end
 
