@@ -18,7 +18,8 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
+    -- По умолчанию Аимбот на букву C
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, TargetPart = "Head" },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     ESP = { Enabled = false },
     TeamCheck = false,
@@ -27,6 +28,18 @@ local Mono = {
 
 local LastShootTime = 0
 local BindWait = nil 
+
+-- Функция для проверки нажатия (поддерживает и клавиатуру, и мышь)
+local function isBindPressed(bind)
+    if typeof(bind) == "EnumItem" then
+        if bind.EnumType == Enum.KeyCode then
+            return UserInputService:IsKeyDown(bind)
+        elseif bind.EnumType == Enum.UserInputType then
+            return UserInputService:IsMouseButtonPressed(bind)
+        end
+    end
+    return false
+end
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
@@ -190,15 +203,18 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
         bindBtn.Text = "..."
         BindWait = function(key)
             bindTable[bindKeyName] = key
-            bindBtn.Text = key.Name
+            local keyName = key.Name
+            if key == Enum.UserInputType.MouseButton1 then keyName = "LMB" end
+            if key == Enum.UserInputType.MouseButton2 then keyName = "RMB" end
+            bindBtn.Text = keyName
             BindWait = nil
         end
     end)
 end
 
 -- Меню
-createToggleWithBind(content, "Aimbot (Auto-Aim)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
-createToggleWithBind(content, "Auto Tap (Triggerbot)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
+createToggleWithBind(content, "Aimbot (Hold Key)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
+createToggleWithBind(content, "Auto Tap (Hold Key)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(content, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
 createToggle(content, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
@@ -222,11 +238,13 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Бинды
+-- Бинды (Поддержка Клавиатуры и Мыши)
 UserInputService.InputBegan:Connect(function(input, gp)
-    if BindWait and input.UserInputType == Enum.UserInputType.Keyboard then
-        if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
+    if BindWait then
+        if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
             BindWait(input.KeyCode)
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 or input.UserInputType == Enum.UserInputType.MouseButton3 then
+            BindWait(input.UserInputType)
         end
         return
     end
@@ -257,18 +275,15 @@ local function isEnemy(plr)
     return true
 end
 
--- Поиск универсальной части тела (чтобы работало на любых модельках)
 local function getBestTargetPart(char)
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
 
--- Универсальный Raycast для 1-го лица
 local function raycastFromCamera()
     local origin = Camera.CFrame.Position
-    local direction = Camera.CFrame.LookVector * 1500 -- Луч прямо из центра экрана
+    local direction = Camera.CFrame.LookVector * 1500 
     
     local rayParams = RaycastParams.new()
-    -- Игнорируем самого игрока, камеру и ВСЕ руки/оружия, которые могут лежать в workspace
     local ignoreList = {LocalPlayer.Character, Camera}
     for _, v in pairs(workspace:GetChildren()) do
         if v.Name:lower():match("viewmodel") or v.Name:lower():match("arm") or v.Name:lower():match("gun") then
@@ -282,7 +297,6 @@ local function raycastFromCamera()
     return workspace:Raycast(origin, direction, rayParams)
 end
 
--- Поиск игрока по задетой лучом детали
 local function getPlayerFromPart(part)
     if not part then return nil end
     local model = part:FindFirstAncestorOfClass("Model")
@@ -292,7 +306,6 @@ local function getPlayerFromPart(part)
     return nil
 end
 
--- Поиск ближайшего к прицелу (для Аима)
 local function getClosestVisibleEnemy()
     local closestTarget = nil
     local shortestDistance = math.huge
@@ -306,8 +319,7 @@ local function getClosestVisibleEnemy()
                 local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < 200 then -- Радиус работы Аимбота
-                        -- Проверка на стены через лучи
+                    if dist < 400 then -- РАДИУС ЗАХВАТА УВЕЛИЧЕН
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
                         local params = RaycastParams.new()
@@ -379,21 +391,19 @@ local function updateESP()
 end
 
 -- === ОСНОВНОЙ ЦИКЛ ===
--- Используем BindToRenderStep для Аима, чтобы он не дергался в 1-м лице
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     updateESP()
 
-    -- AIMBOT
-    if Mono.Aimbot.Enabled and UserInputService:IsKeyDown(Mono.Aimbot.Key) then
+    -- AIMBOT (Проверяем удержание клавиши)
+    if Mono.Aimbot.Enabled and isBindPressed(Mono.Aimbot.Key) then
         local target = getClosestVisibleEnemy()
         if target then
-            -- Жестко привязываем камеру к цели
             Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
         end
     end
 
-    -- TRIGGERBOT (1st Person Raycast)
-    if Mono.AutoTap.Enabled and UserInputService:IsKeyDown(Mono.AutoTap.Key) then
+    -- TRIGGERBOT (Проверяем удержание клавиши)
+    if Mono.AutoTap.Enabled and isBindPressed(Mono.AutoTap.Key) then
         local hitResult = raycastFromCamera()
         if hitResult and hitResult.Instance then
             local targetPlayer = getPlayerFromPart(hitResult.Instance)
