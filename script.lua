@@ -24,13 +24,13 @@ local Mono = {
     ESP = { Enabled = false, MaxDistance = 350 },
     TeamCheck = false,
     ShootFlash = true,
-    TargetObj = "None", -- None, Moon, Butterflies, Lavender, Bananas
+    TargetObj = "None", 
     MenuOpen = true
 }
 
 local LastShootTime = 0
 local BindWait = nil 
-local DeadCache = {} -- Кеш для детектора смерти
+local DeadCache = {} 
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
@@ -43,42 +43,30 @@ local LavenderGradient = ColorSequence.new({
     ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
 })
 
--- ЭФФЕКТ ВЫСТРЕЛА (FLASH)
+-- ИСПРАВЛЕННЫЙ ЭФФЕКТ ВЫСТРЕЛА (FLASH)
 local flashFrame = Instance.new("Frame")
 flashFrame.Size = UDim2.new(1, 0, 1, 0)
 flashFrame.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 flashFrame.BackgroundTransparency = 1
 flashFrame.BorderSizePixel = 0
-flashFrame.ZIndex = 0
+flashFrame.ZIndex = 9999 -- Поверх всего экрана
 flashFrame.Parent = screenGui
-
-local flashGrad = Instance.new("UIGradient", flashFrame)
-flashGrad.Transparency = NumberSequence.new({
-    NumberSequenceKeypoint.new(0, 1),
-    NumberSequenceKeypoint.new(0.5, 0.8),
-    NumberSequenceKeypoint.new(1, 1)
-})
-flashGrad.Rotation = 90
-
-local flashIn = TweenService:Create(flashFrame, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.5})
-local flashOut = TweenService:Create(flashFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1})
 
 local function doShootFlash()
     if Mono.ShootFlash then
-        flashIn:Play()
-        flashIn.Completed:Wait()
-        flashOut:Play()
+        flashFrame.BackgroundTransparency = 0.6
+        TweenService:Create(flashFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     end
 end
 
 -- ДИНАМИЧНЫЙ STATUS HUD
 local hudFrame = Instance.new("Frame")
-hudFrame.Size = UDim2.new(0, 150, 0, 0) -- Начальный размер 0 (скрыт)
+hudFrame.Size = UDim2.new(0, 150, 0, 0)
 hudFrame.Position = UDim2.new(1, -160, 0, 10)
 hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 hudFrame.BackgroundTransparency = 0.2
 hudFrame.BorderSizePixel = 0
-hudFrame.ClipsDescendants = true -- Чтобы элементы плавно выезжали
+hudFrame.ClipsDescendants = true 
 hudFrame.Parent = screenGui
 Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 6)
 
@@ -98,7 +86,6 @@ hudTitle.TextSize = 12
 hudTitle.Parent = hudFrame
 
 local function updateHUD()
-    -- Удаляем старые лейблы
     for _, v in pairs(hudFrame:GetChildren()) do
         if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end
     end
@@ -128,9 +115,11 @@ local function updateHUD()
     if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
     if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
     if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
-    if Mono.TargetObj ~= "None" then addActiveFeature("Obj: " .. string.sub(Mono.TargetObj, 1, -3)) end
+    if Mono.TargetObj ~= "None" then 
+        local objName = Mono.TargetObj:gsub(" .*", "") -- Убираем смайлик из названия для HUD
+        addActiveFeature("Obj: " .. objName) 
+    end
 
-    -- Плавно изменяем размер (выезжание)
     local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
     TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
 end
@@ -169,14 +158,6 @@ logoText.Text = "⬟"
 logoText.TextColor3 = Color3.fromRGB(180, 130, 255)
 logoText.Font = Enum.Font.GothamBlack
 logoText.TextSize = 24
-
-local logoDot = Instance.new("TextLabel", logoText)
-logoDot.Size = UDim2.new(1, 0, 1, 0)
-logoDot.BackgroundTransparency = 1
-logoDot.Text = "•"
-logoDot.TextColor3 = Color3.fromRGB(255, 255, 255)
-logoDot.Font = Enum.Font.GothamBlack
-logoDot.TextSize = 14
 
 local title = Instance.new("TextLabel", header)
 title.Size = UDim2.new(1, -50, 1, 0)
@@ -297,29 +278,69 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 end
 
-local function createCycleButton(parent, text, options, defaultIndex, callback)
+-- НОВОЕ ВЫПАДАЮЩЕЕ МЕНЮ (DROPDOWN)
+local function createDropdown(parent, text, options, defaultIndex, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    frame.ClipsDescendants = true
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(1, 0, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = "  " .. text .. ": " .. options[defaultIndex]
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.TextXAlignment = Enum.TextXAlignment.Left
+    local mainBtn = Instance.new("TextButton", frame)
+    mainBtn.Size = UDim2.new(1, 0, 0, 35)
+    mainBtn.BackgroundTransparency = 1
+    mainBtn.Text = "  " .. text .. ": " .. options[defaultIndex]
+    mainBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mainBtn.Font = Enum.Font.GothamMedium
+    mainBtn.TextSize = 13
+    mainBtn.TextXAlignment = Enum.TextXAlignment.Left
 
-    local currentIndex = defaultIndex
-    btn.MouseButton1Click:Connect(function()
-        currentIndex = (currentIndex % #options) + 1
-        local selected = options[currentIndex]
-        btn.Text = "  " .. text .. ": " .. selected
-        callback(selected)
-        updateHUD()
+    local arrow = Instance.new("TextLabel", mainBtn)
+    arrow.Size = UDim2.new(0, 30, 1, 0)
+    arrow.Position = UDim2.new(1, -30, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.TextColor3 = Color3.fromRGB(180, 130, 255)
+    arrow.Font = Enum.Font.Gotham
+
+    local dropList = Instance.new("Frame", frame)
+    dropList.Size = UDim2.new(1, 0, 0, #options * 30)
+    dropList.Position = UDim2.new(0, 0, 0, 35)
+    dropList.BackgroundTransparency = 1
+
+    local dLayout = Instance.new("UIListLayout", dropList)
+    
+    local isOpen = false
+    mainBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        arrow.Rotation = isOpen and 180 or 0
+        TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = isOpen and UDim2.new(1, 0, 0, 35 + #options * 30) or UDim2.new(1, 0, 0, 35)
+        }):Play()
     end)
+
+    for _, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton", dropList)
+        optBtn.Size = UDim2.new(1, 0, 0, 30)
+        optBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        optBtn.BorderSizePixel = 0
+        optBtn.Text = "   " .. opt
+        optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.TextSize = 12
+        optBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+        optBtn.MouseButton1Click:Connect(function()
+            mainBtn.Text = "  " .. text .. ": " .. opt
+            isOpen = false
+            arrow.Rotation = 0
+            TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(1, 0, 0, 35)
+            }):Play()
+            callback(opt)
+            updateHUD()
+        end)
+    end
 end
 
 local function setToggleStateUI(frameName, state)
@@ -339,7 +360,8 @@ createToggleWithBind(content, "Aimbot (Toggle Key)", Mono.Aimbot.Enabled, Mono.A
 createToggleWithBind(content, "Auto Tap (Toggle Key)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(content, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
 createToggle(content, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
-createCycleButton(content, "Target Obj", {"None", "Moon 🌙", "Butterflies 🦋", "Lavender 🪻", "Bananas 🍌"}, 1, function(val) Mono.TargetObj = val end)
+-- Выпадающее меню с новыми нормальными эмодзи
+createDropdown(content, "Target Obj", {"None", "Moon 🌙", "Butterflies 🦋", "Lavender 💜", "Bananas 🍌"}, 1, function(val) Mono.TargetObj = val end)
 createToggle(content, "Shoot Flash Effect", Mono.ShootFlash, function(s) Mono.ShootFlash = s end)
 
 updateHUD() 
@@ -364,7 +386,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Бинды (Обработка нажатий)
+-- Бинды 
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
@@ -400,13 +422,13 @@ end)
 -- === 4. ЯДРО ЧИТА ===
 
 local function simulateClick()
+    task.spawn(doShootFlash) -- Запускаем эффект ДО выстрела, чтобы не блочился
     if mouse1click then
         mouse1click()
     else
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
     end
-    task.spawn(doShootFlash)
 end
 
 local function isEnemy(plr)
@@ -417,7 +439,6 @@ local function isEnemy(plr)
     return true
 end
 
--- Функция показа надписи о смерти
 local function showDeathNotification(name)
     local notif = Instance.new("TextLabel", screenGui)
     notif.Text = name .. " умер !"
@@ -504,7 +525,7 @@ local espCache = {}
 local Emojis = {
     ["Moon 🌙"] = "🌙",
     ["Butterflies 🦋"] = "🦋",
-    ["Lavender 🪻"] = "🪻",
+    ["Lavender 💜"] = "💜",
     ["Bananas 🍌"] = "🍌"
 }
 
@@ -517,7 +538,6 @@ local function updateESP()
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
-        -- ДЕТЕКТОР СМЕРТИ ТИММЕЙТОВ
         if not isEnem and char then
             local hum = char:FindFirstChild("Humanoid")
             if hum then
@@ -532,7 +552,6 @@ local function updateESP()
 
         if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
             
-            -- WALLHACK LOGIC
             local distToPlayer = (char.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
@@ -569,19 +588,20 @@ local function updateESP()
                 end
             end
 
-            -- TARGET OBJ LOGIC (ЛЕТАЮЩИЕ ОБЪЕКТЫ)
+            -- TARGET OBJ LOGIC (ИСПОЛЬЗУЕМ РЕАЛЬНЫЕ МЕТРЫ ДЛЯ РАЗМЕРА)
             if Mono.TargetObj ~= "None" and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
                     espCache[plr].Orbits = {}
                     for i=1, 3 do
                         local bb = Instance.new("BillboardGui")
-                        bb.Size = UDim2.new(0, 30, 0, 30)
+                        -- ЗАДАЕМ РАЗМЕР В СТАДАХ (2x2 метра), ЧТОБЫ УМЕНЬШАЛИСЬ ВДАЛИ
+                        bb.Size = UDim2.new(2, 0, 2, 0) 
                         bb.AlwaysOnTop = true
                         local tl = Instance.new("TextLabel", bb)
                         tl.Size = UDim2.new(1, 0, 1, 0)
                         tl.BackgroundTransparency = 1
-                        tl.TextScaled = true
+                        tl.TextScaled = true -- Авто-подбор размера шрифта под стады
                         table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
                     end
                 end
@@ -590,7 +610,6 @@ local function updateESP()
                     orb.gui.Parent = char.HumanoidRootPart
                     orb.text.Text = Emojis[Mono.TargetObj]
                     
-                    -- Математика вращения вокруг игрока
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
                     orb.gui.StudsOffset = Vector3.new(math.cos(angle) * radius, math.sin(t * 3) * 1.5, math.sin(angle) * radius)
@@ -622,7 +641,6 @@ end
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     updateESP()
 
-    -- AIMBOT 
     if Mono.Aimbot.Enabled then
         local target = getClosestVisibleEnemy()
         if target then
@@ -630,7 +648,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         end
     end
 
-    -- TRIGGERBOT 
     if Mono.AutoTap.Enabled then
         local hitResult = raycastFromCamera()
         if hitResult and hitResult.Instance then
