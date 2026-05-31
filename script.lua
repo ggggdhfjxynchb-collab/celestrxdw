@@ -46,32 +46,6 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- === ОПТИМИЗАЦИЯ И ANTI-CRASH ЛУЧЕЙ ===
-local GlobalRayParams = RaycastParams.new()
-GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
-GlobalRayParams.IgnoreWater = true
-
-task.spawn(function()
-    while true do
-        pcall(function()
-            local ignoreList = {}
-            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
-            if Camera then table.insert(ignoreList, Camera) end
-            
-            for _, v in pairs(workspace:GetChildren()) do
-                if v and v.Name then
-                    local name = string.lower(v.Name)
-                    if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
-                        table.insert(ignoreList, v)
-                    end
-                end
-            end
-            GlobalRayParams.FilterDescendantsInstances = ignoreList
-        end)
-        task.wait(1)
-    end
-end)
-
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MonogrammaKlient"
@@ -355,7 +329,7 @@ end
 local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 
--- === ФУНКЦИИ GUI: SUB-МЕНЮ ===
+-- === ФУНКЦИИ GUI ===
 local function createSubInput(parent, text, defaultText, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -720,7 +694,31 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА ===
+-- === 4. ЯДРО ЧИТА С АНТИ-КРАШЕМ ===
+local GlobalRayParams = RaycastParams.new()
+GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
+GlobalRayParams.IgnoreWater = true
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local ignoreList = {}
+            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
+            if Camera then table.insert(ignoreList, Camera) end
+            
+            for _, v in pairs(workspace:GetChildren()) do
+                if v and v.Name then
+                    local name = string.lower(v.Name)
+                    if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
+                        table.insert(ignoreList, v)
+                    end
+                end
+            end
+            GlobalRayParams.FilterDescendantsInstances = ignoreList
+        end)
+        task.wait(1)
+    end
+end)
 
 local function simulateClick()
     if mouse1click then
@@ -790,25 +788,7 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ОЧИСТКА ПАМЯТИ ПРИ ВЫХОДЕ ИГРОКОВ
-Players.PlayerRemoving:Connect(function(plr)
-    pcall(function()
-        if espCache[plr] then
-            if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
-            if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
-            if espCache[plr].Orbits then
-                for _, orb in ipairs(espCache[plr].Orbits) do
-                    orb.gui:Destroy()
-                end
-            end
-            espCache[plr] = nil
-        end
-        DeadCache[plr] = nil
-        PlayerData[plr] = nil
-    end)
-end)
-
--- ESP & ВИЗУАЛЫ С УМНЫМ КЭШЕМ
+-- === РЕНДЕР И ЛОГИКА ===
 local espCache = {}
 
 local function updateESP()
@@ -861,6 +841,7 @@ local function updateESP()
         if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
             local distToPlayer = (char.HumanoidRootPart.Position - camPos).Magnitude
             
+            -- ВХ
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -871,28 +852,29 @@ local function updateESP()
                     hl.FillTransparency = 0.5
                     hl.OutlineTransparency = 0.2
                     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = screenGui
                     
                     local bb = Instance.new("BillboardGui")
                     bb.Name = "MonoName"
                     bb.Size = UDim2.new(0, 100, 0, 20)
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
+                    bb.Parent = screenGui
+                    
                     local tl = Instance.new("TextLabel", bb)
                     tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
                     espCache[plr].Text = tl
-                    
-                    hl.Parent = char
-                    bb.Parent = char.HumanoidRootPart
                 end
                 
                 espCache[plr].Highlight.Enabled = true
                 espCache[plr].Billboard.Enabled = true
                 
-                if espCache[plr].Highlight.Parent ~= char then espCache[plr].Highlight.Parent = char end
-                if espCache[plr].Billboard.Parent ~= char.HumanoidRootPart then espCache[plr].Billboard.Parent = char.HumanoidRootPart end
+                -- ИСПОЛЬЗУЕМ ADORNEE ВМЕСТО PARENT ДЛЯ ЗАЩИТЫ ОТ КРАШЕЙ
+                if espCache[plr].Highlight.Adornee ~= char then espCache[plr].Highlight.Adornee = char end
+                if espCache[plr].Billboard.Adornee ~= char.HumanoidRootPart then espCache[plr].Billboard.Adornee = char.HumanoidRootPart end
                 
                 espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
                 espCache[plr].Highlight.FillColor = Mono.ESPColor
@@ -904,6 +886,7 @@ local function updateESP()
                 end
             end
 
+            -- ОРБИТЫ
             if Mono.TargetObjEnabled and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
@@ -912,18 +895,18 @@ local function updateESP()
                         local bb = Instance.new("BillboardGui")
                         bb.Size = UDim2.new(2, 0, 2, 0) 
                         bb.AlwaysOnTop = true
+                        bb.Parent = screenGui
                         local tl = Instance.new("TextLabel", bb)
                         tl.Size = UDim2.new(1, 0, 1, 0)
                         tl.BackgroundTransparency = 1
                         tl.TextScaled = true 
-                        bb.Parent = char.HumanoidRootPart
                         table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
                     end
                 end
 
                 for i, orb in ipairs(espCache[plr].Orbits) do
                     orb.gui.Enabled = true
-                    if orb.gui.Parent ~= char.HumanoidRootPart then orb.gui.Parent = char.HumanoidRootPart end
+                    if orb.gui.Adornee ~= char.HumanoidRootPart then orb.gui.Adornee = char.HumanoidRootPart end
                     orb.text.Text = Mono.OrbitEmoji
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
@@ -937,6 +920,7 @@ local function updateESP()
                 end
             end
         else
+            -- ПРЯЧЕМ ЕСЛИ ИГРОК МЕРТВ
             if espCache[plr] then
                 if espCache[plr].Highlight then
                     espCache[plr].Highlight.Enabled = false
@@ -952,7 +936,6 @@ local function updateESP()
     end
 end
 
--- === ОСНОВНОЙ ЦИКЛ ===
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     pcall(function()
         updateESP()
