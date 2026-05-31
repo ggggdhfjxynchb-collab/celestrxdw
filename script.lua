@@ -46,8 +46,10 @@ local Mono = {
     TimeOfDay = "Default", 
     
     WeatherEnabled = false,
-    WeatherType = "Rain 🌧️",      
+    WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
+    
+    ConfigName = "Monogramma", -- ИМЯ КОНФИГА ПО УМОЛЧАНИЮ
     
     MenuOpen = true
 }
@@ -67,8 +69,12 @@ task.spawn(function()
     while true do
         pcall(function()
             local ignoreList = {}
-            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
-            if Camera then table.insert(ignoreList, Camera) end
+            if LocalPlayer.Character then 
+                table.insert(ignoreList, LocalPlayer.Character) 
+            end
+            if Camera then 
+                table.insert(ignoreList, Camera) 
+            end
             for _, v in pairs(workspace:GetChildren()) do
                 if v and v.Name then
                     local name = string.lower(v.Name)
@@ -96,8 +102,10 @@ fovFrame.BackgroundTransparency = 1
 fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 fovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 fovFrame.ZIndex = 50
+
 local fovCorner = Instance.new("UICorner", fovFrame)
 fovCorner.CornerRadius = UDim.new(1, 0)
+
 local fovStroke = Instance.new("UIStroke", fovFrame)
 fovStroke.Thickness = 1.5
 fovStroke.Color = Mono.FOV.Color
@@ -122,6 +130,7 @@ task.spawn(function()
         pcall(function()
             if Mono.WeatherEnabled then
                 local isRain = (Mono.WeatherType == "Rain 🌧️")
+                
                 local wDrop = Instance.new("TextLabel", weatherContainer)
                 wDrop.BackgroundTransparency = 1
                 wDrop.Size = UDim2.new(0, 30, 0, 30)
@@ -131,7 +140,7 @@ task.spawn(function()
                 wDrop.TextTransparency = 0.2
                 
                 local duration = math.random(30, 60) / 10 
-                local targetX = wDrop.Position.X.Scale + (math.random(-10, 10)/100) 
+                local targetX = wDrop.Position.X.Scale + (math.random(-10, 10) / 100) 
                 
                 local ts = TweenService:Create(wDrop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
                     Position = UDim2.new(targetX, 0, 1.1, 0),
@@ -149,6 +158,7 @@ local notifContainer = Instance.new("Frame", screenGui)
 notifContainer.Size = UDim2.new(0, 400, 0, 300)
 notifContainer.Position = UDim2.new(0.5, -200, 0.12, 0)
 notifContainer.BackgroundTransparency = 1
+
 local notifLayout = Instance.new("UIListLayout", notifContainer)
 notifLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -170,11 +180,14 @@ local function showNotification(text, color)
         
         local ts = TweenService
         ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0}):Play()
+        
         task.delay(3, function()
             pcall(function()
                 local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
                 fade:Play()
-                fade.Completed:Connect(function() notif:Destroy() end)
+                fade.Completed:Connect(function() 
+                    notif:Destroy() 
+                end)
             end)
         end)
     end)
@@ -192,9 +205,13 @@ flashFrame.Parent = screenGui
 local function doKillEffect()
     pcall(function()
         if not Mono.KillEffect then return end
+        
         flashFrame.BackgroundColor3 = Mono.KillColor
         flashFrame.BackgroundTransparency = 0.3
-        TweenService:Create(flashFrame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        
+        TweenService:Create(flashFrame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {
+            BackgroundTransparency = 1
+        }):Play()
         
         for i = 1, 25 do
             local emoji = Instance.new("TextLabel", screenGui)
@@ -221,70 +238,6 @@ local function doKillEffect()
     end)
 end
 
--- === ДИНАМИЧНЫЙ STATUS HUD ===
-local hudFrame = Instance.new("Frame")
-hudFrame.Size = UDim2.new(0, 150, 0, 0)
-hudFrame.Position = UDim2.new(1, -160, 0, 10)
-hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-hudFrame.BackgroundTransparency = 0.2
-hudFrame.BorderSizePixel = 0
-hudFrame.ClipsDescendants = true 
-hudFrame.Parent = screenGui
-Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
-
-local hudList = Instance.new("UIListLayout", hudFrame)
-hudList.Padding = UDim.new(0, 5)
-hudList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-hudList.SortOrder = Enum.SortOrder.LayoutOrder
-
-local hudTitle = Instance.new("TextLabel")
-hudTitle.Name = "0_Title"
-hudTitle.Size = UDim2.new(1, 0, 0, 30)
-hudTitle.BackgroundTransparency = 1
-hudTitle.Text = "MONOGRAMMA"
-hudTitle.TextColor3 = Color3.fromRGB(180, 130, 255)
-hudTitle.Font = Enum.Font.GothamBlack
-hudTitle.TextSize = 12
-hudTitle.Parent = hudFrame
-
-local function updateHUD()
-    pcall(function()
-        for _, v in pairs(hudFrame:GetChildren()) do
-            if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end
-        end
-
-        local activeCount = 0
-        local function addActiveFeature(name)
-            activeCount = activeCount + 1
-            local lbl = Instance.new("TextLabel")
-            lbl.Name = "1_" .. name
-            lbl.Size = UDim2.new(1, -20, 0, 20)
-            lbl.BackgroundTransparency = 1
-            lbl.Text = name
-            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-            lbl.Font = Enum.Font.GothamMedium
-            lbl.TextSize = 12
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Parent = hudFrame
-            local dot = Instance.new("Frame", lbl)
-            dot.Size = UDim2.new(0, 6, 0, 6)
-            dot.Position = UDim2.new(1, -10, 0.5, -3)
-            dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-        end
-
-        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
-        if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
-        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
-        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
-        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
-        if Mono.WeatherEnabled then addActiveFeature("Weather") end
-
-        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
-        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
-    end)
-end
-
 -- === ГЛАВНОЕ МЕНЮ С ИДЕАЛЬНЫМИ ЗАКРУГЛЕНИЯМИ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
@@ -292,7 +245,6 @@ mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
--- Идеальное закругление без выпираний
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
@@ -347,7 +299,6 @@ headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 headerLine.BorderSizePixel = 0
 headerLine.BackgroundTransparency = 0.5
 
--- Прозрачный сайдбар
 local sidebar = Instance.new("Frame", mainFrame)
 sidebar.Size = UDim2.new(0, 130, 1, -41)
 sidebar.Position = UDim2.new(0, 0, 0, 41)
@@ -391,7 +342,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.Padding = UDim.new(0, 8) -- Чуть отступа чтобы скроллбар не наезжал
+    pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
 
@@ -400,7 +351,10 @@ local function createTab(name, icon)
             activeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
             activeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
-        for _, p in pairs(Pages) do p.Visible = false end
+        
+        for _, p in pairs(Pages) do 
+            p.Visible = false 
+        end
         
         btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -416,7 +370,44 @@ local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
--- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
+-- === ФУНКЦИИ GUI: РАЗВЕРНУТЫЕ И ПОЛНЫЕ ===
+
+-- Обычное поле ввода (для меню Settings)
+local function createInput(parent, text, defaultText, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "  " .. text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0, 120, 0, 24)
+    box.Position = UDim2.new(1, -130, 0.5, -12)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    box.Text = defaultText
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+
+    box.FocusLost:Connect(function()
+        if box.Text == "" then 
+            box.Text = defaultText 
+        end
+        callback(box.Text)
+    end)
+end
+
 local function createButton(parent, text, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 35)
@@ -467,10 +458,12 @@ local function createSubInput(parent, text, defaultText, callback)
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
 
     box.FocusLost:Connect(function()
-        if box.Text == "" then box.Text = defaultText end
+        if box.Text == "" then 
+            box.Text = defaultText 
+        end
         callback(box.Text)
-        updateHUD()
     end)
+    
     return 35
 end
 
@@ -512,6 +505,7 @@ local function createSubColorPicker(parent, text, defaultColor, callback)
     })
 
     local isDraggingHue = false
+    
     local function updateHue(inputX)
         local posX = math.clamp(inputX - hueFrame.AbsolutePosition.X, 0, hueFrame.AbsoluteSize.X)
         local hue = posX / hueFrame.AbsoluteSize.X
@@ -526,12 +520,19 @@ local function createSubColorPicker(parent, text, defaultColor, callback)
             updateHue(input.Position.X)
         end
     end)
+    
     hueFrame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then isDraggingHue = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then 
+            isDraggingHue = false 
+        end
     end)
+    
     UserInputService.InputChanged:Connect(function(input)
-        if isDraggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input.Position.X) end
+        if isDraggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then 
+            updateHue(input.Position.X) 
+        end
     end)
+    
     return 50
 end
 
@@ -566,6 +567,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback)
     dropList.BackgroundTransparency = 1
 
     local isOpen = false
+    
     mainBtn.MouseButton1Click:Connect(function()
         isOpen = not isOpen
         arrow.Rotation = isOpen and 180 or 0
@@ -595,7 +597,6 @@ local function createDropdown(parent, text, options, defaultIndex, callback)
                 Size = UDim2.new(1, 0, 0, 35)
             }):Play()
             callback(opt)
-            updateHUD()
         end)
     end
 end
@@ -631,7 +632,6 @@ local function createToggle(parent, text, defaultState, onToggle)
         status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(state)
-        updateHUD()
     end)
 end
 
@@ -661,6 +661,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
     
     local bindBtn = Instance.new("TextButton", frame)
+    bindBtn.Name = "BindBtn"
     bindBtn.Size = UDim2.new(0, 100, 0, 24)
     bindBtn.Position = UDim2.new(1, -110, 0.5, -12)
     bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
@@ -676,7 +677,6 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
         status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(state)
-        updateHUD()
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
@@ -746,7 +746,6 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
         status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(state)
-        updateHUD()
     end)
 
     local isOpen = false
@@ -773,61 +772,142 @@ local function setToggleStateUI(frameName, state)
     end)
 end
 
--- === СИСТЕМА СОХРАНЕНИЯ ===
-local cfgName = "MonogrammaConfig.json"
+-- === СИСТЕМА КОНФИГОВ (СОХРАНЕНИЕ, ЭКСПОРТ, ИМПОРТ) ===
+
+local function GetConfigTable()
+    return {
+        TeamCheck = Mono.TeamCheck,
+        AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name,
+        AutoTapE = Mono.AutoTap.Enabled, AutoTapK = Mono.AutoTap.Key.Name,
+        
+        FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
+        FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
+        
+        ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
+        ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
+        
+        TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
+        
+        KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
+        Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
+        
+        TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
+        
+        TintE = Mono.TintEnabled,
+        Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
+        
+        Time = Mono.TimeOfDay,
+        WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji
+    }
+end
+
+local function ApplyConfigToUI()
+    setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
+    setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
+    setToggleStateUI("Team Check", Mono.TeamCheck)
+    setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
+    setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
+    setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
+    setToggleStateUI("Enemy Orbits", Mono.TargetObjEnabled)
+    setToggleStateUI("Kill Effect", Mono.KillEffect)
+    setToggleStateUI("Screen Tint", Mono.TintEnabled)
+    setToggleStateUI("Weather Event", Mono.WeatherEnabled)
+    
+    tintFrame.BackgroundTransparency = Mono.TintEnabled and 0.85 or 1
+    tintFrame.BackgroundColor3 = Mono.TintColor
+end
+
+local function LoadConfigFromTable(dec)
+    Mono.TeamCheck = dec.TeamCheck or false
+    Mono.Aimbot.Enabled = dec.AimbotE or false
+    pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
+    Mono.AutoTap.Enabled = dec.AutoTapE or false
+    pcall(function() Mono.AutoTap.Key = Enum.KeyCode[dec.AutoTapK] or Enum.UserInputType[dec.AutoTapK] end)
+
+    Mono.FOV.Enabled = dec.FOVE or false
+    Mono.FOV.Radius = dec.FOVRad or 150
+    Mono.FOV.Color = Color3.new(dec.FOV_R or 1, dec.FOV_G or 1, dec.FOV_B or 1)
+
+    Mono.ESP.Enabled = dec.ESPE or false
+    Mono.ESP.MaxDistance = dec.ESPMaxDist or 350
+    Mono.ESPColor = Color3.new(dec.ESP_R or 1, dec.ESP_G or 1, dec.ESP_B or 1)
+    
+    Mono.TargetObjEnabled = dec.TargetObjE or false
+    Mono.OrbitEmoji = dec.ObjEmoji or "🦋"
+    
+    Mono.KillEffect = dec.KillEffE or false
+    Mono.KillEmoji = dec.KillEmoji or "💀"
+    Mono.KillColor = Color3.new(dec.Kill_R or 1, dec.Kill_G or 0, dec.Kill_B or 0)
+    
+    Mono.TeammateNotifs = dec.TeamNotifE or false
+    Mono.DeathNotifDistance = dec.DeathDist or 150
+    
+    Mono.TintEnabled = dec.TintE or false
+    Mono.TintColor = Color3.new(dec.Tint_R or 1, dec.Tint_G or 1, dec.Tint_B or 1)
+    
+    Mono.TimeOfDay = dec.Time or "Default"
+    Mono.WeatherEnabled = dec.WeatherEnabled or false
+    Mono.WeatherType = dec.WeatherType or "Rain 🌧️"
+    Mono.WeatherEmoji = dec.WeathEmoji or "💸"
+
+    ApplyConfigToUI()
+end
 
 local function SaveConfig()
     pcall(function()
-        local data = {
-            TeamCheck = Mono.TeamCheck,
-            MaxDist = Mono.ESP.MaxDistance,
-            FOVRad = Mono.FOV.Radius,
-            ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
-            ObjEmoji = Mono.OrbitEmoji,
-            KillEmoji = Mono.KillEmoji,
-            Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
-            Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
-            Time = Mono.TimeOfDay,
-            WeatherEnabled = Mono.WeatherEnabled,
-            WeatherType = Mono.WeatherType,
-            WeathEmoji = Mono.WeatherEmoji
-        }
+        local fileName = Mono.ConfigName .. ".json"
         if writefile then
-            writefile(cfgName, HttpService:JSONEncode(data))
-            showNotification("💾 Config Saved!", Color3.fromRGB(0, 255, 100))
+            writefile(fileName, HttpService:JSONEncode(GetConfigTable()))
+            showNotification("💾 Saved to " .. fileName, Color3.fromRGB(0, 255, 100))
         end
     end)
 end
 
 local function LoadConfig()
     pcall(function()
-        if readfile and isfile and isfile(cfgName) then
-            local decoded = HttpService:JSONDecode(readfile(cfgName))
-            Mono.TeamCheck = decoded.TeamCheck or false
-            Mono.ESP.MaxDistance = decoded.MaxDist or 350
-            Mono.FOV.Radius = decoded.FOVRad or 150
-            Mono.ESPColor = Color3.new(decoded.ESP_R or 1, decoded.ESP_G or 1, decoded.ESP_B or 1)
-            Mono.OrbitEmoji = decoded.ObjEmoji or "🦋"
-            Mono.KillEmoji = decoded.KillEmoji or "💀"
-            Mono.KillColor = Color3.new(decoded.Kill_R or 1, decoded.Kill_G or 0, decoded.Kill_B or 0)
-            Mono.TintColor = Color3.new(decoded.Tint_R or 1, decoded.Tint_G or 1, decoded.Tint_B or 1)
-            Mono.TimeOfDay = decoded.Time or "Default"
-            Mono.WeatherEnabled = decoded.WeatherEnabled or false
-            Mono.WeatherType = decoded.WeatherType or "Rain 🌧️"
-            Mono.WeatherEmoji = decoded.WeathEmoji or "💸"
-            showNotification("📂 Config Loaded! Re-open tabs.", Color3.fromRGB(0, 255, 100))
+        local fileName = Mono.ConfigName .. ".json"
+        if readfile and isfile and isfile(fileName) then
+            LoadConfigFromTable(HttpService:JSONDecode(readfile(fileName)))
+            showNotification("📂 Loaded " .. fileName, Color3.fromRGB(0, 255, 100))
+        else
+            showNotification("❌ Config not found!", Color3.fromRGB(255, 50, 50))
         end
     end)
 end
 
--- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
+local function ExportConfig()
+    pcall(function()
+        if setclipboard then
+            setclipboard(HttpService:JSONEncode(GetConfigTable()))
+            showNotification("📋 Copied to Clipboard!", Color3.fromRGB(100, 150, 255))
+        end
+    end)
+end
+
+local function ImportConfig()
+    pcall(function()
+        if getclipboard then
+            local clip = getclipboard()
+            if clip and clip ~= "" then
+                local success, result = pcall(function() return HttpService:JSONDecode(clip) end)
+                if success and type(result) == "table" then
+                    LoadConfigFromTable(result)
+                    showNotification("📥 Imported successfully!", Color3.fromRGB(100, 150, 255))
+                else
+                    showNotification("❌ Invalid Config Data", Color3.fromRGB(255, 50, 50))
+                end
+            end
+        end
+    end)
+end
+
+-- === ЗАПОЛНЯЕМ ВКЛАДКИ МЕНЮ ===
 
 -- 1. COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
--- ДОБАВЛЕНА НАСТРОЙКА КРУГА FOV
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end)
     local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end)
@@ -868,7 +948,6 @@ end)
 
 createDropdown(worldPage, "Time of Day", {"Default", "Day ☀️", "Night 🌙"}, 1, function(val) Mono.TimeOfDay = val end)
 
--- ИСПРАВЛЕНА ПОГОДА (КНОПКА С ШЕСТЕРЕНКОЙ И CUSTOM EMOJI)
 createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, function(s) Mono.WeatherEnabled = s end, function(container)
     local h1 = createSubInput(container, "1=Rain, 2=Custom", "1", function(val) Mono.WeatherType = (val == "1") and "Rain 🌧️" or "Custom ❄️" end)
     local h2 = createSubInput(container, "Custom Emoji", Mono.WeatherEmoji, function(val) Mono.WeatherEmoji = val end)
@@ -876,10 +955,12 @@ createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, functi
 end)
 
 -- 4. SETTINGS
+createInput(settingsPage, "Config Name", Mono.ConfigName, function(val) Mono.ConfigName = val end)
 createButton(settingsPage, "💾 Save Configuration", SaveConfig)
 createButton(settingsPage, "📂 Load Configuration", LoadConfig)
+createButton(settingsPage, "📋 Export to Clipboard", ExportConfig)
+createButton(settingsPage, "📥 Import from Clipboard", ImportConfig)
 
-updateHUD() 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
@@ -922,13 +1003,11 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if key == Mono.Aimbot.Key then
         Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
         setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
-        updateHUD()
     end
 
     if key == Mono.AutoTap.Key then
         Mono.AutoTap.Enabled = not Mono.AutoTap.Enabled
         setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
-        updateHUD()
     end
 
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -948,7 +1027,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА ===
+-- === ЯДРО ЧИТА И FOV ЛОГИКА ===
 
 local function simulateClick()
     if mouse1click then
@@ -1000,7 +1079,7 @@ local function getClosestVisibleEnemy()
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     
-                    -- ЕСЛИ FOV ВЫКЛЮЧЕН, ТО ПРИЦЕЛ РАБОТАЕТ НА ВЕСЬ ЭКРАН, ИНАЧЕ ТОЛЬКО ВНУТРИ КРУГА
+                    -- ПРОВЕРКА FOV ДЛЯ AIMBOT
                     if (not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius) then
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
@@ -1223,7 +1302,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
-                        -- ЛОГИКА FOV ДЛЯ АВТО-ТАПА (ЕСЛИ ВЫКЛЮЧЕН = РАБОТАЕТ ВЕЗДЕ)
+                        -- ПРОВЕРКА FOV ДЛЯ АВТО-ТАПА
                         if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
                             LastTargetHit = targetPlayer
                             LastTargetTime = tick()
