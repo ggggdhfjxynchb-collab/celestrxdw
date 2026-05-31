@@ -21,23 +21,27 @@ end)
 local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
-    ESP = { Enabled = false, MaxDistance = 350 },
-    TeamCheck = false,
     
+    ESP = { Enabled = false, MaxDistance = 350 },
+    ESPColor = Color3.fromRGB(180, 130, 255), -- НЕЗАВИСИМЫЙ ЦВЕТ ESP
+    
+    TeamCheck = false,
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     
     KillEffect = true,
     KillEmoji = "💀", 
-    KillColor = Color3.fromRGB(180, 130, 255), 
+    KillColor = Color3.fromRGB(255, 50, 50), 
     
-    TeammateNotifs = true, -- Новый тумблер для смертей тиммейтов
+    TeammateNotifs = true,
+    DeathNotifDistance = 150, -- ДИСТАНЦИЯ В СТАДАХ ДЛЯ СМЕРТЕЙ
+    
     MenuOpen = true
 }
 
 local LastShootTime = 0
 local BindWait = nil 
-local DeadCache = {} 
+local PlayerData = {} -- УМНЫЙ КЭШ ПОЗИЦИЙ
 
 local LastTargetHit = nil
 local LastTargetTime = 0
@@ -48,6 +52,42 @@ screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
+
+local LavenderGradient = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), 
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
+})
+
+-- === КОНТЕЙНЕР ДЛЯ УВЕДОМЛЕНИЙ О СМЕРТИ ===
+local notifContainer = Instance.new("Frame", screenGui)
+notifContainer.Size = UDim2.new(0, 300, 0, 200)
+notifContainer.Position = UDim2.new(0.5, -150, 0.7, 0)
+notifContainer.BackgroundTransparency = 1
+local notifLayout = Instance.new("UIListLayout", notifContainer)
+notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+notifLayout.Padding = UDim.new(0, 5)
+
+local function showDeathNotification(name)
+    local notif = Instance.new("TextLabel")
+    notif.Text = name .. " умер !"
+    notif.TextColor3 = Mono.KillColor
+    notif.Size = UDim2.new(1, 0, 0, 30)
+    notif.BackgroundTransparency = 1
+    notif.Font = Enum.Font.GothamBlack
+    notif.TextSize = 18
+    notif.TextTransparency = 1
+    notif.Parent = notifContainer
+    
+    local ts = TweenService
+    ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    
+    task.delay(2.5, function()
+        local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1})
+        fade:Play()
+        fade.Completed:Connect(function() notif:Destroy() end)
+    end)
+end
 
 -- === КАСТОМНЫЙ ЭФФЕКТ УБИЙСТВА ===
 local flashFrame = Instance.new("Frame")
@@ -151,7 +191,7 @@ local function updateHUD()
     TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 480, 0, 320)
 mainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
@@ -204,6 +244,13 @@ title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
+
+local headerLine = Instance.new("Frame", mainFrame)
+headerLine.Size = UDim2.new(1, 0, 0, 1)
+headerLine.Position = UDim2.new(0, 0, 0, 40)
+headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+headerLine.BorderSizePixel = 0
+headerLine.BackgroundTransparency = 0.5
 
 local sidebar = Instance.new("Frame", mainFrame)
 sidebar.Size = UDim2.new(0, 130, 1, -41)
@@ -271,7 +318,7 @@ end
 local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 
--- === ФУНКЦИИ GUI ===
+-- === ФУНКЦИИ GUI: SUB-МЕНЮ ===
 local function createSubInput(parent, text, defaultText, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -543,8 +590,15 @@ createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
 -- Вкладка VISUALS
-createToggle(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
-createToggle(visualsPage, "Teammate Death Notifs", Mono.TeammateNotifs, function(s) Mono.TeammateNotifs = s end)
+createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
+    local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end)
+    return h1
+end)
+
+createToggleWithSettings(visualsPage, "Teammate Death Notifs", Mono.TeammateNotifs, function(s) Mono.TeammateNotifs = s end, function(container)
+    local h1 = createSubInput(container, "Max Studs", tostring(Mono.DeathNotifDistance), function(val) Mono.DeathNotifDistance = tonumber(val) or 150 end)
+    return h1
+end)
 
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
     local h1 = createSubInput(container, "Orbit Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end)
@@ -645,21 +699,6 @@ local function isEnemy(plr)
     return true
 end
 
-local function showDeathNotification(name)
-    local notif = Instance.new("TextLabel", screenGui)
-    notif.Text = name .. " умер !"
-    notif.TextColor3 = Mono.KillColor
-    notif.Size = UDim2.new(0, 300, 0, 50)
-    notif.Position = UDim2.new(0.5, -150, 0.8, 0)
-    notif.BackgroundTransparency = 1
-    notif.Font = Enum.Font.GothamBlack
-    notif.TextSize = 22
-    
-    local ts = TweenService
-    ts:Create(notif, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -150, 0.65, 0), TextTransparency = 1}):Play()
-    game.Debris:AddItem(notif, 3)
-end
-
 local function getBestTargetPart(char)
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
@@ -726,18 +765,30 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ESP & VISUALS
+-- === ESP & ВИЗУАЛЫ С УМНЫМ КЭШЕМ ===
 local espCache = {}
 
 local function updateESP()
     local t = tick()
+    local camPos = Camera.CFrame.Position
     
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
+        -- Инициализация кэша для игрока
+        if not PlayerData[plr] then
+            PlayerData[plr] = { isDead = false, lastPos = Vector3.zero }
+        end
+        
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
+        -- Запоминаем последнюю позицию, пока игрок жив
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            PlayerData[plr].lastPos = char.HumanoidRootPart.Position
+        end
+        
+        -- Проверка на смерть
         local isDead = false
         if char then
             local hum = char:FindFirstChild("Humanoid")
@@ -747,34 +798,39 @@ local function updateESP()
             isDead = true
         end
 
+        -- Логика уведомлений о смерти (срабатывает ровно 1 раз)
         if isDead then
-            if DeadCache[plr] == false then
-                DeadCache[plr] = true
+            if PlayerData[plr].isDead == false then
+                PlayerData[plr].isDead = true
                 
-                if LastTargetHit == plr and (tick() - LastTargetTime < 3) then
-                    doKillEffect()
-                end
+                -- Проверяем дистанцию до места смерти
+                local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
                 
-                if Mono.TeammateNotifs then
-                    local isTeammate = (plr.Team ~= nil and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team)
-                    if isTeammate then showDeathNotification(plr.Name) end
+                if isEnem then
+                    if LastTargetHit == plr and (tick() - LastTargetTime < 3) then
+                        doKillEffect()
+                    end
+                else
+                    -- Тиммейт умер: проверяем радиус из настроек
+                    if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then
+                        showDeathNotification(plr.Name)
+                    end
                 end
-            elseif DeadCache[plr] == nil then
-                DeadCache[plr] = true
             end
         else
-            DeadCache[plr] = false
+            PlayerData[plr].isDead = false
         end
 
+        -- Отрисовка ESP
         if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
+            local distToPlayer = (char.HumanoidRootPart.Position - camPos).Magnitude
             
-            local distToPlayer = (char.HumanoidRootPart.Position - Camera.CFrame.Position).Magnitude
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
                     local hl = Instance.new("Highlight")
                     hl.Name = "MonoESP"
-                    hl.FillColor = Mono.KillColor
+                    hl.FillColor = Mono.ESPColor
                     hl.OutlineColor = Color3.fromRGB(255, 255, 255)
                     hl.FillTransparency = 0.5
                     hl.OutlineTransparency = 0.2
@@ -796,7 +852,8 @@ local function updateESP()
                 espCache[plr].Highlight.Parent = char
                 espCache[plr].Billboard.Parent = char.HumanoidRootPart
                 espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
-                espCache[plr].Text.TextColor3 = Mono.KillColor
+                espCache[plr].Highlight.FillColor = Mono.ESPColor
+                espCache[plr].Text.TextColor3 = Mono.ESPColor
             else
                 if espCache[plr] and espCache[plr].Highlight then
                     espCache[plr].Highlight.Parent = nil
@@ -804,6 +861,7 @@ local function updateESP()
                 end
             end
 
+            -- Отрисовка Орбит
             if Mono.TargetObjEnabled and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
@@ -823,7 +881,6 @@ local function updateESP()
                 for i, orb in ipairs(espCache[plr].Orbits) do
                     orb.gui.Parent = char.HumanoidRootPart
                     orb.text.Text = Mono.OrbitEmoji
-                    
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
                     orb.gui.StudsOffset = Vector3.new(math.cos(angle) * radius, math.sin(t * 3) * 1.5, math.sin(angle) * radius)
