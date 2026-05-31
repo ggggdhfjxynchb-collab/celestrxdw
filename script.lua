@@ -3,6 +3,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
@@ -24,8 +26,8 @@ local Mono = {
     
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
-    
     TeamCheck = false,
+    
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     
@@ -36,15 +38,46 @@ local Mono = {
     TeammateNotifs = true,
     DeathNotifDistance = 150, 
     
+    -- НОВЫЕ НАСТРОЙКИ МИРА
+    TintEnabled = false,
+    TintColor = Color3.fromRGB(110, 60, 220),
+    TimeOfDay = "Default", -- Default, Day ☀️, Night 🌙
+    Weather = "None",      -- None, Rain 🌧️, Custom Snow ❄️
+    WeatherEmoji = "💸",
+    
     MenuOpen = true
 }
 
 local LastShootTime = 0
 local BindWait = nil 
 local PlayerData = {} 
-
 local LastTargetHit = nil
 local LastTargetTime = 0
+
+-- === ОПТИМИЗАЦИЯ ЛУЧЕЙ ===
+local GlobalRayParams = RaycastParams.new()
+GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
+GlobalRayParams.IgnoreWater = true
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local ignoreList = {}
+            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
+            if Camera then table.insert(ignoreList, Camera) end
+            for _, v in pairs(workspace:GetChildren()) do
+                if v and v.Name then
+                    local name = string.lower(v.Name)
+                    if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
+                        table.insert(ignoreList, v)
+                    end
+                end
+            end
+            GlobalRayParams.FilterDescendantsInstances = ignoreList
+        end)
+        task.wait(1)
+    end
+end)
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
@@ -58,7 +91,49 @@ local LavenderGradient = ColorSequence.new({
     ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
 })
 
--- === КОНТЕЙНЕР ДЛЯ УВЕДОМЛЕНИЙ О СМЕРТИ ===
+-- === НОВОЕ: ЭФФЕКТЫ МИРА (ЗАТЕМНЕНИЕ И ПОГОДА) ===
+local tintFrame = Instance.new("Frame", screenGui)
+tintFrame.Size = UDim2.new(1, 0, 1, 0)
+tintFrame.BackgroundColor3 = Mono.TintColor
+tintFrame.BackgroundTransparency = 1
+tintFrame.BorderSizePixel = 0
+tintFrame.ZIndex = -100 -- Самый задний фон интерфейса
+
+local weatherContainer = Instance.new("Frame", screenGui)
+weatherContainer.Size = UDim2.new(1, 0, 1, 0)
+weatherContainer.BackgroundTransparency = 1
+weatherContainer.ZIndex = -90
+weatherContainer.ClipsDescendants = true
+
+task.spawn(function()
+    while true do
+        task.wait(0.08) -- Скорость спавна частиц погоды
+        pcall(function()
+            if Mono.Weather ~= "None" then
+                local wDrop = Instance.new("TextLabel", weatherContainer)
+                wDrop.BackgroundTransparency = 1
+                wDrop.Size = UDim2.new(0, 30, 0, 30)
+                -- Рандомная позиция сверху
+                wDrop.Position = UDim2.new(math.random(), 0, -0.1, 0)
+                wDrop.Text = (Mono.Weather == "Rain 🌧️") and "💧" or Mono.WeatherEmoji
+                wDrop.TextSize = (Mono.Weather == "Rain 🌧️") and math.random(15, 20) or math.random(20, 35)
+                wDrop.TextTransparency = 0.2
+                
+                local duration = math.random(30, 60) / 10 -- Падение 3-6 сек
+                local targetX = wDrop.Position.X.Scale + (math.random(-10, 10)/100) -- Легкий ветер
+                
+                local ts = TweenService:Create(wDrop, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+                    Position = UDim2.new(targetX, 0, 1.1, 0),
+                    Rotation = math.random(-90, 90)
+                })
+                ts:Play()
+                game.Debris:AddItem(wDrop, duration + 0.1)
+            end
+        end)
+    end
+end)
+
+-- === УВЕДОМЛЕНИЯ ===
 local notifContainer = Instance.new("Frame", screenGui)
 notifContainer.Size = UDim2.new(0, 400, 0, 300)
 notifContainer.Position = UDim2.new(0.5, -200, 0.12, 0)
@@ -68,16 +143,15 @@ notifLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 notifLayout.Padding = UDim.new(0, 8)
 
-local function showDeathNotification(name)
+local function showNotification(text, color)
     pcall(function()
         local notif = Instance.new("TextLabel")
-        notif.Text = "☠️ " .. name .. " УМЕР" 
-        notif.TextColor3 = Mono.KillColor
+        notif.Text = text 
+        notif.TextColor3 = color or Mono.KillColor
         notif.Size = UDim2.new(1, 0, 0, 40)
         notif.BackgroundTransparency = 1
         notif.Font = Enum.Font.GothamBlack
-        notif.TextSize = 26 
-        
+        notif.TextSize = 24 
         notif.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
         notif.TextStrokeTransparency = 1 
         notif.TextTransparency = 1
@@ -85,7 +159,6 @@ local function showDeathNotification(name)
         
         local ts = TweenService
         ts:Create(notif, TweenInfo.new(0.3), {TextTransparency = 0, TextStrokeTransparency = 0}):Play()
-        
         task.delay(3, function()
             pcall(function()
                 local fade = ts:Create(notif, TweenInfo.new(0.5), {TextTransparency = 1, TextStrokeTransparency = 1})
@@ -108,7 +181,6 @@ flashFrame.Parent = screenGui
 local function doKillEffect()
     pcall(function()
         if not Mono.KillEffect then return end
-        
         flashFrame.BackgroundColor3 = Mono.KillColor
         flashFrame.BackgroundTransparency = 0.3
         TweenService:Create(flashFrame, TweenInfo.new(0.4, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
@@ -171,7 +243,6 @@ local function updateHUD()
         end
 
         local activeCount = 0
-
         local function addActiveFeature(name)
             activeCount = activeCount + 1
             local lbl = Instance.new("TextLabel")
@@ -184,7 +255,6 @@ local function updateHUD()
             lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Parent = hudFrame
-            
             local dot = Instance.new("Frame", lbl)
             dot.Size = UDim2.new(0, 6, 0, 6)
             dot.Position = UDim2.new(1, -10, 0.5, -3)
@@ -195,7 +265,8 @@ local function updateHUD()
         if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
         if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
         if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
-        if Mono.TargetObjEnabled then addActiveFeature("Orbits: " .. Mono.OrbitEmoji) end
+        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
+        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
 
         local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
         TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
@@ -204,8 +275,8 @@ end
 
 -- === ГЛАВНОЕ МЕНЮ С РАЗДЕЛАМИ ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 480, 0, 320)
-mainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
+mainFrame.Size = UDim2.new(0, 500, 0, 340)
+mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -328,8 +399,34 @@ end
 
 local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
+local worldPage, worldBtn = createTab("World", "🌍")
+local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
--- === ФУНКЦИИ GUI ===
+-- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
+local function createButton(parent, text, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
+    frame.BackgroundTransparency = 0.2
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    
+    btn.MouseButton1Click:Connect(function()
+        local ts = TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(180, 130, 255)})
+        ts:Play()
+        ts.Completed:Wait()
+        TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 30, 60)}):Play()
+        callback()
+    end)
+end
+
 local function createSubInput(parent, text, defaultText, callback)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -422,6 +519,71 @@ local function createSubColorPicker(parent, text, defaultColor, callback)
         if isDraggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input.Position.X) end
     end)
     return 50
+end
+
+local function createDropdown(parent, text, options, defaultIndex, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
+    frame.ClipsDescendants = true
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    
+    local mainBtn = Instance.new("TextButton", frame)
+    mainBtn.Size = UDim2.new(1, 0, 0, 35)
+    mainBtn.BackgroundTransparency = 1
+    mainBtn.Text = "  " .. text .. ": " .. options[defaultIndex]
+    mainBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mainBtn.Font = Enum.Font.GothamMedium
+    mainBtn.TextSize = 13
+    mainBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+    local arrow = Instance.new("TextLabel", mainBtn)
+    arrow.Size = UDim2.new(0, 30, 1, 0)
+    arrow.Position = UDim2.new(1, -30, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.TextColor3 = Color3.fromRGB(180, 130, 255)
+    arrow.Font = Enum.Font.Gotham
+
+    local dropList = Instance.new("Frame", frame)
+    dropList.Size = UDim2.new(1, 0, 0, #options * 30)
+    dropList.Position = UDim2.new(0, 0, 0, 35)
+    dropList.BackgroundTransparency = 1
+
+    local isOpen = false
+    mainBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        arrow.Rotation = isOpen and 180 or 0
+        TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = isOpen and UDim2.new(1, 0, 0, 35 + #options * 30) or UDim2.new(1, 0, 0, 35)
+        }):Play()
+    end)
+
+    for i, opt in ipairs(options) do
+        local optBtn = Instance.new("TextButton", dropList)
+        optBtn.Size = UDim2.new(1, 0, 0, 30)
+        optBtn.Position = UDim2.new(0, 0, 0, (i-1)*30)
+        optBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        optBtn.BackgroundTransparency = 0.2
+        optBtn.BorderSizePixel = 0
+        optBtn.Text = "   " .. opt
+        optBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.TextSize = 12
+        optBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+        optBtn.MouseButton1Click:Connect(function()
+            mainBtn.Text = "  " .. text .. ": " .. opt
+            isOpen = false
+            arrow.Rotation = 0
+            TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(1, 0, 0, 35)
+            }):Play()
+            callback(opt)
+            updateHUD()
+        end)
+    end
 end
 
 local function createToggle(parent, text, defaultState, onToggle)
@@ -597,12 +759,57 @@ local function setToggleStateUI(frameName, state)
     end)
 end
 
--- Вкладка COMBAT
+-- === СИСТЕМА СОХРАНЕНИЯ ===
+local cfgName = "MonogrammaConfig.json"
+
+local function SaveConfig()
+    pcall(function()
+        local data = {
+            TeamCheck = Mono.TeamCheck,
+            MaxDist = Mono.ESP.MaxDistance,
+            ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
+            ObjEmoji = Mono.OrbitEmoji,
+            KillEmoji = Mono.KillEmoji,
+            Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
+            Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
+            Time = Mono.TimeOfDay,
+            Weather = Mono.Weather,
+            WeathEmoji = Mono.WeatherEmoji
+        }
+        if writefile then
+            writefile(cfgName, HttpService:JSONEncode(data))
+            showNotification("☠️ Config Saved!", Color3.fromRGB(0, 255, 100))
+        end
+    end)
+end
+
+local function LoadConfig()
+    pcall(function()
+        if readfile and isfile and isfile(cfgName) then
+            local decoded = HttpService:JSONDecode(readfile(cfgName))
+            Mono.TeamCheck = decoded.TeamCheck or false
+            Mono.ESP.MaxDistance = decoded.MaxDist or 350
+            Mono.ESPColor = Color3.new(decoded.ESP_R or 1, decoded.ESP_G or 1, decoded.ESP_B or 1)
+            Mono.OrbitEmoji = decoded.ObjEmoji or "🦋"
+            Mono.KillEmoji = decoded.KillEmoji or "💀"
+            Mono.KillColor = Color3.new(decoded.Kill_R or 1, decoded.Kill_G or 0, decoded.Kill_B or 0)
+            Mono.TintColor = Color3.new(decoded.Tint_R or 1, decoded.Tint_G or 1, decoded.Tint_B or 1)
+            Mono.TimeOfDay = decoded.Time or "Default"
+            Mono.Weather = decoded.Weather or "None"
+            Mono.WeatherEmoji = decoded.WeathEmoji or "💸"
+            showNotification("☠️ Config Loaded! Re-open tabs.", Color3.fromRGB(0, 255, 100))
+        end
+    end)
+end
+
+-- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
+
+-- 1. COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
--- Вкладка VISUALS
+-- 2. VISUALS
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
     local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end)
     local h2 = createSubInput(container, "Max Distance", tostring(Mono.ESP.MaxDistance), function(val) Mono.ESP.MaxDistance = tonumber(val) or 350 end)
@@ -624,6 +831,23 @@ createToggleWithSettings(visualsPage, "Kill Effect", Mono.KillEffect, function(s
     local h2 = createSubColorPicker(container, "Flash Color", Mono.KillColor, function(c) Mono.KillColor = c end)
     return h1 + h2 + 5
 end)
+
+-- 3. WORLD
+createToggleWithSettings(worldPage, "Screen Tint", Mono.TintEnabled, function(s) 
+    Mono.TintEnabled = s 
+    tintFrame.BackgroundTransparency = s and 0.5 or 1
+end, function(container)
+    local h1 = createSubColorPicker(container, "Tint Color", Mono.TintColor, function(c) Mono.TintColor = c; tintFrame.BackgroundColor3 = c end)
+    return h1
+end)
+
+createDropdown(worldPage, "Time of Day", {"Default", "Day ☀️", "Night 🌙"}, 1, function(val) Mono.TimeOfDay = val end)
+createDropdown(worldPage, "Weather Event", {"None", "Rain 🌧️", "Custom Snow ❄️"}, 1, function(val) Mono.Weather = val end)
+createSubInput(worldPage, "Custom Snow Emoji", Mono.WeatherEmoji, function(val) Mono.WeatherEmoji = val end)
+
+-- 4. SETTINGS
+createButton(settingsPage, "💾 Save Configuration", SaveConfig)
+createButton(settingsPage, "📂 Load Configuration", LoadConfig)
 
 updateHUD() 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
@@ -694,31 +918,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА С АНТИ-КРАШЕМ ===
-local GlobalRayParams = RaycastParams.new()
-GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
-GlobalRayParams.IgnoreWater = true
-
-task.spawn(function()
-    while true do
-        pcall(function()
-            local ignoreList = {}
-            if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
-            if Camera then table.insert(ignoreList, Camera) end
-            
-            for _, v in pairs(workspace:GetChildren()) do
-                if v and v.Name then
-                    local name = string.lower(v.Name)
-                    if string.match(name, "viewmodel") or string.match(name, "arm") or string.match(name, "gun") or string.match(name, "weapon") then
-                        table.insert(ignoreList, v)
-                    end
-                end
-            end
-            GlobalRayParams.FilterDescendantsInstances = ignoreList
-        end)
-        task.wait(1)
-    end
-end)
+-- === 4. ЯДРО ЧИТА ===
 
 local function simulateClick()
     if mouse1click then
@@ -788,7 +988,23 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- === РЕНДЕР И ЛОГИКА ===
+-- ОЧИСТКА ПАМЯТИ
+Players.PlayerRemoving:Connect(function(plr)
+    pcall(function()
+        if espCache[plr] then
+            if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
+            if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
+            if espCache[plr].Orbits then
+                for _, orb in ipairs(espCache[plr].Orbits) do orb.gui:Destroy() end
+            end
+            espCache[plr] = nil
+        end
+        DeadCache[plr] = nil
+        PlayerData[plr] = nil
+    end)
+end)
+
+-- ESP И ЛОГИКА
 local espCache = {}
 
 local function updateESP()
@@ -821,7 +1037,6 @@ local function updateESP()
         if isDead then
             if PlayerData[plr].isDead == false then
                 PlayerData[plr].isDead = true
-                
                 local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
                 
                 if isEnem then
@@ -830,7 +1045,7 @@ local function updateESP()
                     end
                 else
                     if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then
-                        showDeathNotification(plr.Name)
+                        showNotification("☠️ " .. plr.Name .. " УМЕР", Mono.KillColor)
                     end
                 end
             end
@@ -841,7 +1056,6 @@ local function updateESP()
         if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
             local distToPlayer = (char.HumanoidRootPart.Position - camPos).Magnitude
             
-            -- ВХ
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -852,27 +1066,25 @@ local function updateESP()
                     hl.FillTransparency = 0.5
                     hl.OutlineTransparency = 0.2
                     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    hl.Parent = screenGui
                     
                     local bb = Instance.new("BillboardGui")
                     bb.Name = "MonoName"
                     bb.Size = UDim2.new(0, 100, 0, 20)
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
-                    bb.Parent = screenGui
-                    
                     local tl = Instance.new("TextLabel", bb)
                     tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
                     espCache[plr].Text = tl
+                    
+                    hl.Parent = screenGui
+                    bb.Parent = screenGui
                 end
                 
                 espCache[plr].Highlight.Enabled = true
                 espCache[plr].Billboard.Enabled = true
-                
-                -- ИСПОЛЬЗУЕМ ADORNEE ВМЕСТО PARENT ДЛЯ ЗАЩИТЫ ОТ КРАШЕЙ
                 if espCache[plr].Highlight.Adornee ~= char then espCache[plr].Highlight.Adornee = char end
                 if espCache[plr].Billboard.Adornee ~= char.HumanoidRootPart then espCache[plr].Billboard.Adornee = char.HumanoidRootPart end
                 
@@ -886,7 +1098,6 @@ local function updateESP()
                 end
             end
 
-            -- ОРБИТЫ
             if Mono.TargetObjEnabled and isEnem then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Orbits then
@@ -920,7 +1131,6 @@ local function updateESP()
                 end
             end
         else
-            -- ПРЯЧЕМ ЕСЛИ ИГРОК МЕРТВ
             if espCache[plr] then
                 if espCache[plr].Highlight then
                     espCache[plr].Highlight.Enabled = false
@@ -936,9 +1146,17 @@ local function updateESP()
     end
 end
 
+-- === ОСНОВНОЙ ЦИКЛ ===
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     pcall(function()
         updateESP()
+        
+        -- Обновление времени суток
+        if Mono.TimeOfDay == "Day ☀️" then
+            Lighting.ClockTime = 14
+        elseif Mono.TimeOfDay == "Night 🌙" then
+            Lighting.ClockTime = 0
+        end
 
         if Mono.Aimbot.Enabled then
             local target = getClosestVisibleEnemy()
