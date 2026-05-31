@@ -1,9 +1,9 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
 -- === 1. ЗАГРУЗКА И ОЧИСТКА ===
 local targetParent = nil
@@ -18,36 +18,35 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, TargetPart = "Head" },
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     ESP = { Enabled = false },
+    TeamCheck = false,
     MenuOpen = true
 }
 
 local LastShootTime = 0
-local BindWait = nil -- Глобальная переменная для ожидания нажатия клавиши
+local BindWait = nil 
 
--- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА (ЛАВАНДОВЫЙ СТИЛЬ) ===
+-- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = targetParent
 
--- Цветовая схема Monogramma
 local LavenderGradient = ColorSequence.new({
     ColorSequenceKeypoint.new(0.00, Color3.fromRGB(180, 130, 255)), 
     ColorSequenceKeypoint.new(1.00, Color3.fromRGB(110, 60, 220))   
 })
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 280)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -140)
+mainFrame.Size = UDim2.new(0, 400, 0, 320)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -160)
 mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) 
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
--- Разблокировка мыши
 local unlockMouseBtn = Instance.new("TextButton")
 unlockMouseBtn.Size = UDim2.new(0, 0, 0, 0)
 unlockMouseBtn.BackgroundTransparency = 1
@@ -55,14 +54,12 @@ unlockMouseBtn.Text = ""
 unlockMouseBtn.Modal = true
 unlockMouseBtn.Parent = mainFrame
 
--- Обводка
 local uiStroke = Instance.new("UIStroke", mainFrame)
 uiStroke.Thickness = 2
 local strokeGrad = Instance.new("UIGradient", uiStroke)
 strokeGrad.Color = LavenderGradient
 strokeGrad.Rotation = 45
 
--- Шапка
 local header = Instance.new("Frame", mainFrame)
 header.Size = UDim2.new(1, 0, 0, 40)
 header.BackgroundTransparency = 1
@@ -88,7 +85,7 @@ local logoImage = Instance.new("ImageLabel", header)
 logoImage.Size = UDim2.new(0, 26, 0, 26)
 logoImage.Position = UDim2.new(0, 12, 0, 7)
 logoImage.BackgroundTransparency = 1
-logoImage.Image = "" -- ВСТАВЬ СЮДА ID КАРТИНКИ ПЕНТАГОНА
+logoImage.Image = "" 
 logoImage.ZIndex = 2
 
 local title = Instance.new("TextLabel", header)
@@ -101,7 +98,6 @@ title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Линия под шапкой
 local headerLine = Instance.new("Frame", mainFrame)
 headerLine.Size = UDim2.new(1, -20, 0, 2)
 headerLine.Position = UDim2.new(0, 10, 0, 40)
@@ -109,7 +105,6 @@ headerLine.BorderSizePixel = 0
 local lineGrad = Instance.new("UIGradient", headerLine)
 lineGrad.Color = LavenderGradient
 
--- Контейнер контента
 local content = Instance.new("ScrollingFrame", mainFrame)
 content.Size = UDim2.new(1, -20, 1, -60)
 content.Position = UDim2.new(0, 10, 0, 50)
@@ -121,8 +116,36 @@ listLayout.Padding = UDim.new(0, 10)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- === ФУНКЦИИ GUI ===
+local function createToggle(parent, text, defaultState, onToggle)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = "  " .. text
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 14
+    btn.TextXAlignment = Enum.TextXAlignment.Left
 
--- ИСПРАВЛЕННАЯ ФУНКЦИЯ СОЗДАНИЯ ТОГГЛА И БИНДА
+    local status = Instance.new("Frame", frame)
+    status.Size = UDim2.new(0, 16, 0, 16)
+    status.Position = UDim2.new(1, -30, 0.5, -8)
+    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+    
+    local state = defaultState
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        onToggle(state)
+    end)
+end
+
 local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 40)
@@ -163,9 +186,8 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
-        if BindWait then return end -- Нельзя биндить две кнопки одновременно
+        if BindWait then return end 
         bindBtn.Text = "..."
-        -- Создаем функцию ожидания, которая выполнится при нажатии клавиши
         BindWait = function(key)
             bindTable[bindKeyName] = key
             bindBtn.Text = key.Name
@@ -174,27 +196,11 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     end)
 end
 
--- Создаем элементы интерфейса
-createToggleWithBind(content, "Aimbot (Auto-Aim)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, 
-    function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key"
-)
-
-createToggleWithBind(content, "Auto Tap (Auto Shoot)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, 
-    function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key"
-)
-
-local espFrame = Instance.new("Frame", content)
-espFrame.Size = UDim2.new(1, 0, 0, 40); espFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35); Instance.new("UICorner", espFrame).CornerRadius = UDim.new(0, 6)
-local espBtn = Instance.new("TextButton", espFrame)
-espBtn.Size = UDim2.new(1, 0, 1, 0); espBtn.BackgroundTransparency = 1; espBtn.Text = "  Wallhack (ESP)"; espBtn.TextColor3 = Color3.fromRGB(200, 200, 200); espBtn.Font = Enum.Font.GothamMedium; espBtn.TextSize = 14; espBtn.TextXAlignment = Enum.TextXAlignment.Left
-local espStatus = Instance.new("Frame", espFrame)
-espStatus.Size = UDim2.new(0, 16, 0, 16); espStatus.Position = UDim2.new(1, -30, 0.5, -8); espStatus.BackgroundColor3 = Color3.fromRGB(60, 60, 70); Instance.new("UICorner", espStatus).CornerRadius = UDim.new(1, 0)
-
-espBtn.MouseButton1Click:Connect(function()
-    Mono.ESP.Enabled = not Mono.ESP.Enabled
-    espStatus.BackgroundColor3 = Mono.ESP.Enabled and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-    espBtn.TextColor3 = Mono.ESP.Enabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-end)
+-- Меню
+createToggleWithBind(content, "Aimbot (Auto-Aim)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
+createToggleWithBind(content, "Auto Tap (Triggerbot)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key")
+createToggle(content, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end)
+createToggle(content, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end)
 
 -- Перетаскивание
 local dragging, dragInput, dragStart, startPos
@@ -216,9 +222,8 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- ИСПРАВЛЕННАЯ ОБРАБОТКА КЛАВИАТУРЫ
+-- Бинды
 UserInputService.InputBegan:Connect(function(input, gp)
-    -- Если мы сейчас биндим клавишу
     if BindWait and input.UserInputType == Enum.UserInputType.Keyboard then
         if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
             BindWait(input.KeyCode)
@@ -226,7 +231,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
 
-    -- Открытие/закрытие меню
     if not gp and input.KeyCode == Enum.KeyCode.RightBracket then
         Mono.MenuOpen = not Mono.MenuOpen
         mainFrame.Visible = Mono.MenuOpen
@@ -234,50 +238,89 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- === 4. ЯДРО ЧИТА (АЛГОРИТМЫ) ===
+-- === 4. ЯДРО ЧИТА ===
 
--- Проверка: враг ли это?
+local function simulateClick()
+    if mouse1click then
+        mouse1click()
+    else
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+    end
+end
+
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then return false end
+    if Mono.TeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
+        return false 
+    end
     return true
 end
 
--- Проверка: Виден ли игрок (Raycast)
-local function isVisible(targetPart)
+-- Поиск универсальной части тела (чтобы работало на любых модельках)
+local function getBestTargetPart(char)
+    return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+end
+
+-- Универсальный Raycast для 1-го лица
+local function raycastFromCamera()
     local origin = Camera.CFrame.Position
-    local direction = (targetPart.Position - origin).Unit * 1000
+    local direction = Camera.CFrame.LookVector * 1500 -- Луч прямо из центра экрана
+    
     local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    -- Игнорируем самого игрока, камеру и ВСЕ руки/оружия, которые могут лежать в workspace
+    local ignoreList = {LocalPlayer.Character, Camera}
+    for _, v in pairs(workspace:GetChildren()) do
+        if v.Name:lower():match("viewmodel") or v.Name:lower():match("arm") or v.Name:lower():match("gun") then
+            table.insert(ignoreList, v)
+        end
+    end
+    rayParams.FilterDescendantsInstances = ignoreList
     rayParams.FilterType = Enum.RaycastFilterType.Exclude
     rayParams.IgnoreWater = true
 
-    local result = workspace:Raycast(origin, direction, rayParams)
-    if result and result.Instance then
-        if result.Instance:IsDescendantOf(targetPart.Parent) then
-            return true -- Стен нет
-        end
-    end
-    return false -- Спрятался
+    return workspace:Raycast(origin, direction, rayParams)
 end
 
--- Поиск цели
+-- Поиск игрока по задетой лучом детали
+local function getPlayerFromPart(part)
+    if not part then return nil end
+    local model = part:FindFirstAncestorOfClass("Model")
+    if model and model:FindFirstChild("Humanoid") then
+        return Players:GetPlayerFromCharacter(model)
+    end
+    return nil
+end
+
+-- Поиск ближайшего к прицелу (для Аима)
 local function getClosestVisibleEnemy()
     local closestTarget = nil
     local shortestDistance = math.huge
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, plr in pairs(Players:GetPlayers()) do
-        if isEnemy(plr) and plr.Character and plr.Character:FindFirstChild(Mono.Aimbot.TargetPart) and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local targetPart = plr.Character[Mono.Aimbot.TargetPart]
-            local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                if dist < shortestDistance and dist < 300 then
-                    if isVisible(targetPart) then
-                        shortestDistance = dist
-                        closestTarget = targetPart
+        local char = plr.Character
+        if isEnemy(plr) and char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+            local targetPart = getBestTargetPart(char)
+            if targetPart then
+                local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if dist < 200 then -- Радиус работы Аимбота
+                        -- Проверка на стены через лучи
+                        local origin = Camera.CFrame.Position
+                        local dir = (targetPart.Position - origin).Unit * 1000
+                        local params = RaycastParams.new()
+                        params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                        params.FilterType = Enum.RaycastFilterType.Exclude
+                        local result = workspace:Raycast(origin, dir, params)
+                        
+                        if result and result.Instance and result.Instance:IsDescendantOf(char) then
+                            if dist < shortestDistance then
+                                shortestDistance = dist
+                                closestTarget = targetPart
+                            end
+                        end
                     end
                 end
             end
@@ -286,16 +329,14 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ESP СИСТЕМА
+-- ESP
 local espCache = {}
-
 local function updateESP()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
         
         local char = plr.Character
         if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-            
             if Mono.ESP.Enabled and isEnemy(plr) then
                 if not espCache[plr] then
                     local hl = Instance.new("Highlight")
@@ -338,34 +379,28 @@ local function updateESP()
 end
 
 -- === ОСНОВНОЙ ЦИКЛ ===
-RunService.RenderStepped:Connect(function()
-    -- 1. Отрисовка ESP
+-- Используем BindToRenderStep для Аима, чтобы он не дергался в 1-м лице
+RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function()
     updateESP()
 
-    -- 2. AIMBOT
+    -- AIMBOT
     if Mono.Aimbot.Enabled and UserInputService:IsKeyDown(Mono.Aimbot.Key) then
         local target = getClosestVisibleEnemy()
         if target then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+            -- Жестко привязываем камеру к цели
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
         end
     end
 
-    -- 3. AUTO TAP
+    -- TRIGGERBOT (1st Person Raycast)
     if Mono.AutoTap.Enabled and UserInputService:IsKeyDown(Mono.AutoTap.Key) then
-        local target = getClosestVisibleEnemy()
-        -- Если цель найдена
-        if target then
-            local pos, _ = Camera:WorldToViewportPoint(target.Position)
-            local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-            local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-            
-            -- Триггерим выстрел только если прицел прямо на враге (радиус 30)
-            if dist < 30 then
+        local hitResult = raycastFromCamera()
+        if hitResult and hitResult.Instance then
+            local targetPlayer = getPlayerFromPart(hitResult.Instance)
+            if targetPlayer and isEnemy(targetPlayer) then
                 if tick() - LastShootTime > Mono.AutoTap.Delay then
                     LastShootTime = tick()
-                    if mouse1click then
-                        mouse1click()
-                    end
+                    simulateClick()
                 end
             end
         end
