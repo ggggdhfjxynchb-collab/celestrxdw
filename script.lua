@@ -27,6 +27,8 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
+    ThemeColor = Color3.fromRGB(180, 130, 255), -- ЦВЕТ СИСТЕМЫ
+
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2 },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
@@ -172,13 +174,13 @@ mobileToggle.Size = UDim2.new(0, 45, 0, 45)
 mobileToggle.Position = UDim2.new(0, 10, 0, 10)
 mobileToggle.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
 mobileToggle.Text = "⬟"
-mobileToggle.TextColor3 = Color3.fromRGB(180, 130, 255)
+mobileToggle.TextColor3 = Mono.ThemeColor
 mobileToggle.TextSize = 24
 mobileToggle.Font = Enum.Font.GothamBlack
 mobileToggle.Active = true
 Instance.new("UICorner", mobileToggle).CornerRadius = UDim.new(1, 0)
 local toggleStroke = Instance.new("UIStroke", mobileToggle)
-toggleStroke.Color = Color3.fromRGB(180, 130, 255)
+toggleStroke.Color = Mono.ThemeColor
 toggleStroke.Thickness = 2
 mobileToggle.Parent = screenGui
 makeDraggable(mobileToggle)
@@ -193,7 +195,7 @@ watermarkFrame.BorderSizePixel = 0
 watermarkFrame.Active = true 
 Instance.new("UICorner", watermarkFrame).CornerRadius = UDim.new(0, 6)
 local watermarkStroke = Instance.new("UIStroke", watermarkFrame)
-watermarkStroke.Color = Color3.fromRGB(180, 130, 255)
+watermarkStroke.Color = Mono.ThemeColor
 watermarkStroke.Thickness = 1
 makeDraggable(watermarkFrame) 
 
@@ -275,7 +277,7 @@ tooltipGui.ZIndex = 1000
 tooltipGui.Visible = false
 Instance.new("UICorner", tooltipGui).CornerRadius = UDim.new(0, 6)
 local ttStroke = Instance.new("UIStroke", tooltipGui)
-ttStroke.Color = Color3.fromRGB(180, 130, 255)
+ttStroke.Color = Mono.ThemeColor
 ttStroke.Thickness = 1
 local ttText = Instance.new("TextLabel", tooltipGui)
 ttText.Size = UDim2.new(1, -10, 1, -10)
@@ -405,7 +407,7 @@ hudTitle.Name = "0_Title"
 hudTitle.Size = UDim2.new(1, 0, 0, 30)
 hudTitle.BackgroundTransparency = 1
 hudTitle.Text = "MONOGRAMMA"
-hudTitle.TextColor3 = Color3.fromRGB(180, 130, 255)
+hudTitle.TextColor3 = Mono.ThemeColor
 hudTitle.Font = Enum.Font.GothamBlack
 hudTitle.TextSize = 12
 
@@ -433,7 +435,7 @@ local function updateHUD()
             local dot = Instance.new("Frame", lbl)
             dot.Size = UDim2.new(0, 6, 0, 6)
             dot.Position = UDim2.new(1, -10, 0.5, -3)
-            dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+            dot.BackgroundColor3 = Mono.ThemeColor
             Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
         end
 
@@ -451,7 +453,7 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -465,7 +467,7 @@ makeDraggable(mainFrame)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
 bgGradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(130, 80, 200)), 
+    ColorSequenceKeypoint.new(0.00, Color3.new(Mono.ThemeColor.R * 0.7, Mono.ThemeColor.G * 0.7, Mono.ThemeColor.B * 0.7)), 
     ColorSequenceKeypoint.new(0.70, Color3.fromRGB(15, 15, 15)),   
     ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 10))
 })
@@ -483,7 +485,7 @@ unlockMouseBtn.Parent = mainFrame
 
 local uiStroke = Instance.new("UIStroke", mainFrame)
 uiStroke.Thickness = 1
-uiStroke.Color = Color3.fromRGB(180, 130, 255)
+uiStroke.Color = Mono.ThemeColor
 
 local header = Instance.new("Frame", mainFrame)
 header.Size = UDim2.new(1, 0, 0, 40)
@@ -511,7 +513,7 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 local headerLine = Instance.new("Frame", mainFrame)
 headerLine.Size = UDim2.new(1, 0, 0, 1)
 headerLine.Position = UDim2.new(0, 0, 0, 40)
-headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+headerLine.BackgroundColor3 = Mono.ThemeColor
 headerLine.BorderSizePixel = 0
 headerLine.BackgroundTransparency = 0.5
 
@@ -552,7 +554,7 @@ local function createTab(name, icon)
     page.Position = UDim2.new(0, 0, 0, 10)
     page.BackgroundTransparency = 1
     page.ScrollBarThickness = 2
-    page.ScrollBarImageColor3 = Color3.fromRGB(180, 130, 255)
+    page.ScrollBarImageColor3 = Mono.ThemeColor
     page.Visible = false
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -572,7 +574,7 @@ local function createTab(name, icon)
             p.Visible = false 
         end
         
-        btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+        btn.BackgroundColor3 = Mono.ThemeColor
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         page.Visible = true
         activeBtn = btn
@@ -585,6 +587,7 @@ local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
+local cnfgsPage, cnfgsBtn = createTab("Cnfgs", "📁") -- НОВАЯ ВКАЛДКА КОНФИГОВ
 
 local function setToggleStateUI(frameName, state)
     pcall(function()
@@ -593,7 +596,7 @@ local function setToggleStateUI(frameName, state)
                 local status = v:FindFirstChild("Status", true)
                 local btn = v:FindFirstChild("MainBtn", true)
                 if status and btn then
-                    status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+                    status.BackgroundColor3 = state and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
                     btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
                 end
             end
@@ -606,14 +609,14 @@ local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
     frame.Name = "Header_" .. text
     frame.Size = UDim2.new(1, 0, 0, 26)
-    frame.BackgroundColor3 = Color3.fromRGB(130, 80, 200)
+    frame.BackgroundColor3 = Color3.new(Mono.ThemeColor.R * 0.7, Mono.ThemeColor.G * 0.7, Mono.ThemeColor.B * 0.7)
     frame.BackgroundTransparency = 0.8
     frame.BorderSizePixel = 0
     frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
     
     local stroke = Instance.new("UIStroke", frame)
-    stroke.Color = Color3.fromRGB(180, 130, 255)
+    stroke.Color = Mono.ThemeColor
     stroke.Thickness = 1
     stroke.Transparency = 0.2
     
@@ -649,7 +652,7 @@ local function createButton(parent, text, callback, tooltip)
     handleTooltip(btn, tooltip)
     
     btn.MouseButton1Click:Connect(function()
-        local ts = TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(180, 130, 255)})
+        local ts = TweenService:Create(frame, TweenInfo.new(0.1), {BackgroundColor3 = Mono.ThemeColor})
         ts:Play()
         ts.Completed:Wait()
         local tsBack = TweenService:Create(frame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 30, 60)})
@@ -753,7 +756,7 @@ local function createSubToggle(parent, text, defaultState, callback, uiName)
     btn.Position = UDim2.new(1, -55, 0.5, -10)
     btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     btn.Text = defaultState and "ON" or "OFF"
-    btn.TextColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+    btn.TextColor3 = defaultState and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 10
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
@@ -764,7 +767,7 @@ local function createSubToggle(parent, text, defaultState, callback, uiName)
     btn.MouseButton1Click:Connect(function()
         state = not state
         btn.Text = state and "ON" or "OFF"
-        btn.TextColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+        btn.TextColor3 = state and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
         callback(state)
     end)
     
@@ -895,7 +898,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
     arrow.Position = UDim2.new(1, -30, 0, 0)
     arrow.BackgroundTransparency = 1
     arrow.Text = "▼"
-    arrow.TextColor3 = Color3.fromRGB(180, 130, 255)
+    arrow.TextColor3 = Mono.ThemeColor
     arrow.Font = Enum.Font.Gotham
 
     local dropList = Instance.new("Frame", frame)
@@ -962,12 +965,12 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     status.Name = "Status"
     status.Size = UDim2.new(0, 14, 0, 14)
     status.Position = UDim2.new(1, -30, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    status.BackgroundColor3 = defaultState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
     
     btn.MouseButton1Click:Connect(function()
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        status.BackgroundColor3 = newState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState)
         updateHUD()
@@ -1003,7 +1006,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     status.Name = "Status"
     status.Size = UDim2.new(0, 14, 0, 14)
     status.Position = UDim2.new(1, -60, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    status.BackgroundColor3 = defaultState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
 
     local bindBtn = Instance.new("TextButton", topBar)
@@ -1019,7 +1022,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
 
     btn.MouseButton1Click:Connect(function()
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        status.BackgroundColor3 = newState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState)
         updateHUD()
@@ -1078,7 +1081,7 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
     status.Name = "Status"
     status.Size = UDim2.new(0, 14, 0, 14)
     status.Position = UDim2.new(1, -60, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    status.BackgroundColor3 = defaultState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
     
     local bindBtn = Instance.new("TextButton", topBar)
@@ -1104,7 +1107,7 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
 
     btn.MouseButton1Click:Connect(function() 
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        status.BackgroundColor3 = newState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
         updateHUD()
@@ -1171,7 +1174,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     status.Name = "Status"
     status.Size = UDim2.new(0, 14, 0, 14)
     status.Position = UDim2.new(1, -30, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    status.BackgroundColor3 = defaultState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
     Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
 
     local settingsFrame = Instance.new("Frame", container)
@@ -1186,7 +1189,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
 
     btn.MouseButton1Click:Connect(function() 
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        status.BackgroundColor3 = newState and Mono.ThemeColor or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
         updateHUD()
@@ -1243,10 +1246,132 @@ local function createSubBind(parent, text, defaultBind, bindTable, bindKeyName, 
     return 35
 end
 
+-- === НОВЫЙ ЭЛЕМЕНТ: ПАЛИТРА ДЛЯ ЦВЕТА СИСТЕМЫ (THEME COLOR) ===
+local function createColorPickerElement(parent, text, defaultColor, callback, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Name = "ColorPicker_" .. text
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
+    frame.LayoutOrder = #parent:GetChildren()
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 0, 20)
+    lbl.Position = UDim2.new(0, 0, 0, 5)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "  " .. text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local colorPreview = Instance.new("Frame", frame)
+    colorPreview.Size = UDim2.new(0, 30, 0, 16)
+    colorPreview.Position = UDim2.new(1, -45, 0, 7)
+    colorPreview.BackgroundColor3 = defaultColor
+    Instance.new("UICorner", colorPreview).CornerRadius = UDim.new(0, 4)
+    
+    if uiName then colorPreview.Name = uiName end
+
+    local hueFrame = Instance.new("Frame", frame)
+    hueFrame.Size = UDim2.new(0.9, 0, 0, 10)
+    hueFrame.Position = UDim2.new(0.05, 0, 0, 30)
+    Instance.new("UICorner", hueFrame).CornerRadius = UDim.new(0, 4)
+    
+    local rainbowGrad = Instance.new("UIGradient", hueFrame)
+    rainbowGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.000, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255, 255, 0)),
+        ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.500, Color3.fromRGB(0, 255, 255)),
+        ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0, 0, 255)),
+        ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
+        ColorSequenceKeypoint.new(1.000, Color3.fromRGB(255, 0, 0))
+    })
+
+    local isDraggingHue = false
+    local function updateHue(inputX)
+        local posX = math.clamp(inputX - hueFrame.AbsolutePosition.X, 0, hueFrame.AbsoluteSize.X)
+        local hue = posX / hueFrame.AbsoluteSize.X
+        local newColor = Color3.fromHSV(hue, 1, 1)
+        colorPreview.BackgroundColor3 = newColor
+        callback(newColor)
+    end
+
+    hueFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDraggingHue = true
+            updateHue(input.Position.X)
+        end
+    end)
+    hueFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingHue = false end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if isDraggingHue and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateHue(input.Position.X) end
+    end)
+    return frame
+end
+
+local slotGuis = {}
+
+-- === ФУНКЦИЯ ДИНАМИЧЕСКОГО ОБНОВЛЕНИЯ ЦВЕТА СИСТЕМЫ ===
+local function ApplyTheme(color)
+    Mono.ThemeColor = color
+    local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
+    
+    if watermarkStroke then watermarkStroke.Color = color end
+    if mobileToggle then mobileToggle.TextColor3 = color end
+    if toggleStroke then toggleStroke.Color = color end
+    if ttStroke then ttStroke.Color = color end
+    if uiStroke then uiStroke.Color = color end
+    if headerLine then headerLine.BackgroundColor3 = color end
+    if hudTitle then hudTitle.TextColor3 = color end
+    if bgGradient then
+        bgGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, dimColor), 
+            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(15, 15, 15)),   
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 10))
+        })
+    end
+    
+    for _, p in pairs(Pages) do
+        p.ScrollBarImageColor3 = color
+    end
+    
+    if activeBtn then
+        activeBtn.BackgroundColor3 = color
+    end
+    
+    for _, v in pairs(screenGui:GetDescendants()) do
+        if v:IsA("Frame") and v.Name == "Status" and v.BackgroundColor3 ~= Color3.fromRGB(60, 60, 70) then
+            v.BackgroundColor3 = color
+        elseif v:IsA("TextLabel") and v.Text == "▼" then
+            v.TextColor3 = color
+        elseif v:IsA("UIStroke") and v.Parent and v.Parent.Name:match("^Header_") then
+            v.Color = color
+        elseif v:IsA("Frame") and v.Name:match("^Header_") then
+            v.BackgroundColor3 = dimColor
+        elseif v:IsA("TextButton") and v.Name == "CrossHideToggle" and v.Text == "ON" then
+            v.TextColor3 = color
+        elseif v:IsA("Frame") and v.Size == UDim2.new(0, 6, 0, 6) and v.Parent and v.Parent.Name:match("^1_") then
+            v.BackgroundColor3 = color
+        end
+    end
+    
+    for i, slot in ipairs(slotGuis) do
+        if Mono.SelectedConfigSlot == i then
+            slot.BackgroundColor3 = color
+        end
+    end
+end
+
 -- === СИСТЕМА КОНФИГОВ ===
 
 local function GetConfigTable()
     return {
+        ThemeR = Mono.ThemeColor.R, ThemeG = Mono.ThemeColor.G, ThemeB = Mono.ThemeColor.B,
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
@@ -1336,6 +1461,7 @@ local function ApplyConfigToUI()
                 if v.Name == "SpeedValInput" then v.Text = tostring(Mono.Speed.Value) end
             end
             if v:IsA("Frame") then
+                if v.Name == "ColorPreview_ThemeColor" then v.BackgroundColor3 = Mono.ThemeColor end
                 if v.Name == "FOVCol" then v.BackgroundColor3 = Mono.FOV.Color end
                 if v.Name == "ESPCol" then v.BackgroundColor3 = Mono.ESPColor end
                 if v.Name == "KillCol" then v.BackgroundColor3 = Mono.KillColor end
@@ -1347,7 +1473,7 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
-                v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+                v.TextColor3 = Mono.Crosshair.HideDefault and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
             end
             if v:IsA("TextButton") and v.Name == "CrossBindBtn" then
                 v.Text = (Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown) and Mono.Crosshair.Key.Name or "None"
@@ -1358,6 +1484,10 @@ local function ApplyConfigToUI()
 end
 
 local function LoadConfigFromTable(dec)
+    if dec.ThemeR and dec.ThemeG and dec.ThemeB then
+        ApplyTheme(Color3.new(dec.ThemeR, dec.ThemeG, dec.ThemeB))
+    end
+
     Mono.Aimbot.Enabled = dec.AimbotE or false
     Mono.Aimbot.Mode = dec.AimMode or "Rage 😡"
     Mono.Aimbot.Smoothness = dec.AimSmooth or 0.2
@@ -1548,9 +1678,17 @@ createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, functi
 end, "Creates falling emojis (like rain or snow).")
 
 -- 4. SETTINGS
+createSectionHeader(settingsPage, "🎨 THEME SETTINGS")
+createColorPickerElement(settingsPage, "Theme Color", Mono.ThemeColor, function(c)
+    ApplyTheme(c)
+end, "ColorPreview_ThemeColor")
+
+createSectionHeader(settingsPage, "📺 UI SETTINGS")
 createToggle(settingsPage, "Show Watermark", Mono.WatermarkEnabled, function(s) Mono.WatermarkEnabled = s; watermarkFrame.Visible = s end, "Displays Ping and FPS in the top right corner.")
 
-local configTitle = Instance.new("TextLabel", settingsPage)
+
+-- 5. CONFIGS (CNFGS)
+local configTitle = Instance.new("TextLabel", cnfgsPage)
 configTitle.Size = UDim2.new(1, 0, 0, 20)
 configTitle.BackgroundTransparency = 1
 configTitle.Text = "  Select & Rename Config Slot (.txt):"
@@ -1558,22 +1696,22 @@ configTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 configTitle.Font = Enum.Font.GothamBold
 configTitle.TextSize = 12
 configTitle.TextXAlignment = Enum.TextXAlignment.Left
+configTitle.LayoutOrder = #cnfgsPage:GetChildren()
 
-local gridFrame = Instance.new("Frame", settingsPage)
-gridFrame.Size = UDim2.new(1, 0, 0, 140) 
-gridFrame.BackgroundTransparency = 1
+local cnfgsGridFrame = Instance.new("Frame", cnfgsPage)
+cnfgsGridFrame.Size = UDim2.new(1, 0, 0, 140) 
+cnfgsGridFrame.BackgroundTransparency = 1
+cnfgsGridFrame.LayoutOrder = #cnfgsPage:GetChildren()
 
-local gridLayout = Instance.new("UIGridLayout", gridFrame)
+local gridLayout = Instance.new("UIGridLayout", cnfgsGridFrame)
 gridLayout.CellSize = UDim2.new(0, 105, 0, 65)
 gridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
 gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local slotGuis = {}
-
 local function updateSlotSelection()
     for i, slot in ipairs(slotGuis) do
         if Mono.SelectedConfigSlot == i then
-            slot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+            slot.BackgroundColor3 = Mono.ThemeColor
         else
             slot.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
         end
@@ -1581,7 +1719,7 @@ local function updateSlotSelection()
 end
 
 for i = 1, 6 do
-    local slotFrame = Instance.new("TextButton", gridFrame)
+    local slotFrame = Instance.new("TextButton", cnfgsGridFrame)
     slotFrame.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
     slotFrame.Text = ""
     Instance.new("UICorner", slotFrame).CornerRadius = UDim.new(0, 6)
@@ -1619,10 +1757,10 @@ for i = 1, 6 do
 end
 updateSlotSelection()
 
-createButton(settingsPage, "💾 Save Selected Config", SaveConfig)
-createButton(settingsPage, "📂 Load Selected Config", LoadConfig)
+createButton(cnfgsPage, "💾 Save Selected Config", SaveConfig)
+createButton(cnfgsPage, "📂 Load Selected Config", LoadConfig)
 
-local importTitle = Instance.new("TextLabel", settingsPage)
+local importTitle = Instance.new("TextLabel", cnfgsPage)
 importTitle.Size = UDim2.new(1, 0, 0, 20)
 importTitle.BackgroundTransparency = 1
 importTitle.Text = "  Share & Import (Paste text below to import):"
@@ -1630,12 +1768,13 @@ importTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 importTitle.Font = Enum.Font.GothamBold
 importTitle.TextSize = 12
 importTitle.TextXAlignment = Enum.TextXAlignment.Left
+importTitle.LayoutOrder = #cnfgsPage:GetChildren()
 
-local importBoxFrame = Instance.new("Frame", settingsPage)
+local importBoxFrame = Instance.new("Frame", cnfgsPage)
 importBoxFrame.Size = UDim2.new(1, 0, 0, 35)
 importBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 30)
+importBoxFrame.LayoutOrder = #cnfgsPage:GetChildren()
 Instance.new("UICorner", importBoxFrame).CornerRadius = UDim.new(0, 6)
-importBoxFrame.LayoutOrder = #settingsPage:GetChildren()
 
 local importBox = Instance.new("TextBox", importBoxFrame)
 importBox.Size = UDim2.new(1, -20, 1, 0)
@@ -1666,11 +1805,13 @@ local function ManualImport()
     end
 end
 
-createButton(settingsPage, "📥 Import from Textbox", ManualImport)
-createButton(settingsPage, "📋 Export to Clipboard", ExportConfig)
+createButton(cnfgsPage, "📥 Import from Textbox", ManualImport)
+createButton(cnfgsPage, "📋 Export to Clipboard", ExportConfig)
 
+-- === ФИНАЛЬНЫЙ СЕТАП ===
+ApplyTheme(Mono.ThemeColor)
 updateHUD() 
-combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+combatBtn.BackgroundColor3 = Mono.ThemeColor
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
@@ -1718,7 +1859,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
             for _, v in pairs(contentArea:GetDescendants()) do
                 if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                     v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
-                    v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+                    v.TextColor3 = Mono.Crosshair.HideDefault and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
                 end
             end
         end)
@@ -2063,7 +2204,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v38 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v39 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
