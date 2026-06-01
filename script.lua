@@ -1689,7 +1689,7 @@ createSectionHeader(combatPage, "🛠️ UTILITS")
 
 createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
     Mono.GodMode = s 
-end, "Удаляет хитбоксы локально. Может не спасти от серверных ваншотов!")
+end, "Убирает регистрацию урона локально (пули пролетают сквозь).")
 
 -- 2. VISUALS
 createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
@@ -1924,6 +1924,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
+    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2006,6 +2007,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
+    -- Вшитая проверка на тиму
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2067,29 +2069,25 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (ЖЕСТКИЙ СКАН ИНВЕНТАРЯ)
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ ИНВЕНТАРЯ)
 local function getPlayerAbilities(plr)
     local abilities = {}
     pcall(function()
-        local bp = plr:FindFirstChild("Backpack")
-        if bp then
-            for _, item in pairs(bp:GetChildren()) do
-                if item:IsA("Tool") then
-                    table.insert(abilities, item.Name)
-                end
+        -- Ищем в скрытых атрибутах игрока
+        for name, value in pairs(plr:GetAttributes()) do
+            if type(value) == "string" and (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip")) then
+                table.insert(abilities, value)
             end
         end
-        local char = plr.Character
-        if char then
-            for _, item in pairs(char:GetChildren()) do
-                if item:IsA("Tool") then
-                    table.insert(abilities, item.Name)
-                end
+        
+        -- Ищем StringValue внутри папок игрока
+        for _, obj in pairs(plr:GetDescendants()) do
+            if obj:IsA("StringValue") and (obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E") then
+                table.insert(abilities, obj.Value)
             end
         end
     end)
     
-    if #abilities == 0 then return "?", "?" end
     local a1 = abilities[1] or "?"
     local a2 = abilities[2] or "?"
     
@@ -2345,32 +2343,31 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v45 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v46 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
         -- GOD MODE (BYPASS)
-        if Mono.GodMode then
-            local char = LocalPlayer.Character
-            if char then
-                pcall(function()
-                    for _, part in pairs(char:GetChildren()) do
-                        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                            part.CanCollide = false
+        local char = LocalPlayer.Character
+        if char then
+            pcall(function()
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                        if Mono.GodMode then
                             part.CanQuery = false
                             part.CanTouch = false
-                            part.Transparency = 1
-                            part.Size = Vector3.new(0.05, 0.05, 0.05)
+                        else
+                            part.CanQuery = true
+                            part.CanTouch = true
                         end
                     end
-                end)
-            end
+                end
+            end)
         end
         
         -- ФУНКЦИЯ SPEEDS
         if Mono.Speed.Enabled then
-            local char = LocalPlayer.Character
             if char then
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
@@ -2432,8 +2429,8 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
-                    local char = targetPlayer.Character
-                    local targetPart = char and getBestTargetPart(char)
+                    local tChar = targetPlayer.Character
+                    local targetPart = tChar and getBestTargetPart(tChar)
                     if targetPart then
                         local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
