@@ -27,9 +27,9 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
-    ThemeColor = Color3.fromRGB(180, 130, 255), -- ЦВЕТ СИСТЕМЫ
+    ThemeColor = Color3.fromRGB(180, 130, 255),
 
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2 },
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, TargetHead = false },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
@@ -49,12 +49,15 @@ local Mono = {
     KillColor = Color3.fromRGB(255, 50, 50), 
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
+    
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
     TimeOfDay = "Default", 
     WeatherEnabled = false,
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
+    CleanWorld = false, -- НОВАЯ ФУНКЦИЯ ДЛЯ ФПС
+    
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
     WatermarkEnabled = true, 
@@ -152,6 +155,19 @@ task.spawn(function()
             GlobalRayParams.FilterDescendantsInstances = ignoreList
         end)
         task.wait(1)
+    end
+end)
+
+-- ДИНАМИЧЕСКИЙ CLEAN WORLD (УДАЛЕНИЕ ТЕКСТУР НА ЛЕТУ)
+workspace.DescendantAdded:Connect(function(v)
+    if Mono.CleanWorld then
+        pcall(function()
+            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
+                v.Material = Enum.Material.SmoothPlastic
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            end
+        end)
     end
 end)
 
@@ -443,6 +459,7 @@ local function updateHUD()
         if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
+        if Mono.CleanWorld then addActiveFeature("Clean World") end
         if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
         if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
         if Mono.TintEnabled then addActiveFeature("Screen Tint") end
@@ -587,7 +604,7 @@ local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
-local cnfgsPage, cnfgsBtn = createTab("Cnfgs", "📁") -- НОВАЯ ВКАЛДКА КОНФИГОВ
+local cnfgsPage, cnfgsBtn = createTab("Cnfgs", "📁")
 
 local function setToggleStateUI(frameName, state)
     pcall(function()
@@ -1372,10 +1389,12 @@ end
 local function GetConfigTable()
     return {
         ThemeR = Mono.ThemeColor.R, ThemeG = Mono.ThemeColor.G, ThemeB = Mono.ThemeColor.B,
-        AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness,
+        
+        AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness, AimHead = Mono.Aimbot.TargetHead,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
+        
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
@@ -1394,6 +1413,7 @@ local function GetConfigTable()
         Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
         Time = Mono.TimeOfDay,
         WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
+        CleanW = Mono.CleanWorld,
         WatermarkE = Mono.WatermarkEnabled
     }
 end
@@ -1434,6 +1454,7 @@ local function ApplyConfigToUI()
     setToggleStateUI("Kill Effect", Mono.KillEffect)
     setToggleStateUI("Screen Tint", Mono.TintEnabled)
     setToggleStateUI("Weather Event", Mono.WeatherEnabled)
+    setToggleStateUI("Clean World (FPS Boost)", Mono.CleanWorld)
     setToggleStateUI("Show Watermark", Mono.WatermarkEnabled)
     
     tintFrame.BackgroundTransparency = Mono.TintEnabled and 0.85 or 1
@@ -1471,6 +1492,10 @@ local function ApplyConfigToUI()
             end
             if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
+            if v:IsA("TextButton") and v.Name == "AimHeadToggle" then
+                v.Text = Mono.Aimbot.TargetHead and "ON" or "OFF"
+                v.TextColor3 = Mono.Aimbot.TargetHead and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
+            end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
@@ -1491,6 +1516,7 @@ local function LoadConfigFromTable(dec)
     Mono.Aimbot.Enabled = dec.AimbotE or false
     Mono.Aimbot.Mode = dec.AimMode or "Rage 😡"
     Mono.Aimbot.Smoothness = dec.AimSmooth or 0.2
+    Mono.Aimbot.TargetHead = dec.AimHead or false
     pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
     
     Mono.TriggerBot.Enabled = dec.TrigE or false
@@ -1539,6 +1565,7 @@ local function LoadConfigFromTable(dec)
     Mono.WeatherType = dec.WeatherType or "Rain 🌧️"
     Mono.WeatherEmoji = dec.WeathEmoji or "💸"
     
+    Mono.CleanWorld = dec.CleanW or false
     Mono.WatermarkEnabled = dec.WatermarkE
     if Mono.WatermarkEnabled == nil then Mono.WatermarkEnabled = true end
 
@@ -1596,7 +1623,8 @@ createSectionHeader(combatPage, "🔫 GUN SETTINGS")
 createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", function(container)
     local h1 = createSubCycleButton(container, "Mode", {"Rage 😡", "Legit 🎯"}, Mono.Aimbot.Mode == "Rage 😡" and 1 or 2, function(val) Mono.Aimbot.Mode = val end, "AimModeBtn")
     local h2 = createSubInput(container, "Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
-    return h1 + h2 + 5
+    local h3 = createSubToggle(container, "Target Head Only", Mono.Aimbot.TargetHead, function(val) Mono.Aimbot.TargetHead = val end, "AimHeadToggle")
+    return h1 + h2 + h3 + 5
 end, "Automatically aims at enemies.")
 
 createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
@@ -1622,6 +1650,8 @@ end, "Увеличивает вашу скорость.")
 createToggleWithBind(combatPage, "Push", Mono.Push.Enabled, Mono.Push.Key, function(s) Mono.Push.Enabled = s end, Mono.Push, "Key", "Подбрасывает вас вверх (можно спамить в воздухе).")
 
 -- 2. VISUALS
+createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
+
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
     local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end, "ESPCol")
     local h2 = createSubInput(container, "Max Distance", tostring(Mono.ESP.MaxDistance), function(val) Mono.ESP.MaxDistance = tonumber(val) or 350 end, "ESPMaxInput")
@@ -1644,6 +1674,8 @@ createToggleWithSettings(visualsPage, "Custom Crosshair", Mono.Crosshair.Enabled
     return h1 + h2 + h3 + h4 + h5 + h6 + 5
 end, "Draws a custom crosshair in the center of your screen.")
 
+createSectionHeader(visualsPage, "✨ EFFECTS")
+
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
     local h1 = createSubInput(container, "Orbit Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end, "OrbitEmojiInput")
     return h1
@@ -1661,6 +1693,23 @@ createToggleWithSettings(visualsPage, "Kill Effect", Mono.KillEffect, function(s
 end, "Creates a screen flash and emoji explosion when you get a kill.")
 
 -- 3. WORLD
+createSectionHeader(worldPage, "🌍 ENVIRONMENT")
+
+createToggle(worldPage, "Clean World (FPS Boost)", Mono.CleanWorld, function(s) 
+    Mono.CleanWorld = s 
+    if s then
+        pcall(function()
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
+                    v.Material = Enum.Material.SmoothPlastic
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
+                end
+            end
+        end)
+    end
+end, "Удаляет все текстуры с карты (вернуть можно только перезаходом).")
+
 createToggleWithSettings(worldPage, "Screen Tint", Mono.TintEnabled, function(s) 
     Mono.TintEnabled = s 
     tintFrame.BackgroundTransparency = s and 0.85 or 1
@@ -1685,7 +1734,6 @@ end, "ColorPreview_ThemeColor")
 
 createSectionHeader(settingsPage, "📺 UI SETTINGS")
 createToggle(settingsPage, "Show Watermark", Mono.WatermarkEnabled, function(s) Mono.WatermarkEnabled = s; watermarkFrame.Visible = s end, "Displays Ping and FPS in the top right corner.")
-
 
 -- 5. CONFIGS (CNFGS)
 local configTitle = Instance.new("TextLabel", cnfgsPage)
@@ -1934,6 +1982,9 @@ local function isEnemy(plr)
 end
 
 local function getBestTargetPart(char)
+    if Mono.Aimbot.TargetHead then
+        return char:FindFirstChild("Head")
+    end
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
 
@@ -2204,7 +2255,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v39 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v40 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
