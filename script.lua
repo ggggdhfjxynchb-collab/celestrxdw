@@ -1689,6 +1689,20 @@ createSectionHeader(combatPage, "🛠️ UTILITS")
 
 createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
     Mono.GodMode = s 
+    -- Если выключаем годмод, восстанавливаем коллизию
+    if not s then
+        pcall(function()
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanQuery = true
+                        part.CanTouch = true
+                    end
+                end
+            end
+        end)
+    end
 end, "Убирает регистрацию урона локально (пули пролетают сквозь).")
 
 -- 2. VISUALS
@@ -2069,21 +2083,33 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ ИНВЕНТАРЯ)
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ МУСОРА)
 local function getPlayerAbilities(plr)
     local abilities = {}
+    
+    local function isValid(str)
+        if type(str) ~= "string" then return false end
+        local lowerStr = str:lower()
+        -- Жестко отсекаем айдишники картинок и ссылки
+        if lowerStr:match("rbxassetid") or lowerStr:match("http") or lowerStr:match("rbxthumb") or lowerStr:match("asset") then return false end
+        if string.len(str) < 2 or string.len(str) > 30 then return false end
+        return true
+    end
+
     pcall(function()
-        -- Ищем в скрытых атрибутах игрока
         for name, value in pairs(plr:GetAttributes()) do
-            if type(value) == "string" and (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip")) then
-                table.insert(abilities, value)
+            if (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip")) then
+                if isValid(value) then
+                    table.insert(abilities, value)
+                end
             end
         end
         
-        -- Ищем StringValue внутри папок игрока
         for _, obj in pairs(plr:GetDescendants()) do
             if obj:IsA("StringValue") and (obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E") then
-                table.insert(abilities, obj.Value)
+                if isValid(obj.Value) then
+                    table.insert(abilities, obj.Value)
+                end
             end
         end
     end)
@@ -2343,12 +2369,12 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v46 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v47 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
-        -- GOD MODE (BYPASS)
+        -- GOD MODE (BYPASS) - ТЕПЕРЬ ТЫ НЕ ПРОВАЛИШЬСЯ
         local char = LocalPlayer.Character
         if char then
             pcall(function()
