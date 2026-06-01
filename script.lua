@@ -2083,42 +2083,59 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ МУСОРА)
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ ИНВЕНТАРЯ)
 local function getPlayerAbilities(plr)
     local abilities = {}
-    
-    local function isValid(str)
-        if type(str) ~= "string" then return false end
-        local lowerStr = str:lower()
-        -- Жестко отсекаем айдишники картинок и ссылки
-        if lowerStr:match("rbxassetid") or lowerStr:match("http") or lowerStr:match("rbxthumb") or lowerStr:match("asset") then return false end
-        if string.len(str) < 2 or string.len(str) > 30 then return false end
-        return true
-    end
-
     pcall(function()
-        for name, value in pairs(plr:GetAttributes()) do
-            if (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip")) then
-                if isValid(value) then
-                    table.insert(abilities, value)
+        -- 1. Сначала ищем в Attributes
+        for name, val in pairs(plr:GetAttributes()) do
+            local s = tostring(val)
+            if not s:lower():match("rbxasset") and not s:lower():match("http") then
+                if name:lower():match("ability") or name:lower():match("skill") or name == "Q" or name == "E" then
+                    table.insert(abilities, s)
                 end
             end
         end
         
+        -- 2. Ищем в StringValue
         for _, obj in pairs(plr:GetDescendants()) do
-            if obj:IsA("StringValue") and (obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E") then
-                if isValid(obj.Value) then
-                    table.insert(abilities, obj.Value)
+            if obj:IsA("StringValue") then
+                local s = tostring(obj.Value)
+                if s ~= "" and not s:lower():match("rbxasset") and not s:lower():match("http") then
+                    if obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E" or obj.Name:lower():match("name") then
+                        table.insert(abilities, s)
+                    end
+                end
+            end
+        end
+        
+        -- 3. ФОЛБЭК: Если мы находим только картинки, возможно само название объекта — это название абилки!
+        if #abilities == 0 then
+            for _, obj in pairs(plr:GetDescendants()) do
+                if obj:IsA("StringValue") and (obj.Value:lower():match("rbxasset") or obj.Value:lower():match("http")) then
+                    if obj.Name ~= "Q" and obj.Name ~= "E" and not obj.Name:lower():match("ability") then
+                        table.insert(abilities, obj.Name)
+                    end
                 end
             end
         end
     end)
     
-    local a1 = abilities[1] or "?"
-    local a2 = abilities[2] or "?"
+    -- Убираем дубликаты
+    local unique = {}
+    local res = {}
+    for _, v in ipairs(abilities) do
+        if not unique[v] then
+            unique[v] = true
+            table.insert(res, v)
+        end
+    end
     
-    if string.len(a1) > 12 then a1 = string.sub(a1, 1, 10) .. ".." end
-    if string.len(a2) > 12 then a2 = string.sub(a2, 1, 10) .. ".." end
+    local a1 = res[1] or "?"
+    local a2 = res[2] or "?"
+    
+    if string.len(a1) > 15 then a1 = string.sub(a1, 1, 13) .. ".." end
+    if string.len(a2) > 15 then a2 = string.sub(a2, 1, 13) .. ".." end
     
     return a1, a2
 end
@@ -2369,7 +2386,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v47 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v48 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
