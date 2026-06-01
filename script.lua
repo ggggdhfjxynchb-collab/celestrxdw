@@ -32,24 +32,26 @@ local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, TargetHead = false },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
+    Speed = { Enabled = false, Value = 50 },
+    Push = { Enabled = false, Key = Enum.KeyCode.F },
+    
+    GodMode = false, -- НОВАЯ ФУНКЦИЯ БЕССМЕРТИЯ
+    
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
+    AbilityESP = false, -- НОВАЯ ФУНКЦИЯ ОТОБРАЖЕНИЯ АБИЛОК
     
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
     Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
     
-    Speed = { Enabled = false, Value = 50 },
-    Push = { Enabled = false, Key = Enum.KeyCode.F },
-    
     KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
-    Tracers = { Enabled = false, Color = Color3.fromRGB(255, 255, 255) },
     
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
@@ -422,51 +424,6 @@ local function doKillEffect()
     end)
 end
 
--- === ФУНКЦИЯ ФИЛЬТРАЦИИ ОРУЖИЯ ===
--- Проверяет, держит ли игрок огнестрел (а не нож/кулаки)
-local function isHoldingGun()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return false end 
-    
-    local n = string.lower(tool.Name)
-    if string.find(n, "knife") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "melee") or string.find(n, "fist") or string.find(n, "bat") or string.find(n, "punch") or string.find(n, "hand") then
-        return false
-    end
-    
-    return true
-end
-
--- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
-local function createTracer(startPos, endPos)
-    if not Mono.Tracers.Enabled then return end
-    task.spawn(function()
-        pcall(function()
-            local distance = (startPos - endPos).Magnitude
-            local tracer = Instance.new("Part")
-            tracer.Anchored = true
-            tracer.CanCollide = false
-            tracer.CanQuery = false
-            tracer.Material = Enum.Material.Neon
-            tracer.Color = Mono.Tracers.Color
-            tracer.Size = Vector3.new(0.08, 0.08, distance)
-            tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
-            tracer.Parent = workspace
-            
-            -- Трейсер плавно исчезает 1.5 секунды
-            local ts = TweenService:Create(tracer, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Transparency = 1, 
-                Size = Vector3.new(0, 0, distance)
-            })
-            ts:Play()
-            
-            game.Debris:AddItem(tracer, 1.6)
-        end)
-    end)
-end
-
 -- === STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
@@ -525,10 +482,10 @@ local function updateHUD()
         if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
+        if Mono.GodMode then addActiveFeature("God Mode") end
         if Mono.CleanWorld then addActiveFeature("Max FPS") end
         if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
         if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
-        if Mono.Tracers.Enabled then addActiveFeature("Bullet Tracers") end
         if Mono.TintEnabled then addActiveFeature("Screen Tint") end
         if Mono.WeatherEnabled then addActiveFeature("Weather") end
 
@@ -539,7 +496,7 @@ end
 
 -- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 500, 0, 340)
+mainFrame.Size = UDim2.new(0, 500, 370)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -644,7 +601,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    pLayout.SortOrder = Enum.SortOrder.LayoutOrder 
     pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
@@ -696,7 +653,7 @@ local function createSectionHeader(parent, text)
     frame.BackgroundColor3 = Color3.new(Mono.ThemeColor.R * 0.7, Mono.ThemeColor.G * 0.7, Mono.ThemeColor.B * 0.7)
     frame.BackgroundTransparency = 0.8
     frame.BorderSizePixel = 0
-    frame.LayoutOrder = #parent:GetChildren()
+    frame.LayoutOrder = #parent:GetChildren() 
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
     
     local stroke = Instance.new("UIStroke", frame)
@@ -722,7 +679,7 @@ local function createButton(parent, text, callback, tooltip)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
     frame.BackgroundTransparency = 0.2
-    frame.LayoutOrder = #parent:GetChildren()
+    frame.LayoutOrder = #parent:GetChildren() 
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -751,7 +708,7 @@ local function createInput(parent, text, defaultText, callback, uiName)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren()
+    frame.LayoutOrder = #parent:GetChildren() 
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel", frame)
@@ -917,7 +874,7 @@ local function createSubColorPicker(parent, text, defaultColor, callback, uiName
     
     if uiName then colorPreview.Name = uiName end
 
-    local hueFrame = Instance.new("Frame", frame)
+    local hueFrame = Instance.new("Frame", parent)
     hueFrame.Size = UDim2.new(0.9, 0, 0, 10)
     hueFrame.Position = UDim2.new(0.05, 0, 0, 30)
     Instance.new("UICorner", hueFrame).CornerRadius = UDim.new(0, 4)
@@ -1030,7 +987,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren()
+    frame.LayoutOrder = #parent:GetChildren() 
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -1067,7 +1024,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren()
+    frame.LayoutOrder = #parent:GetChildren() 
 
     local topBar = Instance.new("Frame", frame)
     topBar.Size = UDim2.new(1, 0, 0, 35)
@@ -1134,7 +1091,7 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
     container.ClipsDescendants = true 
-    container.LayoutOrder = #parent:GetChildren()
+    container.LayoutOrder = #parent:GetChildren() 
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -1461,6 +1418,9 @@ local function GetConfigTable()
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
         
+        GodMode = Mono.GodMode,
+        AbilESPE = Mono.AbilityESP,
+        
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
@@ -1475,7 +1435,7 @@ local function GetConfigTable()
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
-        TracersE = Mono.Tracers.Enabled, Tracers_R = Mono.Tracers.Color.R, Tracers_G = Mono.Tracers.Color.G, Tracers_B = Mono.Tracers.Color.B,
+        
         TintE = Mono.TintEnabled,
         Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
         Time = Mono.TimeOfDay,
@@ -1512,10 +1472,13 @@ local function ApplyConfigToUI()
     setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
     setToggleStateUI("Speeds", Mono.Speed.Enabled)
     setToggleStateUI("Push", Mono.Push.Enabled)
+    
+    setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
+    setToggleStateUI("Show Abilities", Mono.AbilityESP)
+    
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
     setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
-    setToggleStateUI("Bullet Tracers", Mono.Tracers.Enabled)
     setToggleStateUI("Enemy Orbits", Mono.TargetObjEnabled)
     setToggleStateUI("Off-Screen Arrows", Mono.OffScreenArrows.Enabled)
     setToggleStateUI("Custom Crosshair", Mono.Crosshair.Enabled)
@@ -1557,7 +1520,6 @@ local function ApplyConfigToUI()
                 if v.Name == "TintCol" then v.BackgroundColor3 = Mono.TintColor end
                 if v.Name == "ArrCol" then v.BackgroundColor3 = Mono.OffScreenArrows.Color end
                 if v.Name == "CrossCol" then v.BackgroundColor3 = Mono.Crosshair.Color end
-                if v.Name == "TracerCol" then v.BackgroundColor3 = Mono.Tracers.Color end
             end
             if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
@@ -1596,6 +1558,9 @@ local function LoadConfigFromTable(dec)
     Mono.Push.Enabled = dec.PushE or false
     pcall(function() Mono.Push.Key = Enum.KeyCode[dec.PushK] or Enum.UserInputType[dec.PushK] end)
 
+    Mono.GodMode = dec.GodMode or false
+    Mono.AbilityESP = dec.AbilESPE or false
+
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
     Mono.FOV.Color = Color3.new(dec.FOV_R or 1, dec.FOV_G or 1, dec.FOV_B or 1)
@@ -1625,11 +1590,6 @@ local function LoadConfigFromTable(dec)
     
     Mono.TeammateNotifs = dec.TeamNotifE or false
     Mono.DeathNotifDistance = dec.DeathDist or 150
-    
-    Mono.Tracers.Enabled = dec.TracersE or false
-    if dec.Tracers_R and dec.Tracers_G and dec.Tracers_B then
-        Mono.Tracers.Color = Color3.new(dec.Tracers_R, dec.Tracers_G, dec.Tracers_B)
-    end
     
     Mono.TintEnabled = dec.TintE or false
     Mono.TintColor = Color3.new(dec.Tint_R or 1, dec.Tint_G or 1, dec.Tint_B or 1)
@@ -1725,8 +1685,16 @@ end, "Увеличивает вашу скорость.")
 
 createToggleWithBind(combatPage, "Push", Mono.Push.Enabled, Mono.Push.Key, function(s) Mono.Push.Enabled = s end, Mono.Push, "Key", "Подбрасывает вас вверх (можно спамить в воздухе).")
 
+createSectionHeader(combatPage, "🛠️ UTILITS")
+
+createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
+    Mono.GodMode = s 
+end, "Удаляет хитбоксы локально. Может не спасти от серверных ваншотов!")
+
 -- 2. VISUALS
 createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
+
+createToggle(visualsPage, "Show Abilities", Mono.AbilityESP, function(s) Mono.AbilityESP = s end, "Показывает способности врагов под ником.")
 
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
     local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end, "ESPCol")
@@ -1751,11 +1719,6 @@ createToggleWithSettings(visualsPage, "Custom Crosshair", Mono.Crosshair.Enabled
 end, "Draws a custom crosshair in the center of your screen.")
 
 createSectionHeader(visualsPage, "✨ EFFECTS")
-
-createToggleWithSettings(visualsPage, "Bullet Tracers", Mono.Tracers.Enabled, function(s) Mono.Tracers.Enabled = s end, function(container)
-    local h1 = createSubColorPicker(container, "Tracer Color", Mono.Tracers.Color, function(c) Mono.Tracers.Color = c end, "TracerCol")
-    return h1 + 5
-end, "Рисует неоновые линии за вашими выстрелами.")
 
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
     local h1 = createSubInput(container, "Orbit Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end, "OrbitEmojiInput")
@@ -1935,51 +1898,6 @@ combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
 
--- === ФУНКЦИЯ ФИЛЬТРАЦИИ ОРУЖИЯ ===
--- Проверяет, держит ли игрок огнестрел (а не нож/кулаки)
-local function isHoldingGun()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    
-    local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return false end 
-    
-    local n = string.lower(tool.Name)
-    if string.find(n, "knife") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "melee") or string.find(n, "fist") or string.find(n, "bat") or string.find(n, "punch") or string.find(n, "hand") then
-        return false
-    end
-    
-    return true
-end
-
--- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
-local function createTracer(startPos, endPos)
-    if not Mono.Tracers.Enabled then return end
-    task.spawn(function()
-        pcall(function()
-            local distance = (startPos - endPos).Magnitude
-            local tracer = Instance.new("Part")
-            tracer.Anchored = true
-            tracer.CanCollide = false
-            tracer.CanQuery = false
-            tracer.Material = Enum.Material.Neon
-            tracer.Color = Mono.Tracers.Color
-            tracer.Size = Vector3.new(0.08, 0.08, distance)
-            tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
-            tracer.Parent = workspace
-            
-            -- Трейсер плавно исчезает 1.5 секунды
-            local ts = TweenService:Create(tracer, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Transparency = 1, 
-                Size = Vector3.new(0, 0, distance)
-            })
-            ts:Play()
-            
-            game.Debris:AddItem(tracer, 1.6)
-        end)
-    end)
-end
-
 -- === ОБРАБОТКА НАЖАТИЙ ===
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
@@ -1989,24 +1907,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
             BindWait(input.UserInputType)
         end
         return
-    end
-
-    -- РУЧНАЯ СТРЕЛЬБА ДЛЯ ТРЕЙСЕРОВ
-    if not gp and input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if Mono.Tracers.Enabled and isHoldingGun() then
-            pcall(function()
-                local mouseLocation = UserInputService:GetMouseLocation()
-                local ray = Camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y - 36)
-                local hit = workspace:Raycast(ray.Origin, ray.Direction * 2000, GlobalRayParams)
-                local endP = hit and hit.Position or (ray.Origin + ray.Direction * 2000)
-                
-                local startP = Camera.CFrame.Position
-                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-                    startP = LocalPlayer.Character.Head.Position - Vector3.new(0, 0.5, 0)
-                end
-                createTracer(startP, endP)
-            end)
-        end
     end
 
     if gp then return end
@@ -2024,7 +1924,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
-    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2093,16 +1992,7 @@ mobileToggle.MouseButton1Click:Connect(function()
 end)
 
 -- === ЧИСТЫЙ БЕЗОПАСНЫЙ КЛИКЕР ROBLOX ===
-local function simulateClick(targetPos)
-    if Mono.Tracers.Enabled and targetPos and isHoldingGun() then
-        pcall(function()
-            local startP = Camera.CFrame.Position
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
-                startP = LocalPlayer.Character.Head.Position - Vector3.new(0, 0.5, 0)
-            end
-            createTracer(startP, targetPos)
-        end)
-    end
+local function simulateClick()
     coroutine.wrap(function()
         pcall(function()
             local vim = game:GetService("VirtualInputManager")
@@ -2117,7 +2007,6 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму (TeamCheck всегда работает)
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2177,6 +2066,22 @@ local function getClosestVisibleEnemy()
         end
     end
     return closestTarget
+end
+
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (ЗАГЛУШКА)
+local function getPlayerAbilities(plr)
+    local ab1, ab2 = "?", "?"
+    pcall(function()
+        if plr:GetAttribute("Ability1") then ab1 = tostring(plr:GetAttribute("Ability1")) end
+        if plr:GetAttribute("Ability2") then ab2 = tostring(plr:GetAttribute("Ability2")) end
+        
+        local leaderstats = plr:FindFirstChild("leaderstats")
+        if leaderstats then
+            if leaderstats:FindFirstChild("Ability1") then ab1 = tostring(leaderstats.Ability1.Value) end
+            if leaderstats:FindFirstChild("Ability2") then ab2 = tostring(leaderstats.Ability2.Value) end
+        end
+    end)
+    return ab1, ab2
 end
 
 Players.PlayerRemoving:Connect(function(plr)
@@ -2250,7 +2155,7 @@ local function updateESP()
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
-            -- WALLHACK ESP
+            -- WALLHACK ESP И ABILITY ESP
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -2264,19 +2169,33 @@ local function updateESP()
                     
                     local bb = Instance.new("BillboardGui")
                     bb.Name = "MonoName"
-                    bb.Size = UDim2.new(0, 100, 0, 20)
+                    bb.Size = UDim2.new(0, 100, 0, 40)
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
+                    
+                    local list = Instance.new("UIListLayout", bb)
+                    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                    list.VerticalAlignment = Enum.VerticalAlignment.Center
+                    
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 1, 0)
+                    tl.Size = UDim2.new(1, 0, 0.5, 0)
                     tl.BackgroundTransparency = 1
                     tl.Font = Enum.Font.GothamBold
                     tl.TextSize = 12
                     tl.TextStrokeTransparency = 0
                     
+                    local abilText = Instance.new("TextLabel", bb)
+                    abilText.Size = UDim2.new(1, 0, 0.5, 0)
+                    abilText.BackgroundTransparency = 1
+                    abilText.Font = Enum.Font.Gotham
+                    abilText.TextSize = 10
+                    abilText.TextStrokeTransparency = 0
+                    abilText.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
                     espCache[plr].Text = tl
+                    espCache[plr].AbilityText = abilText
                     
                     hl.Parent = screenGui
                     bb.Parent = screenGui
@@ -2296,6 +2215,14 @@ local function updateESP()
                 espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
                 espCache[plr].Highlight.FillColor = Mono.ESPColor
                 espCache[plr].Text.TextColor3 = Mono.ESPColor
+                
+                if Mono.AbilityESP then
+                    local a1, a2 = getPlayerAbilities(plr)
+                    espCache[plr].AbilityText.Text = "[" .. a1 .. " | " .. a2 .. "]"
+                    espCache[plr].AbilityText.Visible = true
+                else
+                    espCache[plr].AbilityText.Visible = false
+                end
             else
                 if espCache[plr] and espCache[plr].Highlight then
                     espCache[plr].Highlight.Enabled = false
@@ -2398,9 +2325,29 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v42 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v43 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
+        end
+        
+        -- GOD MODE (BYPASS)
+        if Mono.GodMode then
+            local char = LocalPlayer.Character
+            if char then
+                pcall(function()
+                    -- Ломаем хитбоксы локально
+                    local head = char:FindFirstChild("Head")
+                    if head then
+                        head.CanCollide = false
+                        head.Size = Vector3.new(0.05, 0.05, 0.05)
+                        head.Transparency = 1
+                    end
+                    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+                    if torso then
+                        torso.CanCollide = false
+                    end
+                end)
+            end
         end
         
         -- ФУНКЦИЯ SPEEDS
@@ -2479,7 +2426,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             LastTargetTime = tick()
                             if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
-                                simulateClick(hitResult.Position)
+                                simulateClick()
                             end
                         end
                     end
