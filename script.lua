@@ -49,6 +49,7 @@ local Mono = {
     KillColor = Color3.fromRGB(255, 50, 50), 
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
+    Tracers = { Enabled = false, Color = Color3.fromRGB(255, 255, 255) }, -- НОВЫЕ ТРЕЙСЕРЫ ПУЛЬ
     
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
@@ -56,7 +57,7 @@ local Mono = {
     WeatherEnabled = false,
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
-    CleanWorld = false, -- НОВАЯ ФУНКЦИЯ ДЛЯ ФПС
+    CleanWorld = false, -- ЖЕСТКИЙ ФПС БУСТ
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
@@ -158,17 +159,37 @@ task.spawn(function()
     end
 end)
 
--- ДИНАМИЧЕСКИЙ CLEAN WORLD (УДАЛЕНИЕ ТЕКСТУР НА ЛЕТУ)
-workspace.DescendantAdded:Connect(function(v)
+-- ДИНАМИЧЕСКИЙ CLEAN WORLD (ЖЕСТКАЯ ОПТИМИЗАЦИЯ)
+local function applyMaxFPS(v)
+    pcall(function()
+        if v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
+            v.Material = Enum.Material.SmoothPlastic
+            v.CastShadow = false
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("PostEffect") or v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
+            v.Enabled = false
+        end
+    end)
+end
+
+local function executeMaxFPS()
     if Mono.CleanWorld then
         pcall(function()
-            if v:IsA("BasePart") and not v.Parent:FindFirstChild("Humanoid") then
-                v.Material = Enum.Material.SmoothPlastic
-            elseif v:IsA("Decal") or v:IsA("Texture") then
-                v.Transparency = 1
-            end
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            for _, v in pairs(Lighting:GetDescendants()) do applyMaxFPS(v) end
+            for _, v in pairs(workspace:GetDescendants()) do applyMaxFPS(v) end
         end)
     end
+end
+
+workspace.DescendantAdded:Connect(function(v)
+    if Mono.CleanWorld then applyMaxFPS(v) end
+end)
+
+Lighting.DescendantAdded:Connect(function(v)
+    if Mono.CleanWorld then applyMaxFPS(v) end
 end)
 
 -- === 3. СОЗДАНИЕ ИНТЕРФЕЙСА ===
@@ -401,6 +422,34 @@ local function doKillEffect()
     end)
 end
 
+-- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
+local function createTracer(startPos, endPos)
+    if not Mono.Tracers.Enabled then return end
+    task.spawn(function()
+        pcall(function()
+            local distance = (startPos - endPos).Magnitude
+            local tracer = Instance.new("Part")
+            tracer.Anchored = true
+            tracer.CanCollide = false
+            tracer.CanQuery = false
+            tracer.Material = Enum.Material.Neon
+            tracer.Color = Mono.Tracers.Color
+            tracer.Size = Vector3.new(0.08, 0.08, distance)
+            tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
+            tracer.Parent = workspace
+            
+            local ts = TweenService:Create(tracer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Transparency = 1, 
+                Size = Vector3.new(0, 0, distance)
+            })
+            ts:Play()
+            ts.Completed:Connect(function()
+                tracer:Destroy()
+            end)
+        end)
+    end)
+end
+
 -- === STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
@@ -459,9 +508,10 @@ local function updateHUD()
         if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
-        if Mono.CleanWorld then addActiveFeature("Clean World") end
+        if Mono.CleanWorld then addActiveFeature("Max FPS") end
         if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
         if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
+        if Mono.Tracers.Enabled then addActiveFeature("Bullet Tracers") end
         if Mono.TintEnabled then addActiveFeature("Screen Tint") end
         if Mono.WeatherEnabled then addActiveFeature("Weather") end
 
@@ -1409,6 +1459,7 @@ local function GetConfigTable()
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
+        TracersE = Mono.Tracers.Enabled, Tracers_R = Mono.Tracers.Color.R, Tracers_G = Mono.Tracers.Color.G, Tracers_B = Mono.Tracers.Color.B,
         TintE = Mono.TintEnabled,
         Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
         Time = Mono.TimeOfDay,
@@ -1448,6 +1499,7 @@ local function ApplyConfigToUI()
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
     setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
+    setToggleStateUI("Bullet Tracers", Mono.Tracers.Enabled)
     setToggleStateUI("Enemy Orbits", Mono.TargetObjEnabled)
     setToggleStateUI("Off-Screen Arrows", Mono.OffScreenArrows.Enabled)
     setToggleStateUI("Custom Crosshair", Mono.Crosshair.Enabled)
@@ -1489,6 +1541,7 @@ local function ApplyConfigToUI()
                 if v.Name == "TintCol" then v.BackgroundColor3 = Mono.TintColor end
                 if v.Name == "ArrCol" then v.BackgroundColor3 = Mono.OffScreenArrows.Color end
                 if v.Name == "CrossCol" then v.BackgroundColor3 = Mono.Crosshair.Color end
+                if v.Name == "TracerCol" then v.BackgroundColor3 = Mono.Tracers.Color end
             end
             if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
@@ -1557,6 +1610,11 @@ local function LoadConfigFromTable(dec)
     Mono.TeammateNotifs = dec.TeamNotifE or false
     Mono.DeathNotifDistance = dec.DeathDist or 150
     
+    Mono.Tracers.Enabled = dec.TracersE or false
+    if dec.Tracers_R and dec.Tracers_G and dec.Tracers_B then
+        Mono.Tracers.Color = Color3.new(dec.Tracers_R, dec.Tracers_G, dec.Tracers_B)
+    end
+    
     Mono.TintEnabled = dec.TintE or false
     Mono.TintColor = Color3.new(dec.Tint_R or 1, dec.Tint_G or 1, dec.Tint_B or 1)
     
@@ -1566,6 +1624,8 @@ local function LoadConfigFromTable(dec)
     Mono.WeatherEmoji = dec.WeathEmoji or "💸"
     
     Mono.CleanWorld = dec.CleanW or false
+    executeMaxFPS()
+    
     Mono.WatermarkEnabled = dec.WatermarkE
     if Mono.WatermarkEnabled == nil then Mono.WatermarkEnabled = true end
 
@@ -1676,6 +1736,11 @@ end, "Draws a custom crosshair in the center of your screen.")
 
 createSectionHeader(visualsPage, "✨ EFFECTS")
 
+createToggleWithSettings(visualsPage, "Bullet Tracers", Mono.Tracers.Enabled, function(s) Mono.Tracers.Enabled = s end, function(container)
+    local h1 = createSubColorPicker(container, "Tracer Color", Mono.Tracers.Color, function(c) Mono.Tracers.Color = c end, "TracerCol")
+    return h1 + 5
+end, "Рисует неоновые линии за вашими выстрелами.")
+
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
     local h1 = createSubInput(container, "Orbit Emoji", Mono.OrbitEmoji, function(val) Mono.OrbitEmoji = val end, "OrbitEmojiInput")
     return h1
@@ -1697,18 +1762,8 @@ createSectionHeader(worldPage, "🌍 ENVIRONMENT")
 
 createToggle(worldPage, "Clean World (FPS Boost)", Mono.CleanWorld, function(s) 
     Mono.CleanWorld = s 
-    if s then
-        pcall(function()
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
-                    v.Material = Enum.Material.SmoothPlastic
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                end
-            end
-        end)
-    end
-end, "Удаляет все текстуры с карты (вернуть можно только перезаходом).")
+    executeMaxFPS()
+end, "Отключает тени, эффекты и текстуры. Вернуть можно только перезаходом.")
 
 createToggleWithSettings(worldPage, "Screen Tint", Mono.TintEnabled, function(s) 
     Mono.TintEnabled = s 
@@ -1864,6 +1919,34 @@ combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
 
+-- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
+local function createTracer(startPos, endPos)
+    if not Mono.Tracers.Enabled then return end
+    task.spawn(function()
+        pcall(function()
+            local distance = (startPos - endPos).Magnitude
+            local tracer = Instance.new("Part")
+            tracer.Anchored = true
+            tracer.CanCollide = false
+            tracer.CanQuery = false
+            tracer.Material = Enum.Material.Neon
+            tracer.Color = Mono.Tracers.Color
+            tracer.Size = Vector3.new(0.08, 0.08, distance)
+            tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
+            tracer.Parent = workspace
+            
+            local ts = TweenService:Create(tracer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Transparency = 1, 
+                Size = Vector3.new(0, 0, distance)
+            })
+            ts:Play()
+            ts.Completed:Connect(function()
+                tracer:Destroy()
+            end)
+        end)
+    end)
+end
+
 -- === ОБРАБОТКА НАЖАТИЙ ===
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
@@ -1873,6 +1956,23 @@ UserInputService.InputBegan:Connect(function(input, gp)
             BindWait(input.UserInputType)
         end
         return
+    end
+
+    if not gp and input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if Mono.Tracers.Enabled then
+            pcall(function()
+                local mouseLocation = UserInputService:GetMouseLocation()
+                local ray = Camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y - 36)
+                local hit = workspace:Raycast(ray.Origin, ray.Direction * 2000, GlobalRayParams)
+                local endP = hit and hit.Position or (ray.Origin + ray.Direction * 2000)
+                
+                local startP = Camera.CFrame.Position
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+                    startP = LocalPlayer.Character.Head.Position - Vector3.new(0, 0.5, 0)
+                end
+                createTracer(startP, endP)
+            end)
+        end
     end
 
     if gp then return end
@@ -1890,7 +1990,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
-    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -1936,7 +2035,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -1959,7 +2057,16 @@ mobileToggle.MouseButton1Click:Connect(function()
 end)
 
 -- === ЧИСТЫЙ БЕЗОПАСНЫЙ КЛИКЕР ROBLOX ===
-local function simulateClick()
+local function simulateClick(targetPos)
+    if Mono.Tracers.Enabled and targetPos then
+        pcall(function()
+            local startP = Camera.CFrame.Position
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
+                startP = LocalPlayer.Character.Head.Position - Vector3.new(0, 0.5, 0)
+            end
+            createTracer(startP, targetPos)
+        end)
+    end
     coroutine.wrap(function()
         pcall(function()
             local vim = game:GetService("VirtualInputManager")
@@ -1974,7 +2081,6 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму (TeamCheck всегда работает)
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2255,7 +2361,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v40 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v41 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2336,7 +2442,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             LastTargetTime = tick()
                             if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
-                                simulateClick()
+                                simulateClick(hitResult.Position)
                             end
                         end
                     end
