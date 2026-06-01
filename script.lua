@@ -33,14 +33,11 @@ local Mono = {
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
-    TeamCheck = false,
+    
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
-    
-    -- ДОБАВИЛИ КНОПКУ БИНДА ДЛЯ СКРЫТИЯ МЫШКИ (ПО УМОЛЧАНИЮ UNKNOWN)
-    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
-    
+    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false }, 
     KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
@@ -199,7 +196,7 @@ makeDraggable(watermarkFrame)
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v35 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v37 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -625,46 +622,6 @@ local function createButton(parent, text, callback, tooltip)
     end)
 end
 
-local function createInput(parent, text, defaultText, callback, uiName)
-    local frame = Instance.new("Frame", parent)
-    frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    frame.BackgroundTransparency = 0.4
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-
-    local lbl = Instance.new("TextLabel", frame)
-    lbl.Size = UDim2.new(0.6, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "  " .. text
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local box = Instance.new("TextBox", frame)
-    box.Size = UDim2.new(0, 120, 0, 24)
-    box.Position = UDim2.new(1, -130, 0.5, -12)
-    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    box.Text = defaultText
-    box.TextColor3 = Color3.fromRGB(255, 255, 255)
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 12
-    box.ClearTextOnFocus = false
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
-    
-    if uiName then 
-        box.Name = uiName 
-    end
-
-    box.FocusLost:Connect(function()
-        if box.Text == "" then 
-            box.Text = defaultText 
-        end
-        callback(box.Text)
-    end)
-    return 35
-end
-
 local function createSubInput(parent, text, defaultText, callback, uiName)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -733,49 +690,6 @@ local function createSubToggle(parent, text, defaultState, callback, uiName)
         callback(state)
     end)
     
-    return 35
-end
-
--- НОВАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ БИНДА В ПОДМЕНЮ
-local function createSubBind(parent, text, defaultBind, bindTable, bindKeyName, uiName)
-    local frame = Instance.new("Frame", parent)
-    frame.Size = UDim2.new(1, 0, 0, 30)
-    frame.BackgroundTransparency = 1
-
-    local lbl = Instance.new("TextLabel", frame)
-    lbl.Size = UDim2.new(0.6, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "    -> " .. text
-    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0, 80, 0, 24)
-    btn.Position = UDim2.new(1, -95, 0.5, -12)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    btn.Text = (defaultBind and defaultBind ~= Enum.KeyCode.Unknown) and defaultBind.Name or "None"
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    if uiName then btn.Name = uiName end
-
-    btn.MouseButton1Click:Connect(function()
-        if BindWait then return end 
-        btn.Text = "..."
-        BindWait = function(key)
-            bindTable[bindKeyName] = key
-            local kn = key.Name
-            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
-            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
-            elseif key == Enum.KeyCode.Unknown then kn = "None"
-            end
-            btn.Text = kn
-            BindWait = nil 
-        end
-    end)
     return 35
 end
 
@@ -1136,76 +1050,52 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 end
 
-local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, tooltip)
-    local container = Instance.new("Frame", parent)
-    container.Name = text
-    container.Size = UDim2.new(1, 0, 0, 35)
-    container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    container.BackgroundTransparency = 0.4
-    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+local function createSubBind(parent, text, defaultBind, bindTable, bindKeyName, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.BackgroundTransparency = 1
 
-    local topBar = Instance.new("Frame", container)
-    topBar.Size = UDim2.new(1, 0, 0, 35)
-    topBar.BackgroundTransparency = 1
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "    -> " .. text
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-    local btn = Instance.new("TextButton", topBar)
-    btn.Name = "MainBtn"
-    btn.Size = UDim2.new(1, -160, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = "  " .. text
-    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-
-    handleTooltip(btn, tooltip)
-
-    local status = Instance.new("Frame", topBar)
-    status.Name = "Status"
-    status.Size = UDim2.new(0, 14, 0, 14)
-    status.Position = UDim2.new(1, -60, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
-
-    local bindBtn = Instance.new("TextButton", topBar)
-    bindBtn.Name = "BindBtn"
-    bindBtn.Size = UDim2.new(0, 80, 0, 24)
-    bindBtn.Position = UDim2.new(1, -150, 0.5, -12)
-    bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    bindBtn.Text = defaultBind and defaultBind.Name or "None"
-    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    bindBtn.Font = Enum.Font.Gotham
-    bindBtn.TextSize = 12
-    Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 80, 0, 24)
+    btn.Position = UDim2.new(1, -95, 0.5, -12)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = (defaultBind and defaultBind ~= Enum.KeyCode.Unknown) and defaultBind.Name or "None"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    if uiName then btn.Name = uiName end
 
     btn.MouseButton1Click:Connect(function()
-        local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-        btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        onToggle(newState)
-        updateHUD()
-    end)
-
-    bindBtn.MouseButton1Click:Connect(function()
-        if BindWait then return end
-        bindBtn.Text = "..."
+        if BindWait then return end 
+        btn.Text = "..."
         BindWait = function(key)
             bindTable[bindKeyName] = key
             local kn = key.Name
-            if key == Enum.UserInputType.MouseButton1 then kn = "LMB"
-            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB"
+            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
+            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
+            elseif key == Enum.KeyCode.Unknown then kn = "None"
             end
-            bindBtn.Text = kn
-            BindWait = nil
+            btn.Text = kn
+            BindWait = nil 
         end
     end)
+    return 35
 end
 
 -- === СИСТЕМА КОНФИГОВ ===
 
 local function GetConfigTable()
     return {
-        TeamCheck = Mono.TeamCheck,
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
@@ -1213,12 +1103,12 @@ local function GetConfigTable()
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
         ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
         TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
-        OffScreenArrows = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
+        OffArrE = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
         OffArr_R = Mono.OffScreenArrows.Color.R, OffArr_G = Mono.OffScreenArrows.Color.G, OffArr_B = Mono.OffScreenArrows.Color.B,
         CrossE = Mono.Crosshair.Enabled, CrossS = Mono.Crosshair.Size, CrossG = Mono.Crosshair.Gap, CrossT = Mono.Crosshair.Thickness,
         Cross_R = Mono.Crosshair.Color.R, Cross_G = Mono.Crosshair.Color.G, Cross_B = Mono.Crosshair.Color.B,
         CrossHide = Mono.Crosshair.HideDefault,
-        CrossK = Mono.Crosshair.Key.Name, -- КЛЮЧ БИНДА СКРЫТИЯ КУРСОРA В КОНФИГЕ
+        CrossK = (Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown) and Mono.Crosshair.Key.Name or "Unknown",
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
@@ -1255,7 +1145,6 @@ end
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
     setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
-    setToggleStateUI("Team Check", Mono.TeamCheck)
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
     setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
@@ -1303,7 +1192,6 @@ local function ApplyConfigToUI()
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
             end
-            -- Обновление отображения бинда мышки на UI
             if v:IsA("TextButton") and v.Name == "CrossBindBtn" then
                 v.Text = (Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown) and Mono.Crosshair.Key.Name or "None"
             end
@@ -1313,7 +1201,6 @@ local function ApplyConfigToUI()
 end
 
 local function LoadConfigFromTable(dec)
-    Mono.TeamCheck = dec.TeamCheck or false
     Mono.Aimbot.Enabled = dec.AimbotE or false
     Mono.Aimbot.Mode = dec.AimMode or "Rage 😡"
     Mono.Aimbot.Smoothness = dec.AimSmooth or 0.2
@@ -1419,7 +1306,6 @@ createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabl
 end, "Automatically aims at enemies.")
 
 createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
-createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end, "Ignores players on the same team.")
 
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end, "FOVRadInput")
@@ -1446,7 +1332,6 @@ createToggleWithSettings(visualsPage, "Custom Crosshair", Mono.Crosshair.Enabled
     local h3 = createSubInput(container, "Thickness", tostring(Mono.Crosshair.Thickness), function(val) Mono.Crosshair.Thickness = tonumber(val) or 2 end, "CrossTInput")
     local h4 = createSubColorPicker(container, "Color", Mono.Crosshair.Color, function(c) Mono.Crosshair.Color = c end, "CrossCol")
     local h5 = createSubToggle(container, "Hide Default Mouse", Mono.Crosshair.HideDefault, function(s) Mono.Crosshair.HideDefault = s end, "CrossHideToggle")
-    -- ДОБАВИЛИ КНОПКУ С БИНДОМ ВНУТРЬ МЕНЮ ПРИЦЕЛА
     local h6 = createSubBind(container, "Hide Mouse Key", Mono.Crosshair.Key, Mono.Crosshair, "Key", "CrossBindBtn")
     return h1 + h2 + h3 + h4 + h5 + h6 + 5
 end, "Draws a custom crosshair in the center of your screen.")
@@ -1636,8 +1521,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
         updateHUD()
     end
-
-    -- ОБРАБОТКА НАЖАТИЯ БИНДА ДЛЯ СКРЫТИЯ МЫШКИ
+    
     if Mono.Crosshair.Key and key == Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown then
         Mono.Crosshair.HideDefault = not Mono.Crosshair.HideDefault
         pcall(function()
@@ -1673,6 +1557,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -1694,7 +1579,7 @@ mobileToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- === ЧИСТЫЙ БЕЗОПАСНЫЙ КЛИКЕР ROBLOX ===
+-- === ЯДРО ЧИТА ===
 local function simulateClick()
     coroutine.wrap(function()
         pcall(function()
@@ -1710,7 +1595,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    if Mono.TeamCheck and plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
     return true
@@ -1767,6 +1652,22 @@ local function getClosestVisibleEnemy()
     end
     return closestTarget
 end
+
+Players.PlayerRemoving:Connect(function(plr)
+    pcall(function()
+        if espCache[plr] then
+            if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
+            if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
+            if espCache[plr].Orbits then
+                for _, orb in ipairs(espCache[plr].Orbits) do orb.gui:Destroy() end
+            end
+            if espCache[plr].Arrow then espCache[plr].Arrow:Destroy() end
+            espCache[plr] = nil
+        end
+        DeadCache[plr] = nil
+        PlayerData[plr] = nil
+    end)
+end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
 local espCache = {}
@@ -1896,7 +1797,9 @@ local function updateESP()
 
                 for i, orb in ipairs(espCache[plr].Orbits) do
                     orb.gui.Enabled = true
-                    if orb.gui.Adornee ~= targetPart then orb.gui.Adornee = targetPart end
+                    if orb.gui.Adornee ~= targetPart then 
+                        orb.gui.Adornee = targetPart 
+                    end
                     orb.text.Text = Mono.OrbitEmoji
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
@@ -1904,7 +1807,9 @@ local function updateESP()
                 end
             else
                 if espCache[plr] and espCache[plr].Orbits then
-                    for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end
+                    for _, orb in ipairs(espCache[plr].Orbits) do
+                        orb.gui.Enabled = false
+                    end
                 end
             end
             
@@ -1967,7 +1872,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v34 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v37 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
