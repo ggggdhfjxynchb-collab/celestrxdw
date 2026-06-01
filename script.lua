@@ -1090,6 +1090,72 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 end
 
+-- === НЕДОСТАЮЩАЯ ФУНКЦИЯ ДЛЯ ТРИГГЕРБОТА (БЕЗ НАСТРОЕК) ===
+local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, tooltip)
+    local container = Instance.new("Frame", parent)
+    container.Name = text
+    container.Size = UDim2.new(1, 0, 0, 35)
+    container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    container.BackgroundTransparency = 0.4
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+
+    local topBar = Instance.new("Frame", container)
+    topBar.Size = UDim2.new(1, 0, 0, 35)
+    topBar.BackgroundTransparency = 1
+
+    local btn = Instance.new("TextButton", topBar)
+    btn.Name = "MainBtn"
+    btn.Size = UDim2.new(1, -160, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = "  " .. text
+    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 13
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+
+    handleTooltip(btn, tooltip)
+
+    local status = Instance.new("Frame", topBar)
+    status.Name = "Status"
+    status.Size = UDim2.new(0, 14, 0, 14)
+    status.Position = UDim2.new(1, -60, 0.5, -7)
+    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+
+    local bindBtn = Instance.new("TextButton", topBar)
+    bindBtn.Name = "BindBtn"
+    bindBtn.Size = UDim2.new(0, 80, 0, 24)
+    bindBtn.Position = UDim2.new(1, -150, 0.5, -12)
+    bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    bindBtn.Text = defaultBind and defaultBind.Name or "None"
+    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindBtn.Font = Enum.Font.Gotham
+    bindBtn.TextSize = 12
+    Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseButton1Click:Connect(function()
+        local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
+        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        onToggle(newState)
+        updateHUD()
+    end)
+
+    bindBtn.MouseButton1Click:Connect(function()
+        if BindWait then return end
+        bindBtn.Text = "..."
+        BindWait = function(key)
+            bindTable[bindKeyName] = key
+            local kn = key.Name
+            if key == Enum.UserInputType.MouseButton1 then kn = "LMB"
+            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB"
+            end
+            bindBtn.Text = kn
+            BindWait = nil
+        end
+    end)
+end
+
 -- === СИСТЕМА КОНФИГОВ ===
 
 local function GetConfigTable()
