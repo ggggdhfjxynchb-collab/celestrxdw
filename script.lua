@@ -21,7 +21,7 @@ pcall(function()
     if oldBlur then oldBlur:Destroy() end
 end)
 
--- === 2. НАСТРОЙКИ ЧИТА (ВСЕ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ) ===
+-- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2 },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
@@ -90,6 +90,35 @@ local function SaveSlotNames()
     end)
 end
 
+-- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (МЫШЬ + СЕНСОР) ===
+local function makeDraggable(frame)
+    local dragging, dragInput, dragStart, startPos
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            local c; c = UserInputService.InputEnded:Connect(function(e)
+                if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then 
+                    dragging = false
+                    c:Disconnect() 
+                end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
+            dragInput = input 
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
 -- === ОПТИМИЗАЦИЯ ЛУЧЕЙ ===
 local GlobalRayParams = RaycastParams.new()
 GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -135,10 +164,12 @@ watermarkFrame.Position = UDim2.new(1, -260, 0, 10)
 watermarkFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 30)
 watermarkFrame.BackgroundTransparency = 0.2
 watermarkFrame.BorderSizePixel = 0
+watermarkFrame.Active = true 
 Instance.new("UICorner", watermarkFrame).CornerRadius = UDim.new(0, 6)
 local watermarkStroke = Instance.new("UIStroke", watermarkFrame)
 watermarkStroke.Color = Color3.fromRGB(180, 130, 255)
 watermarkStroke.Thickness = 1
+makeDraggable(watermarkFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМОЙ
 
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
@@ -329,12 +360,14 @@ end
 -- === ВОЗВРАЩЕННЫЙ STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
-hudFrame.Position = UDim2.new(1, -160, 0, 10)
+hudFrame.Position = UDim2.new(1, -160, 0, 60)
 hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 hudFrame.BackgroundTransparency = 0.2
 hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
+hudFrame.Active = true
 Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
+makeDraggable(hudFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМЫМ
 
 local hudList = Instance.new("UIListLayout", hudFrame)
 hudList.Padding = UDim.new(0, 5)
@@ -397,8 +430,10 @@ mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
+makeDraggable(mainFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМЫМ (СЕНСОР + МЫШЬ)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
 bgGradient.Color = ColorSequence.new({
@@ -876,7 +911,6 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     end)
 end
 
--- НОВАЯ ФУНКЦИЯ: ТОГЛ С БИНДОМ И НАСТРОЙКАМИ (ШЕСТЕРЕНКОЙ)
 local function createToggleWithBindAndSettings(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, buildSettingsFunc, tooltip)
     local container = Instance.new("Frame", parent)
     container.Name = text
@@ -1115,7 +1149,7 @@ local function ApplyConfigToUI()
         for _, v in pairs(contentArea:GetDescendants()) do
             if v:IsA("TextButton") and v.Name == "BindBtn" then
                 if v.Parent.Parent.Name == "Aimbot (Toggle)" then v.Text = Mono.Aimbot.Key.Name end
-                if v.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
+                if v.Parent.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
             end
             if v:IsA("TextBox") then
                 if v.Name == "FOVRadInput" then v.Text = tostring(Mono.FOV.Radius) end
@@ -1449,12 +1483,12 @@ activeBtn = combatBtn
 -- === ПЕРЕТАСКИВАНИЕ ===
 local dragging, dragInput, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = mainFrame.Position
         local c; c = UserInputService.InputEnded:Connect(function(e)
-            if e.UserInputType == Enum.UserInputType.MouseButton1 then 
+            if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then 
                 dragging = false
                 c:Disconnect() 
             end
@@ -1463,7 +1497,7 @@ mainFrame.InputBegan:Connect(function(input)
 end)
 
 mainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then 
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
         dragInput = input 
     end
 end)
@@ -1690,7 +1724,11 @@ local function updateESP()
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
+                    tl.Size = UDim2.new(1, 0, 1, 0)
+                    tl.BackgroundTransparency = 1
+                    tl.Font = Enum.Font.GothamBold
+                    tl.TextSize = 12
+                    tl.TextStrokeTransparency = 0
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
@@ -1757,7 +1795,7 @@ local function updateESP()
                 end
             end
             
-            -- OFF-SCREEN ARROWS (ПРИВЛЕКАТЕЛЬНЫЕ СТРЕЛКИ С ОБВОДКОЙ)
+            -- OFF-SCREEN ARROWS
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
@@ -1822,7 +1860,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v33 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v32 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
