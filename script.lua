@@ -49,7 +49,7 @@ local Mono = {
     KillColor = Color3.fromRGB(255, 50, 50), 
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
-    Tracers = { Enabled = false, Color = Color3.fromRGB(255, 255, 255) }, -- НОВЫЕ ТРЕЙСЕРЫ ПУЛЬ
+    Tracers = { Enabled = false, Color = Color3.fromRGB(255, 255, 255) },
     
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
@@ -57,7 +57,7 @@ local Mono = {
     WeatherEnabled = false,
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
-    CleanWorld = false, -- ЖЕСТКИЙ ФПС БУСТ
+    CleanWorld = false, 
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
@@ -422,6 +422,23 @@ local function doKillEffect()
     end)
 end
 
+-- === ФУНКЦИЯ ФИЛЬТРАЦИИ ОРУЖИЯ ===
+-- Проверяет, держит ли игрок огнестрел (а не нож/кулаки)
+local function isHoldingGun()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return false end 
+    
+    local n = string.lower(tool.Name)
+    if string.find(n, "knife") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "melee") or string.find(n, "fist") or string.find(n, "bat") or string.find(n, "punch") or string.find(n, "hand") then
+        return false
+    end
+    
+    return true
+end
+
 -- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
 local function createTracer(startPos, endPos)
     if not Mono.Tracers.Enabled then return end
@@ -438,14 +455,14 @@ local function createTracer(startPos, endPos)
             tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
             tracer.Parent = workspace
             
-            local ts = TweenService:Create(tracer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            -- Трейсер плавно исчезает 1.5 секунды
+            local ts = TweenService:Create(tracer, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Transparency = 1, 
                 Size = Vector3.new(0, 0, distance)
             })
             ts:Play()
-            ts.Completed:Connect(function()
-                tracer:Destroy()
-            end)
+            
+            game.Debris:AddItem(tracer, 1.6)
         end)
     end)
 end
@@ -520,7 +537,7 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -627,7 +644,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.SortOrder = Enum.SortOrder.LayoutOrder -- ФИКС СОРТИРОВКИ! ЖЕСТКО ЗАДАЕМ ПОРЯДОК
+    pLayout.SortOrder = Enum.SortOrder.LayoutOrder
     pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
@@ -679,7 +696,7 @@ local function createSectionHeader(parent, text)
     frame.BackgroundColor3 = Color3.new(Mono.ThemeColor.R * 0.7, Mono.ThemeColor.G * 0.7, Mono.ThemeColor.B * 0.7)
     frame.BackgroundTransparency = 0.8
     frame.BorderSizePixel = 0
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    frame.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
     
     local stroke = Instance.new("UIStroke", frame)
@@ -705,7 +722,7 @@ local function createButton(parent, text, callback, tooltip)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
     frame.BackgroundTransparency = 0.2
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    frame.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -734,7 +751,7 @@ local function createInput(parent, text, defaultText, callback, uiName)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    frame.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel", frame)
@@ -947,7 +964,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
     frame.ClipsDescendants = true
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    frame.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local mainBtn = Instance.new("TextButton", frame)
@@ -1013,7 +1030,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    frame.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -1050,8 +1067,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
-    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    frame.LayoutOrder = #parent:GetChildren()
 
     local topBar = Instance.new("Frame", frame)
     topBar.Size = UDim2.new(1, 0, 0, 35)
@@ -1118,7 +1134,7 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
     container.ClipsDescendants = true 
-    container.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    container.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -1211,7 +1227,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
     container.ClipsDescendants = true 
-    container.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
+    container.LayoutOrder = #parent:GetChildren()
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -1919,6 +1935,23 @@ combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
 
+-- === ФУНКЦИЯ ФИЛЬТРАЦИИ ОРУЖИЯ ===
+-- Проверяет, держит ли игрок огнестрел (а не нож/кулаки)
+local function isHoldingGun()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return false end 
+    
+    local n = string.lower(tool.Name)
+    if string.find(n, "knife") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "melee") or string.find(n, "fist") or string.find(n, "bat") or string.find(n, "punch") or string.find(n, "hand") then
+        return false
+    end
+    
+    return true
+end
+
 -- === ФУНКЦИЯ ОТРИСОВКИ ТРЕЙСЕРОВ ===
 local function createTracer(startPos, endPos)
     if not Mono.Tracers.Enabled then return end
@@ -1935,14 +1968,14 @@ local function createTracer(startPos, endPos)
             tracer.CFrame = CFrame.lookAt(startPos, endPos) * CFrame.new(0, 0, -distance / 2)
             tracer.Parent = workspace
             
-            local ts = TweenService:Create(tracer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            -- Трейсер плавно исчезает 1.5 секунды
+            local ts = TweenService:Create(tracer, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Transparency = 1, 
                 Size = Vector3.new(0, 0, distance)
             })
             ts:Play()
-            ts.Completed:Connect(function()
-                tracer:Destroy()
-            end)
+            
+            game.Debris:AddItem(tracer, 1.6)
         end)
     end)
 end
@@ -1958,8 +1991,9 @@ UserInputService.InputBegan:Connect(function(input, gp)
         return
     end
 
+    -- РУЧНАЯ СТРЕЛЬБА ДЛЯ ТРЕЙСЕРОВ
     if not gp and input.UserInputType == Enum.UserInputType.MouseButton1 then
-        if Mono.Tracers.Enabled then
+        if Mono.Tracers.Enabled and isHoldingGun() then
             pcall(function()
                 local mouseLocation = UserInputService:GetMouseLocation()
                 local ray = Camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y - 36)
@@ -1990,6 +2024,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
+    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2035,6 +2070,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -2058,7 +2094,7 @@ end)
 
 -- === ЧИСТЫЙ БЕЗОПАСНЫЙ КЛИКЕР ROBLOX ===
 local function simulateClick(targetPos)
-    if Mono.Tracers.Enabled and targetPos then
+    if Mono.Tracers.Enabled and targetPos and isHoldingGun() then
         pcall(function()
             local startP = Camera.CFrame.Position
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") then
@@ -2081,6 +2117,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
+    -- Вшитая проверка на тиму (TeamCheck всегда работает)
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2361,7 +2398,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v41 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v42 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
