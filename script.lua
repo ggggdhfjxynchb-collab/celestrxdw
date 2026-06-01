@@ -35,12 +35,12 @@ local Mono = {
     Speed = { Enabled = false, Value = 50 },
     Push = { Enabled = false, Key = Enum.KeyCode.F },
     
-    GodMode = false, -- НОВАЯ ФУНКЦИЯ БЕССМЕРТИЯ
+    GodMode = false,
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
-    AbilityESP = false, -- НОВАЯ ФУНКЦИЯ ОТОБРАЖЕНИЯ АБИЛОК
+    AbilityESP = false, 
     
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
@@ -494,9 +494,9 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 500, 370)
+mainFrame.Size = UDim2.new(0, 500, 0, 370) -- ИСПРАВЛЕНА ОШИБКА: РАЗМЕР В ПИКСЕЛЯХ
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -601,7 +601,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
-    pLayout.SortOrder = Enum.SortOrder.LayoutOrder 
+    pLayout.SortOrder = Enum.SortOrder.LayoutOrder
     pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
@@ -874,7 +874,7 @@ local function createSubColorPicker(parent, text, defaultColor, callback, uiName
     
     if uiName then colorPreview.Name = uiName end
 
-    local hueFrame = Instance.new("Frame", parent)
+    local hueFrame = Instance.new("Frame", frame)
     hueFrame.Size = UDim2.new(0.9, 0, 0, 10)
     hueFrame.Position = UDim2.new(0.05, 0, 0, 30)
     Instance.new("UICorner", hueFrame).CornerRadius = UDim.new(0, 4)
@@ -1924,6 +1924,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
+    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2007,6 +2008,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
+    -- Вшитая проверка на тиму (TeamCheck всегда работает)
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2325,7 +2327,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v43 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v44 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
