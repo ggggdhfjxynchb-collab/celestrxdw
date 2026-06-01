@@ -34,14 +34,14 @@ local Mono = {
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
     
-    -- НОВЫЕ ФУНКЦИИ KNIFE
-    Speed = { Enabled = false, Value = 50 },
-    Push = { Enabled = false, Key = Enum.KeyCode.F },
-    
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
     Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
+    
+    Speed = { Enabled = false, Value = 50 },
+    Push = { Enabled = false, Key = Enum.KeyCode.F },
+    
     KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
@@ -451,7 +451,7 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -603,17 +603,25 @@ end
 -- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
-    frame.Size = UDim2.new(1, 0, 0, 20)
-    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 26)
+    frame.BackgroundColor3 = Color3.fromRGB(130, 80, 200)
+    frame.BackgroundTransparency = 0.8
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
+    
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(180, 130, 255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.2
     
     local lbl = Instance.new("TextLabel", frame)
     lbl.Size = UDim2.new(1, 0, 1, 0)
     lbl.BackgroundTransparency = 1
-    lbl.Text = "  --- " .. text .. " ---"
-    lbl.TextColor3 = Color3.fromRGB(180, 130, 255)
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
     lbl.Font = Enum.Font.GothamBlack
-    lbl.TextSize = 14
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Center
     
     return frame
 end
@@ -1440,7 +1448,7 @@ end
 -- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
 
 -- 1. COMBAT
-createSectionHeader(combatPage, "GUN")
+createSectionHeader(combatPage, "🔫 GUN SETTINGS")
 
 createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", function(container)
     local h1 = createSubCycleButton(container, "Mode", {"Rage 😡", "Legit 🎯"}, Mono.Aimbot.Mode == "Rage 😡" and 1 or 2, function(val) Mono.Aimbot.Mode = val end, "AimModeBtn")
@@ -1456,7 +1464,7 @@ createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, functi
     return h1 + h2 + 5
 end, "Shows the area where Aimbot and TriggerBot work.")
 
-createSectionHeader(combatPage, "KNIFE")
+createSectionHeader(combatPage, "🔪 KNIFE & MOVEMENT")
 
 createToggleWithSettings(combatPage, "Speeds", Mono.Speed.Enabled, function(s) 
     Mono.Speed.Enabled = s 
@@ -1469,7 +1477,6 @@ end, function(container)
 end, "Увеличивает вашу скорость.")
 
 createToggleWithBind(combatPage, "Push", Mono.Push.Enabled, Mono.Push.Key, function(s) Mono.Push.Enabled = s end, Mono.Push, "Key", "Подбрасывает вас вверх (можно спамить в воздухе).")
-
 
 -- 2. VISUALS
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
@@ -1686,7 +1693,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         if char then
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if hrp then
-                -- Подбрасываем вверх, сохраняя скорость движения
                 hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 50, hrp.AssemblyLinearVelocity.Z)
             end
         end
@@ -2048,7 +2054,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             lastUpdate = tick()
         end
         
-        -- ФУНКЦИЯ SPEEDS (РАБОТАЕТ ПОСТОЯННО)
+        -- ФУНКЦИЯ SPEEDS (РАБОТАЕТ ПОСТОЯННО ЕСЛИ ВКЛЮЧЕНА)
         if Mono.Speed.Enabled then
             local char = LocalPlayer.Character
             if char then
