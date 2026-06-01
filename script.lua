@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
@@ -23,7 +24,6 @@ local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
-    -- НАСТРОЙКИ КРУГА FOV
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     
     ESP = { Enabled = false, MaxDistance = 350 },
@@ -48,7 +48,6 @@ local Mono = {
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
     
-    -- НАСТРОЙКИ СИСТЕМЫ КОНФИГОВ
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
     
@@ -61,7 +60,7 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- === ЗАГРУЗКА И СОХРАНЕНИЕ НАЗВАНИЙ СЛОТОВ БЕЗ JSON ===
+-- Загрузка названий слотов конфигов при старте
 pcall(function()
     if readfile then
         local content = readfile("MonoSlotNames.txt")
@@ -265,13 +264,77 @@ local function doKillEffect()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
-local mainFrame = Instance.new("Frame")
+-- === ВОЗВРАЩЕННЫЙ STATUS HUD (ПАНЕЛЬ АКТИВНЫХ ФУНКЦИЙ) ===
+local hudFrame = Instance.new("Frame", screenGui)
+hudFrame.Size = UDim2.new(0, 150, 0, 0)
+hudFrame.Position = UDim2.new(1, -160, 0, 10)
+hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+hudFrame.BackgroundTransparency = 0.2
+hudFrame.BorderSizePixel = 0
+hudFrame.ClipsDescendants = true 
+Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
+
+local hudList = Instance.new("UIListLayout", hudFrame)
+hudList.Padding = UDim.new(0, 5)
+hudList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+hudList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local hudTitle = Instance.new("TextLabel", hudFrame)
+hudTitle.Name = "0_Title"
+hudTitle.Size = UDim2.new(1, 0, 0, 30)
+hudTitle.BackgroundTransparency = 1
+hudTitle.Text = "MONOGRAMMA"
+hudTitle.TextColor3 = Color3.fromRGB(180, 130, 255)
+hudTitle.Font = Enum.Font.GothamBlack
+hudTitle.TextSize = 12
+
+local function updateHUD()
+    pcall(function()
+        for _, v in pairs(hudFrame:GetChildren()) do
+            if v:IsA("TextLabel") and v.Name ~= "0_Title" then 
+                v:Destroy() 
+            end
+        end
+
+        local activeCount = 0
+        local function addActiveFeature(name)
+            activeCount = activeCount + 1
+            local lbl = Instance.new("TextLabel", hudFrame)
+            lbl.Name = "1_" .. name
+            lbl.Size = UDim2.new(1, -20, 0, 20)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.TextSize = 12
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            
+            local dot = Instance.new("Frame", lbl)
+            dot.Size = UDim2.new(0, 6, 0, 6)
+            dot.Position = UDim2.new(1, -10, 0.5, -3)
+            dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        end
+
+        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot") end
+        if Mono.AutoTap.Enabled then addActiveFeature("Auto Tap") end
+        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
+        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
+        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
+        if Mono.WeatherEnabled then addActiveFeature("Weather") end
+
+        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
+        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
+    end)
+end
+
+-- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
+local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
-mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5) -- Идеальный центр для анимации
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- Идеальный центр для анимации
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
@@ -285,12 +348,11 @@ bgGradient.Rotation = 45
 local uiScale = Instance.new("UIScale", mainFrame)
 uiScale.Scale = 1
 
-local unlockMouseBtn = Instance.new("TextButton")
+local unlockMouseBtn = Instance.new("TextButton", mainFrame)
 unlockMouseBtn.Size = UDim2.new(0, 0, 0, 0)
 unlockMouseBtn.BackgroundTransparency = 1
 unlockMouseBtn.Text = ""
 unlockMouseBtn.Modal = true
-unlockMouseBtn.Parent = mainFrame
 
 local uiStroke = Instance.new("UIStroke", mainFrame)
 uiStroke.Thickness = 1
@@ -396,7 +458,7 @@ local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
--- Обновление UI из кода
+-- Обновление кнопок меню из кода
 local function setToggleStateUI(frameName, state)
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
@@ -611,6 +673,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
                 Size = UDim2.new(1, 0, 0, 35)
             }):Play()
             callback(opt)
+            updateHUD()
         end)
     end
 end
@@ -645,6 +708,7 @@ local function createToggle(parent, text, defaultState, onToggle)
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState)
+        updateHUD()
     end)
 end
 
@@ -689,6 +753,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
+        updateHUD()
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
@@ -758,6 +823,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
+        updateHUD()
     end)
 
     local isOpen = false
@@ -769,7 +835,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 end
 
--- === НОВЫЙ КАСТОМНЫЙ ТЕКСТОВЫЙ ФОРМАТ КОНФИГОВ ===
+-- === СИСТЕМА КОНФИГОВ (ЧИСТЫЙ ТЕКСТОВЫЙ ФОРМАТ .TXT) ===
 
 local function GetConfigTable()
     return {
@@ -798,7 +864,6 @@ local function GetConfigTable()
     }
 end
 
--- Кодируем таблицу в обычный текст (Key=Value)
 local function EncodeTXT(tbl)
     local str = ""
     for k, v in pairs(tbl) do
@@ -807,7 +872,6 @@ local function EncodeTXT(tbl)
     return str
 end
 
--- Декодируем обычный текст обратно в таблицу
 local function DecodeTXT(str)
     local tbl = {}
     for line in string.gmatch(str, "[^\r\n]+") do
@@ -867,6 +931,7 @@ local function ApplyConfigToUI()
             end
         end
     end)
+    updateHUD()
 end
 
 local function LoadConfigFromTable(dec)
@@ -1086,7 +1151,6 @@ updateSlotSelection()
 createButton(settingsPage, "💾 Save Selected Config", SaveConfig)
 createButton(settingsPage, "📂 Load Selected Config", LoadConfig)
 
--- БЛОК ИМПОРТА И ЭКСПОРТА 
 local importTitle = Instance.new("TextLabel", settingsPage)
 importTitle.Size = UDim2.new(1, 0, 0, 20)
 importTitle.BackgroundTransparency = 1
@@ -1106,7 +1170,7 @@ importBox.Size = UDim2.new(1, -20, 1, 0)
 importBox.Position = UDim2.new(0, 10, 0, 0)
 importBox.BackgroundTransparency = 1
 importBox.Text = ""
-importBox.PlaceholderText = "Paste your friend's config code here..."
+importBox.PlaceholderText = "Paste your friend's config text here..."
 importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 importBox.Font = Enum.Font.Gotham
 importBox.TextSize = 12
@@ -1123,16 +1187,17 @@ local function ManualImport()
             showNotification("📥 Imported successfully!", Color3.fromRGB(100, 150, 255))
             importBox.Text = "" 
         else
-            showNotification("❌ Invalid Config Code!", Color3.fromRGB(255, 50, 50))
+            showNotification("❌ Invalid Config Text!", Color3.fromRGB(255, 50, 50))
         end
     else
-        showNotification("❌ Paste code first!", Color3.fromRGB(255, 50, 50))
+        showNotification("❌ Paste text first!", Color3.fromRGB(255, 50, 50))
     end
 end
 
 createButton(settingsPage, "📥 Import from Textbox", ManualImport)
 createButton(settingsPage, "📋 Export to Clipboard", ExportConfig)
 
+updateHUD() 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
@@ -1184,11 +1249,13 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if key == Mono.Aimbot.Key then
         Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
         setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
+        updateHUD()
     end
 
     if key == Mono.AutoTap.Key then
         Mono.AutoTap.Enabled = not Mono.AutoTap.Enabled
         setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
+        updateHUD()
     end
 
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -1197,6 +1264,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         
         if Mono.MenuOpen then
             mainFrame.Visible = true
+            -- Открытие из центра
             TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         else
             local tw = TweenService:Create(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
