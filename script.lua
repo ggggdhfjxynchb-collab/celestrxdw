@@ -25,7 +25,6 @@ end)
 local Mono = {
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
     AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
-    AutoStrafe = { Enabled = false }, -- НОВОЕ: АВТО-УКЛОНЕНИЕ
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     
@@ -36,8 +35,8 @@ local Mono = {
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     
-    OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, -- НОВОЕ: РАДАР
-    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255) }, -- НОВОЕ: ПРИЦЕЛ
+    OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
+    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false }, 
     
     KillEffect = false,
     KillEmoji = "💀", 
@@ -57,7 +56,7 @@ local Mono = {
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
     
-    WatermarkEnabled = true, -- НОВОЕ: ВОТЕРМАРКА
+    WatermarkEnabled = true, 
     MenuOpen = true
 }
 
@@ -327,7 +326,7 @@ local function doKillEffect()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ (С АНИМАЦИЕЙ ИЗ ЦЕНТРА) ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -441,7 +440,10 @@ local function createTab(name, icon)
             activeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
             activeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
-        for _, p in pairs(Pages) do p.Visible = false end
+        for _, p in pairs(Pages) do 
+            p.Visible = false 
+        end
+        
         btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         page.Visible = true
@@ -530,6 +532,43 @@ local function createSubInput(parent, text, defaultText, callback, uiName)
         if box.Text == "" then box.Text = defaultText end
         callback(box.Text)
     end)
+    return 35
+end
+
+local function createSubToggle(parent, text, defaultState, callback, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "    -> " .. text
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 40, 0, 20)
+    btn.Position = UDim2.new(1, -55, 0.5, -10)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = defaultState and "ON" or "OFF"
+    btn.TextColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 10
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    if uiName then btn.Name = uiName end
+
+    local state = defaultState
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = state and "ON" or "OFF"
+        btn.TextColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+        callback(state)
+    end)
+    
     return 35
 end
 
@@ -828,7 +867,6 @@ local function GetConfigTable()
         TeamCheck = Mono.TeamCheck,
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name,
         AutoTapE = Mono.AutoTap.Enabled, AutoTapK = Mono.AutoTap.Key.Name,
-        AutoStrafeE = Mono.AutoStrafe.Enabled,
         
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
@@ -843,6 +881,7 @@ local function GetConfigTable()
         
         CrossE = Mono.Crosshair.Enabled, CrossS = Mono.Crosshair.Size, CrossG = Mono.Crosshair.Gap, CrossT = Mono.Crosshair.Thickness,
         Cross_R = Mono.Crosshair.Color.R, Cross_G = Mono.Crosshair.Color.G, Cross_B = Mono.Crosshair.Color.B,
+        CrossHide = Mono.Crosshair.HideDefault,
         
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
@@ -883,7 +922,6 @@ end
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
     setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
-    setToggleStateUI("Auto Strafe (Slide)", Mono.AutoStrafe.Enabled)
     setToggleStateUI("Team Check", Mono.TeamCheck)
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
@@ -928,6 +966,10 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "TimeDrop" then 
                 v.Text = "  Time of Day: " .. Mono.TimeOfDay 
             end
+            if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
+                v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
+                v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+            end
         end
     end)
 end
@@ -938,7 +980,6 @@ local function LoadConfigFromTable(dec)
     pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
     Mono.AutoTap.Enabled = dec.AutoTapE or false
     pcall(function() Mono.AutoTap.Key = Enum.KeyCode[dec.AutoTapK] or Enum.UserInputType[dec.AutoTapK] end)
-    Mono.AutoStrafe.Enabled = dec.AutoStrafeE or false
 
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
@@ -960,6 +1001,7 @@ local function LoadConfigFromTable(dec)
     Mono.Crosshair.Gap = dec.CrossG or 4
     Mono.Crosshair.Thickness = dec.CrossT or 2
     Mono.Crosshair.Color = Color3.new(dec.Cross_R or 1, dec.Cross_G or 1, dec.Cross_B or 1)
+    Mono.Crosshair.HideDefault = dec.CrossHide or false
     
     Mono.KillEffect = dec.KillEffE or false
     Mono.KillEmoji = dec.KillEmoji or "💀"
@@ -1027,7 +1069,6 @@ end
 -- 1. COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", "Automatically aims at enemies inside the FOV circle.")
 createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key", "Automatically shoots when an enemy is inside the FOV circle.")
-createToggle(combatPage, "Auto Strafe (Slide)", Mono.AutoStrafe.Enabled, function(s) Mono.AutoStrafe.Enabled = s end, "Automatically uses Left Control (Slide) when an enemy aims at you.")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end, "Ignores players on the same team.")
 
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
@@ -1054,7 +1095,8 @@ createToggleWithSettings(visualsPage, "Custom Crosshair", Mono.Crosshair.Enabled
     local h2 = createSubInput(container, "Center Gap", tostring(Mono.Crosshair.Gap), function(val) Mono.Crosshair.Gap = tonumber(val) or 4 end, "CrossGInput")
     local h3 = createSubInput(container, "Thickness", tostring(Mono.Crosshair.Thickness), function(val) Mono.Crosshair.Thickness = tonumber(val) or 2 end, "CrossTInput")
     local h4 = createSubColorPicker(container, "Color", Mono.Crosshair.Color, function(c) Mono.Crosshair.Color = c end, "CrossCol")
-    return h1 + h2 + h3 + h4 + 5
+    local h5 = createSubToggle(container, "Hide Default Mouse", Mono.Crosshair.HideDefault, function(s) Mono.Crosshair.HideDefault = s end, "CrossHideToggle")
+    return h1 + h2 + h3 + h4 + h5 + 5
 end, "Draws a custom crosshair in the center of your screen.")
 
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
@@ -1260,7 +1302,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- === ОБРАБОТКА НАЖАТИЙ ===
+-- === ОБРАБОТКА НАЖАТИЙ БИНДОВ И МЕНЮ ===
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
@@ -1533,17 +1575,23 @@ local function updateESP()
                 end
             end
             
-            -- OFF-SCREEN ARROWS
+            -- OFF-SCREEN ARROWS (ПРИВЛЕКАТЕЛЬНЫЕ СТРЕЛКИ С ОБВОДКОЙ)
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
                     local arr = Instance.new("TextLabel")
                     arr.Text = "▲"
                     arr.Font = Enum.Font.GothamBlack
-                    arr.TextSize = 20
+                    arr.TextSize = 22
                     arr.BackgroundTransparency = 1
                     arr.Size = UDim2.new(0, 20, 0, 20)
                     arr.AnchorPoint = Vector2.new(0.5, 0.5)
+                    
+                    local stroke = Instance.new("UIStroke", arr)
+                    stroke.Color = Color3.fromRGB(0, 0, 0)
+                    stroke.Thickness = 1.5
+                    stroke.Transparency = 0.2
+                    
                     arr.Parent = screenGui
                     espCache[plr].Arrow = arr
                 end
@@ -1563,24 +1611,6 @@ local function updateESP()
             else
                 if espCache[plr] and espCache[plr].Arrow then
                     espCache[plr].Arrow.Visible = false
-                end
-            end
-            
-            -- AUTO-STRAFE (СЛАЙД ПРИ ПРИЦЕЛИВАНИИ)
-            if Mono.AutoStrafe.Enabled and isEnem then
-                local head = char:FindFirstChild("Head")
-                if head and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local dirToUs = (LocalPlayer.Character.HumanoidRootPart.Position - head.Position).Unit
-                    local enemyLook = head.CFrame.LookVector
-                    local dot = dirToUs:Dot(enemyLook)
-                    
-                    if dot > 0.96 then 
-                        pcall(function()
-                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
-                            task.wait(0.1)
-                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftControl, false, game)
-                        end)
-                    end
                 end
             end
 
@@ -1624,7 +1654,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             fovFrame.Visible = false
         end
         
-        -- КАСТОМНЫЙ ПРИЦЕЛ
+        -- КАСТОМНЫЙ ПРИЦЕЛ И СКРЫТИЕ МЫШИ
         if Mono.Crosshair.Enabled then
             crosshairFolder.Parent = screenGui
             local cx = Camera.ViewportSize.X / 2
@@ -1638,8 +1668,15 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             chBot.Size = UDim2.new(0, t, 0, s); chBot.Position = UDim2.new(0, cx, 0, cy + g); chBot.BackgroundColor3 = col
             chLeft.Size = UDim2.new(0, s, 0, t); chLeft.Position = UDim2.new(0, cx - g, 0, cy); chLeft.BackgroundColor3 = col
             chRight.Size = UDim2.new(0, s, 0, t); chRight.Position = UDim2.new(0, cx + g, 0, cy); chRight.BackgroundColor3 = col
+            
+            if Mono.Crosshair.HideDefault then
+                UserInputService.MouseIconEnabled = false
+            else
+                UserInputService.MouseIconEnabled = true
+            end
         else
             crosshairFolder.Parent = nil
+            UserInputService.MouseIconEnabled = true
         end
         
         if Mono.TimeOfDay == "Day ☀️" then
