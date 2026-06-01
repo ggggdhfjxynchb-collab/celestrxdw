@@ -23,10 +23,7 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА (ВСЕ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ) ===
 local Mono = {
-    -- НОВОЕ: НАСТРОЙКИ ЛЕГИТ АИМБОТА
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2 },
-    
-    -- НОВОЕ: TRIGGERBOT ВМЕСТО АВТО-ТАПА
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
@@ -146,7 +143,7 @@ watermarkStroke.Thickness = 1
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v31 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v32 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -329,7 +326,7 @@ local function doKillEffect()
     end)
 end
 
--- === ВОЗВРАЩЕННЫЙ STATUS HUD (ПАНЕЛЬ АКТИВНЫХ ФУНКЦИЙ) ===
+-- === ВОЗВРАЩЕННЫЙ STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
 hudFrame.Position = UDim2.new(1, -160, 0, 10)
@@ -507,10 +504,7 @@ local function createTab(name, icon)
             activeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
             activeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
-        for _, p in pairs(Pages) do 
-            p.Visible = false 
-        end
-        
+        for _, p in pairs(Pages) do p.Visible = false end
         btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         page.Visible = true
@@ -586,8 +580,8 @@ local function createInput(parent, text, defaultText, callback, uiName)
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local box = Instance.new("TextBox", frame)
-    box.Size = UDim2.new(0, 80, 0, 24)
-    box.Position = UDim2.new(1, -95, 0.5, -12)
+    box.Size = UDim2.new(0, 120, 0, 24)
+    box.Position = UDim2.new(1, -130, 0.5, -12)
     box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     box.Text = defaultText
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -675,6 +669,42 @@ local function createSubToggle(parent, text, defaultState, callback, uiName)
         btn.Text = state and "ON" or "OFF"
         btn.TextColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
         callback(state)
+    end)
+    
+    return 35
+end
+
+local function createSubCycleButton(parent, text, options, defaultIndex, callback, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "    -> " .. text
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 80, 0, 24)
+    btn.Position = UDim2.new(1, -95, 0.5, -12)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = options[defaultIndex]
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    if uiName then btn.Name = uiName end
+
+    local currentIndex = defaultIndex
+    btn.MouseButton1Click:Connect(function()
+        currentIndex = currentIndex + 1
+        if currentIndex > #options then currentIndex = 1 end
+        btn.Text = options[currentIndex]
+        callback(options[currentIndex])
     end)
     
     return 35
@@ -842,6 +872,98 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState)
         updateHUD()
+    end)
+end
+
+-- === НОВАЯ СОВМЕЩЕННАЯ ФУНКЦИЯ ДЛЯ БИНДА И ШЕСТЕРЕНКИ ===
+local function createToggleWithBindAndSettings(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, buildSettingsFunc, tooltip)
+    local container = Instance.new("Frame", parent)
+    container.Name = text
+    container.Size = UDim2.new(1, 0, 0, 35) 
+    container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    container.BackgroundTransparency = 0.4
+    container.ClipsDescendants = true 
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
+
+    local topBar = Instance.new("Frame", container)
+    topBar.Size = UDim2.new(1, 0, 0, 35)
+    topBar.BackgroundTransparency = 1
+
+    local btn = Instance.new("TextButton", topBar)
+    btn.Name = "MainBtn"
+    btn.Size = UDim2.new(1, -160, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = "  " .. text
+    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 13
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+
+    handleTooltip(btn, tooltip)
+
+    local gearBtn = Instance.new("TextButton", topBar)
+    gearBtn.Size = UDim2.new(0, 24, 0, 24)
+    gearBtn.Position = UDim2.new(1, -30, 0.5, -12)
+    gearBtn.BackgroundTransparency = 1
+    gearBtn.Text = "⚙️"
+    gearBtn.TextSize = 14
+
+    local status = Instance.new("Frame", topBar)
+    status.Name = "Status"
+    status.Size = UDim2.new(0, 14, 0, 14)
+    status.Position = UDim2.new(1, -60, 0.5, -7)
+    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
+    
+    local bindBtn = Instance.new("TextButton", topBar)
+    bindBtn.Name = "BindBtn"
+    bindBtn.Size = UDim2.new(0, 80, 0, 24)
+    bindBtn.Position = UDim2.new(1, -150, 0.5, -12)
+    bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    bindBtn.Text = defaultBind and defaultBind.Name or "None"
+    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    bindBtn.Font = Enum.Font.Gotham
+    bindBtn.TextSize = 12
+    Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
+
+    local settingsFrame = Instance.new("Frame", container)
+    settingsFrame.Size = UDim2.new(1, 0, 0, 200) 
+    settingsFrame.Position = UDim2.new(0, 0, 0, 35)
+    settingsFrame.BackgroundTransparency = 1
+    
+    local sLayout = Instance.new("UIListLayout", settingsFrame)
+    sLayout.Padding = UDim.new(0, 5)
+    
+    local totalSettingsHeight = buildSettingsFunc(settingsFrame)
+
+    btn.MouseButton1Click:Connect(function() 
+        local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
+        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+        btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+        onToggle(newState) 
+        updateHUD()
+    end)
+
+    bindBtn.MouseButton1Click:Connect(function()
+        if BindWait then return end 
+        bindBtn.Text = "..."
+        BindWait = function(key)
+            bindTable[bindKeyName] = key
+            local kn = key.Name
+            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
+            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
+            end
+            bindBtn.Text = kn
+            BindWait = nil 
+        end
+    end)
+
+    local isOpen = false
+    gearBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        TweenService:Create(gearBtn, TweenInfo.new(0.3), {Rotation = isOpen and 90 or 0}):Play()
+        local targetSize = isOpen and (35 + totalSettingsHeight + 5) or 35
+        TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play()
     end)
 end
 
@@ -1052,7 +1174,7 @@ local function ApplyConfigToUI()
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
             if v:IsA("TextButton") and v.Name == "BindBtn" then
-                if v.Parent.Name == "Aimbot (Toggle)" then v.Text = Mono.Aimbot.Key.Name end
+                if v.Parent.Parent.Name == "Aimbot (Toggle)" then v.Text = Mono.Aimbot.Key.Name end
                 if v.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
             end
             if v:IsA("TextBox") then
@@ -1079,8 +1201,8 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "TimeDrop" then 
                 v.Text = "  Time of Day: " .. Mono.TimeOfDay 
             end
-            if v:IsA("TextButton") and v.Name == "AimModeDrop" then 
-                v.Text = "  Aimbot Mode: " .. Mono.Aimbot.Mode 
+            if v:IsA("TextButton") and v.Name == "AimModeBtn" then 
+                v.Text = Mono.Aimbot.Mode 
             end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
@@ -1187,9 +1309,11 @@ end
 -- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
 
 -- 1. COMBAT
-createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", "Automatically aims at enemies.")
-createDropdown(combatPage, "Aimbot Mode", {"Rage 😡", "Legit 🎯"}, 1, function(val) Mono.Aimbot.Mode = val end, "AimModeDrop")
-createInput(combatPage, "Aimbot Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
+createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", function(container)
+    local h1 = createSubCycleButton(container, "Mode", {"Rage 😡", "Legit 🎯"}, Mono.Aimbot.Mode == "Rage 😡" and 1 or 2, function(val) Mono.Aimbot.Mode = val end, "AimModeBtn")
+    local h2 = createSubInput(container, "Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
+    return h1 + h2 + 5
+end, "Automatically aims at enemies.")
 
 createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end, "Ignores players on the same team.")
@@ -1250,24 +1374,9 @@ end, "Applies a colored filter over the whole game.")
 createDropdown(worldPage, "Time of Day", {"Default", "Day ☀️", "Night 🌙"}, 1, function(val) Mono.TimeOfDay = val end, "TimeDrop")
 
 createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, function(s) Mono.WeatherEnabled = s end, function(container)
-    local mainBtn = Instance.new("TextButton", container)
-    mainBtn.Size = UDim2.new(1, 0, 0, 30)
-    mainBtn.BackgroundTransparency = 1
-    mainBtn.Text = "    -> Type: " .. Mono.WeatherType
-    mainBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-    mainBtn.Font = Enum.Font.Gotham
-    mainBtn.TextSize = 12
-    mainBtn.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local isCustom = false
-    mainBtn.MouseButton1Click:Connect(function()
-        isCustom = not isCustom
-        Mono.WeatherType = isCustom and "Custom ❄️" or "Rain 🌧️"
-        mainBtn.Text = "    -> Type: " .. Mono.WeatherType
-    end)
-    
+    local h1 = createSubCycleButton(container, "Type", {"Rain 🌧️", "Custom ❄️"}, Mono.WeatherType == "Rain 🌧️" and 1 or 2, function(val) Mono.WeatherType = val end)
     local h2 = createSubInput(container, "Custom Emoji", Mono.WeatherEmoji, function(val) Mono.WeatherEmoji = val end, "WeathEmojiInput")
-    return 30 + h2 + 5
+    return h1 + h2 + 5
 end, "Creates falling emojis (like rain or snow).")
 
 -- 4. SETTINGS
@@ -1701,7 +1810,7 @@ local function updateESP()
                 end
             end
             
-            -- OFF-SCREEN ARROWS (ПРИВЛЕКАТЕЛЬНЫЕ СТРЕЛКИ С ОБВОДКОЙ)
+            -- OFF-SCREEN ARROWS
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
@@ -1766,7 +1875,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v31 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v32 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -1831,7 +1940,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- НАСТОЯЩИЙ TRIGGERBOT (РАБОТАЕТ ОТ КРЕСТИКА ЭКРАНА)
+        -- НАСТОЯЩИЙ TRIGGERBOT
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCamera()
             if hitResult and hitResult.Instance then
@@ -1846,7 +1955,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
-                        -- ПРОСТОЙ КЛИК ЕСЛИ ИГРОК В ЦЕНТРЕ ИЛИ В РАДИУСЕ FOV
                         if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
                             LastTargetHit = targetPlayer
                             LastTargetTime = tick()
