@@ -3,7 +3,6 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
@@ -62,14 +61,17 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- Загрузка названий слотов конфигов при старте (БЕЗ isfile)
+-- === ЗАГРУЗКА И СОХРАНЕНИЕ НАЗВАНИЙ СЛОТОВ БЕЗ JSON ===
 pcall(function()
     if readfile then
         local content = readfile("MonoSlotNames.txt")
         if content and content ~= "" then
-            local decoded = HttpService:JSONDecode(content)
-            if decoded and type(decoded) == "table" then
-                Mono.ConfigNames = decoded
+            local names = {}
+            for name in string.gmatch(content, "([^|]+)") do
+                table.insert(names, name)
+            end
+            if #names == 6 then
+                Mono.ConfigNames = names
             end
         end
     end
@@ -78,7 +80,7 @@ end)
 local function SaveSlotNames()
     pcall(function()
         if writefile then
-            writefile("MonoSlotNames.txt", HttpService:JSONEncode(Mono.ConfigNames))
+            writefile("MonoSlotNames.txt", table.concat(Mono.ConfigNames, "|"))
         end
     end)
 end
@@ -263,7 +265,7 @@ local function doKillEffect()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С ИДЕАЛЬНЫМИ ЗАКРУГЛЕНИЯМИ ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.Position = UDim2.new(0.5, -250, 0.5, -170)
@@ -394,7 +396,7 @@ local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
--- Обновление UI из кода (нужно для загрузки конфига)
+-- Обновление UI из кода
 local function setToggleStateUI(frameName, state)
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
@@ -579,6 +581,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
     dropList.BackgroundTransparency = 1
 
     local isOpen = false
+    
     mainBtn.MouseButton1Click:Connect(function()
         isOpen = not isOpen
         arrow.Rotation = isOpen and 180 or 0
@@ -691,7 +694,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     bindBtn.MouseButton1Click:Connect(function()
         if BindWait then return end 
         bindBtn.Text = "..."
-        BindWait = function(key) 
+        BindWait = function(key)
             bindTable[bindKeyName] = key
             local kn = key.Name
             if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
@@ -758,15 +761,15 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 
     local isOpen = false
-    gearBtn.MouseButton1Click:Connect(function() 
+    gearBtn.MouseButton1Click:Connect(function()
         isOpen = not isOpen
         TweenService:Create(gearBtn, TweenInfo.new(0.3), {Rotation = isOpen and 90 or 0}):Play()
         local targetSize = isOpen and (35 + totalSettingsHeight + 5) or 35
-        TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play() 
+        TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play()
     end)
 end
 
--- === СИСТЕМА КОНФИГОВ (СОХРАНЕНИЕ, ЭКСПОРТ, ИМПОРТ, СЛОТЫ) ===
+-- === НОВЫЙ КАСТОМНЫЙ ТЕКСТОВЫЙ ФОРМАТ КОНФИГОВ ===
 
 local function GetConfigTable()
     return {
@@ -793,6 +796,35 @@ local function GetConfigTable()
         Time = Mono.TimeOfDay,
         WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji
     }
+end
+
+-- Кодируем таблицу в обычный текст (Key=Value)
+local function EncodeTXT(tbl)
+    local str = ""
+    for k, v in pairs(tbl) do
+        str = str .. tostring(k) .. "=" .. tostring(v) .. "\n"
+    end
+    return str
+end
+
+-- Декодируем обычный текст обратно в таблицу
+local function DecodeTXT(str)
+    local tbl = {}
+    for line in string.gmatch(str, "[^\r\n]+") do
+        local k, v = string.match(line, "^([^=]+)=(.+)$")
+        if k and v then
+            if v == "true" then 
+                tbl[k] = true
+            elseif v == "false" then 
+                tbl[k] = false
+            elseif tonumber(v) then 
+                tbl[k] = tonumber(v)
+            else
+                tbl[k] = v
+            end
+        end
+    end
+    return tbl
 end
 
 local function ApplyConfigToUI()
@@ -874,7 +906,6 @@ local function LoadConfigFromTable(dec)
 end
 
 local function GetCurrentFileName()
-    -- Теперь сохраняем файл с форматом .txt
     return Mono.ConfigNames[Mono.SelectedConfigSlot] .. ".txt"
 end
 
@@ -882,13 +913,13 @@ local function SaveConfig()
     pcall(function()
         local fileName = GetCurrentFileName()
         if writefile then
-            writefile(fileName, HttpService:JSONEncode(GetConfigTable()))
+            local textData = EncodeTXT(GetConfigTable())
+            writefile(fileName, textData)
             showNotification("💾 Saved as " .. fileName, Color3.fromRGB(0, 255, 100))
         end
     end)
 end
 
--- Изменена логика LoadConfig для обхода проверки isfile, которой нет в мобильных экзекуторах
 local function LoadConfig()
     local fileName = GetCurrentFileName()
     local success, content = pcall(function()
@@ -896,16 +927,9 @@ local function LoadConfig()
     end)
     
     if success and content and content ~= "" then
-        local s, decoded = pcall(function()
-            return HttpService:JSONDecode(content)
-        end)
-        
-        if s and type(decoded) == "table" then
-            LoadConfigFromTable(decoded)
-            showNotification("📂 Loaded " .. fileName, Color3.fromRGB(0, 255, 100))
-        else
-            showNotification("❌ File corrupted!", Color3.fromRGB(255, 50, 50))
-        end
+        local decoded = DecodeTXT(content)
+        LoadConfigFromTable(decoded)
+        showNotification("📂 Loaded " .. fileName, Color3.fromRGB(0, 255, 100))
     else
         showNotification("❌ Config not found!", Color3.fromRGB(255, 50, 50))
     end
@@ -914,13 +938,14 @@ end
 local function ExportConfig()
     pcall(function()
         if setclipboard then
-            setclipboard(HttpService:JSONEncode(GetConfigTable()))
+            local textData = EncodeTXT(GetConfigTable())
+            setclipboard(textData)
             showNotification("📋 Copied to Clipboard!", Color3.fromRGB(100, 150, 255))
         end
     end)
 end
 
--- === ЗАПОЛНЯЕМ ВКЛАДКИ МЕНЮ ===
+-- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
 
 -- 1. COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
@@ -988,7 +1013,7 @@ createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, functi
     return 30 + h2 + 5
 end)
 
--- 4. SETTINGS (СЛОТЫ КОНФИГОВ И ИМПОРТ)
+-- 4. SETTINGS (Сетка из 6 конфигов)
 local configTitle = Instance.new("TextLabel", settingsPage)
 configTitle.Size = UDim2.new(1, 0, 0, 20)
 configTitle.BackgroundTransparency = 1
@@ -1061,7 +1086,7 @@ updateSlotSelection()
 createButton(settingsPage, "💾 Save Selected Config", SaveConfig)
 createButton(settingsPage, "📂 Load Selected Config", LoadConfig)
 
--- БЛОК ИМПОРТА И ЭКСПОРТА (Решение проблемы с мобилками)
+-- БЛОК ИМПОРТА И ЭКСПОРТА 
 local importTitle = Instance.new("TextLabel", settingsPage)
 importTitle.Size = UDim2.new(1, 0, 0, 20)
 importTitle.BackgroundTransparency = 1
@@ -1092,14 +1117,11 @@ importBox.TextTruncate = Enum.TextTruncate.AtEnd
 local function ManualImport()
     local clip = importBox.Text
     if clip and clip ~= "" then
-        local success, result = pcall(function() 
-            return HttpService:JSONDecode(clip) 
-        end)
-        
-        if success and type(result) == "table" then
-            LoadConfigFromTable(result)
+        local decoded = DecodeTXT(clip)
+        if decoded and next(decoded) ~= nil then
+            LoadConfigFromTable(decoded)
             showNotification("📥 Imported successfully!", Color3.fromRGB(100, 150, 255))
-            importBox.Text = "" -- Очищаем поле после успешного импорта
+            importBox.Text = "" 
         else
             showNotification("❌ Invalid Config Code!", Color3.fromRGB(255, 50, 50))
         end
