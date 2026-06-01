@@ -494,9 +494,9 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 500, 0, 370) -- ИСПРАВЛЕНА ОШИБКА: РАЗМЕР В ПИКСЕЛЯХ
+mainFrame.Size = UDim2.new(0, 500, 0, 370)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1924,7 +1924,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
-    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -1970,7 +1969,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -2008,7 +2006,6 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму (TeamCheck всегда работает)
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2171,28 +2168,34 @@ local function updateESP()
                     
                     local bb = Instance.new("BillboardGui")
                     bb.Name = "MonoName"
-                    bb.Size = UDim2.new(0, 100, 0, 40)
-                    bb.StudsOffset = Vector3.new(0, 3, 0)
+                    -- ИСПОЛЬЗУЕМ OFFSET, ЧТОБЫ ТЕКСТ НЕ УМЕНЬШАЛСЯ ВДАЛИ
+                    bb.Size = UDim2.new(0, 200, 0, 45) 
+                    bb.StudsOffset = Vector3.new(0, 4, 0)
                     bb.AlwaysOnTop = true
                     
                     local list = Instance.new("UIListLayout", bb)
                     list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-                    list.VerticalAlignment = Enum.VerticalAlignment.Center
+                    list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+                    list.SortOrder = Enum.SortOrder.LayoutOrder
+                    
+                    local abilText = Instance.new("TextLabel", bb)
+                    abilText.Name = "Abilities"
+                    abilText.Size = UDim2.new(1, 0, 0, 20)
+                    abilText.BackgroundTransparency = 1
+                    abilText.Font = Enum.Font.GothamBlack
+                    abilText.TextSize = 16 -- КРУПНЫЙ ПЛАН
+                    abilText.TextColor3 = Color3.fromRGB(255, 200, 50) -- ЯРКИЙ ЦВЕТ
+                    abilText.TextStrokeTransparency = 0
+                    abilText.LayoutOrder = 1 -- СВЕРХУ НИКА
                     
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 0.5, 0)
+                    tl.Name = "Name"
+                    tl.Size = UDim2.new(1, 0, 0, 15)
                     tl.BackgroundTransparency = 1
                     tl.Font = Enum.Font.GothamBold
                     tl.TextSize = 12
                     tl.TextStrokeTransparency = 0
-                    
-                    local abilText = Instance.new("TextLabel", bb)
-                    abilText.Size = UDim2.new(1, 0, 0.5, 0)
-                    abilText.BackgroundTransparency = 1
-                    abilText.Font = Enum.Font.Gotham
-                    abilText.TextSize = 10
-                    abilText.TextStrokeTransparency = 0
-                    abilText.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    tl.LayoutOrder = 2 -- СНИЗУ
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
@@ -2220,7 +2223,7 @@ local function updateESP()
                 
                 if Mono.AbilityESP then
                     local a1, a2 = getPlayerAbilities(plr)
-                    espCache[plr].AbilityText.Text = "[" .. a1 .. " | " .. a2 .. "]"
+                    espCache[plr].AbilityText.Text = "[ " .. a1 .. " | " .. a2 .. " ]"
                     espCache[plr].AbilityText.Visible = true
                 else
                     espCache[plr].AbilityText.Visible = false
