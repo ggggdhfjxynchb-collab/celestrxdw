@@ -2067,20 +2067,36 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (ЗАГЛУШКА)
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (ЖЕСТКИЙ СКАН ИНВЕНТАРЯ)
 local function getPlayerAbilities(plr)
-    local ab1, ab2 = "?", "?"
+    local abilities = {}
     pcall(function()
-        if plr:GetAttribute("Ability1") then ab1 = tostring(plr:GetAttribute("Ability1")) end
-        if plr:GetAttribute("Ability2") then ab2 = tostring(plr:GetAttribute("Ability2")) end
-        
-        local leaderstats = plr:FindFirstChild("leaderstats")
-        if leaderstats then
-            if leaderstats:FindFirstChild("Ability1") then ab1 = tostring(leaderstats.Ability1.Value) end
-            if leaderstats:FindFirstChild("Ability2") then ab2 = tostring(leaderstats.Ability2.Value) end
+        local bp = plr:FindFirstChild("Backpack")
+        if bp then
+            for _, item in pairs(bp:GetChildren()) do
+                if item:IsA("Tool") then
+                    table.insert(abilities, item.Name)
+                end
+            end
+        end
+        local char = plr.Character
+        if char then
+            for _, item in pairs(char:GetChildren()) do
+                if item:IsA("Tool") then
+                    table.insert(abilities, item.Name)
+                end
+            end
         end
     end)
-    return ab1, ab2
+    
+    if #abilities == 0 then return "?", "?" end
+    local a1 = abilities[1] or "?"
+    local a2 = abilities[2] or "?"
+    
+    if string.len(a1) > 12 then a1 = string.sub(a1, 1, 10) .. ".." end
+    if string.len(a2) > 12 then a2 = string.sub(a2, 1, 10) .. ".." end
+    
+    return a1, a2
 end
 
 Players.PlayerRemoving:Connect(function(plr)
@@ -2154,7 +2170,7 @@ local function updateESP()
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
-            -- WALLHACK ESP И ABILITY ESP
+            -- WALLHACK ESP И ABILITY ESP (ЖЕСТКИЙ OFFSET)
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -2168,8 +2184,7 @@ local function updateESP()
                     
                     local bb = Instance.new("BillboardGui")
                     bb.Name = "MonoName"
-                    -- ИСПОЛЬЗУЕМ OFFSET, ЧТОБЫ ТЕКСТ НЕ УМЕНЬШАЛСЯ ВДАЛИ
-                    bb.Size = UDim2.new(0, 200, 0, 45) 
+                    bb.Size = UDim2.new(0, 250, 0, 60) 
                     bb.StudsOffset = Vector3.new(0, 4, 0)
                     bb.AlwaysOnTop = true
                     
@@ -2183,10 +2198,10 @@ local function updateESP()
                     abilText.Size = UDim2.new(1, 0, 0, 20)
                     abilText.BackgroundTransparency = 1
                     abilText.Font = Enum.Font.GothamBlack
-                    abilText.TextSize = 16 -- КРУПНЫЙ ПЛАН
-                    abilText.TextColor3 = Color3.fromRGB(255, 200, 50) -- ЯРКИЙ ЦВЕТ
+                    abilText.TextSize = 16 
+                    abilText.TextColor3 = Color3.fromRGB(255, 200, 50) 
                     abilText.TextStrokeTransparency = 0
-                    abilText.LayoutOrder = 1 -- СВЕРХУ НИКА
+                    abilText.LayoutOrder = 1 
                     
                     local tl = Instance.new("TextLabel", bb)
                     tl.Name = "Name"
@@ -2195,7 +2210,7 @@ local function updateESP()
                     tl.Font = Enum.Font.GothamBold
                     tl.TextSize = 12
                     tl.TextStrokeTransparency = 0
-                    tl.LayoutOrder = 2 -- СНИЗУ
+                    tl.LayoutOrder = 2 
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
@@ -2330,7 +2345,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v44 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v45 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2340,16 +2355,14 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local char = LocalPlayer.Character
             if char then
                 pcall(function()
-                    -- Ломаем хитбоксы локально
-                    local head = char:FindFirstChild("Head")
-                    if head then
-                        head.CanCollide = false
-                        head.Size = Vector3.new(0.05, 0.05, 0.05)
-                        head.Transparency = 1
-                    end
-                    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
-                    if torso then
-                        torso.CanCollide = false
+                    for _, part in pairs(char:GetChildren()) do
+                        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                            part.CanCollide = false
+                            part.CanQuery = false
+                            part.CanTouch = false
+                            part.Transparency = 1
+                            part.Size = Vector3.new(0.05, 0.05, 0.05)
+                        end
                     end
                 end)
             end
