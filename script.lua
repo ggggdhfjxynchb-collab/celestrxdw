@@ -62,12 +62,15 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- Загрузка названий слотов конфигов при старте
+-- Загрузка названий слотов конфигов при старте (БЕЗ isfile)
 pcall(function()
-    if readfile and isfile and isfile("MonoSlotNames.txt") then
-        local decoded = HttpService:JSONDecode(readfile("MonoSlotNames.txt"))
-        if decoded and type(decoded) == "table" then
-            Mono.ConfigNames = decoded
+    if readfile then
+        local content = readfile("MonoSlotNames.txt")
+        if content and content ~= "" then
+            local decoded = HttpService:JSONDecode(content)
+            if decoded and type(decoded) == "table" then
+                Mono.ConfigNames = decoded
+            end
         end
     end
 end)
@@ -294,7 +297,6 @@ uiStroke.Color = Color3.fromRGB(180, 130, 255)
 local header = Instance.new("Frame", mainFrame)
 header.Size = UDim2.new(1, 0, 0, 40)
 header.BackgroundTransparency = 1
-header.Parent = mainFrame
 
 local logoText = Instance.new("TextLabel", header)
 logoText.Size = UDim2.new(0, 40, 0, 40)
@@ -321,7 +323,6 @@ headerLine.Position = UDim2.new(0, 0, 0, 40)
 headerLine.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 headerLine.BorderSizePixel = 0
 headerLine.BackgroundTransparency = 0.5
-headerLine.Parent = mainFrame
 
 local sidebar = Instance.new("Frame", mainFrame)
 sidebar.Size = UDim2.new(0, 130, 1, -41)
@@ -392,6 +393,22 @@ local combatPage, combatBtn = createTab("Combat", "⚔️")
 local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
+
+-- Обновление UI из кода (нужно для загрузки конфига)
+local function setToggleStateUI(frameName, state)
+    pcall(function()
+        for _, v in pairs(contentArea:GetDescendants()) do
+            if v:IsA("Frame") and v.Name == frameName then
+                local status = v:FindFirstChild("Status", true)
+                local btn = v:FindFirstChild("MainBtn", true)
+                if status and btn then
+                    status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
+                    btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+                end
+            end
+        end
+    end)
+end
 
 -- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createButton(parent, text, callback)
@@ -664,23 +681,24 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     bindBtn.TextSize = 12
     Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
 
-    btn.MouseButton1Click:Connect(function()
+    btn.MouseButton1Click:Connect(function() 
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        onToggle(newState)
+        onToggle(newState) 
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
         if BindWait then return end 
         bindBtn.Text = "..."
-        BindWait = function(key)
+        BindWait = function(key) 
             bindTable[bindKeyName] = key
-            local keyName = key.Name
-            if key == Enum.UserInputType.MouseButton1 then keyName = "LMB" end
-            if key == Enum.UserInputType.MouseButton2 then keyName = "RMB" end
-            bindBtn.Text = keyName
-            BindWait = nil
+            local kn = key.Name
+            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
+            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
+            end
+            bindBtn.Text = kn
+            BindWait = nil 
         end
     end)
 end
@@ -732,39 +750,23 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     
     local totalSettingsHeight = buildSettingsFunc(settingsFrame)
 
-    btn.MouseButton1Click:Connect(function()
+    btn.MouseButton1Click:Connect(function() 
         local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        onToggle(newState)
+        onToggle(newState) 
     end)
 
     local isOpen = false
-    gearBtn.MouseButton1Click:Connect(function()
+    gearBtn.MouseButton1Click:Connect(function() 
         isOpen = not isOpen
         TweenService:Create(gearBtn, TweenInfo.new(0.3), {Rotation = isOpen and 90 or 0}):Play()
         local targetSize = isOpen and (35 + totalSettingsHeight + 5) or 35
-        TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play()
+        TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play() 
     end)
 end
 
--- Функция для обновления состояния UI (нужна при загрузке конфигов)
-local function setToggleStateUI(frameName, state)
-    pcall(function()
-        for _, v in pairs(contentArea:GetDescendants()) do
-            if v:IsA("Frame") and v.Name == frameName then
-                local status = v:FindFirstChild("Status", true)
-                local btn = v:FindFirstChild("MainBtn", true)
-                if status and btn then
-                    status.BackgroundColor3 = state and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-                    btn.TextColor3 = state and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-                end
-            end
-        end
-    end)
-end
-
--- === НОВОЕ: СИСТЕМА КОНФИГОВ (.TXT) И СЛОТОВ ===
+-- === СИСТЕМА КОНФИГОВ (СОХРАНЕНИЕ, ЭКСПОРТ, ИМПОРТ, СЛОТЫ) ===
 
 local function GetConfigTable()
     return {
@@ -828,7 +830,9 @@ local function ApplyConfigToUI()
                 if v.Name == "KillCol" then v.BackgroundColor3 = Mono.KillColor end
                 if v.Name == "TintCol" then v.BackgroundColor3 = Mono.TintColor end
             end
-            if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
+            if v:IsA("TextButton") and v.Name == "TimeDrop" then 
+                v.Text = "  Time of Day: " .. Mono.TimeOfDay 
+            end
         end
     end)
 end
@@ -870,6 +874,7 @@ local function LoadConfigFromTable(dec)
 end
 
 local function GetCurrentFileName()
+    -- Теперь сохраняем файл с форматом .txt
     return Mono.ConfigNames[Mono.SelectedConfigSlot] .. ".txt"
 end
 
@@ -883,16 +888,27 @@ local function SaveConfig()
     end)
 end
 
+-- Изменена логика LoadConfig для обхода проверки isfile, которой нет в мобильных экзекуторах
 local function LoadConfig()
-    pcall(function()
-        local fileName = GetCurrentFileName()
-        if readfile and isfile and isfile(fileName) then
-            LoadConfigFromTable(HttpService:JSONDecode(readfile(fileName)))
+    local fileName = GetCurrentFileName()
+    local success, content = pcall(function()
+        return readfile(fileName)
+    end)
+    
+    if success and content and content ~= "" then
+        local s, decoded = pcall(function()
+            return HttpService:JSONDecode(content)
+        end)
+        
+        if s and type(decoded) == "table" then
+            LoadConfigFromTable(decoded)
             showNotification("📂 Loaded " .. fileName, Color3.fromRGB(0, 255, 100))
         else
-            showNotification("❌ Config not found!", Color3.fromRGB(255, 50, 50))
+            showNotification("❌ File corrupted!", Color3.fromRGB(255, 50, 50))
         end
-    end)
+    else
+        showNotification("❌ Config not found!", Color3.fromRGB(255, 50, 50))
+    end
 end
 
 local function ExportConfig()
@@ -904,24 +920,7 @@ local function ExportConfig()
     end)
 end
 
-local function ImportConfig()
-    pcall(function()
-        if getclipboard then
-            local clip = getclipboard()
-            if clip and clip ~= "" then
-                local success, result = pcall(function() return HttpService:JSONDecode(clip) end)
-                if success and type(result) == "table" then
-                    LoadConfigFromTable(result)
-                    showNotification("📥 Imported successfully!", Color3.fromRGB(100, 150, 255))
-                else
-                    showNotification("❌ Invalid Config Data", Color3.fromRGB(255, 50, 50))
-                end
-            end
-        end
-    end)
-end
-
--- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
+-- === ЗАПОЛНЯЕМ ВКЛАДКИ МЕНЮ ===
 
 -- 1. COMBAT
 createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key")
@@ -989,11 +988,11 @@ createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, functi
     return 30 + h2 + 5
 end)
 
--- 4. SETTINGS (Сетка из 6 конфигов)
+-- 4. SETTINGS (СЛОТЫ КОНФИГОВ И ИМПОРТ)
 local configTitle = Instance.new("TextLabel", settingsPage)
 configTitle.Size = UDim2.new(1, 0, 0, 20)
 configTitle.BackgroundTransparency = 1
-configTitle.Text = "  Select & Rename Config Slot:"
+configTitle.Text = "  Select & Rename Config Slot (.txt):"
 configTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
 configTitle.Font = Enum.Font.GothamBold
 configTitle.TextSize = 12
@@ -1061,8 +1060,56 @@ updateSlotSelection()
 
 createButton(settingsPage, "💾 Save Selected Config", SaveConfig)
 createButton(settingsPage, "📂 Load Selected Config", LoadConfig)
+
+-- БЛОК ИМПОРТА И ЭКСПОРТА (Решение проблемы с мобилками)
+local importTitle = Instance.new("TextLabel", settingsPage)
+importTitle.Size = UDim2.new(1, 0, 0, 20)
+importTitle.BackgroundTransparency = 1
+importTitle.Text = "  Share & Import (Paste code below to import):"
+importTitle.TextColor3 = Color3.fromRGB(200, 200, 200)
+importTitle.Font = Enum.Font.GothamBold
+importTitle.TextSize = 12
+importTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local importBoxFrame = Instance.new("Frame", settingsPage)
+importBoxFrame.Size = UDim2.new(1, 0, 0, 35)
+importBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 30)
+Instance.new("UICorner", importBoxFrame).CornerRadius = UDim.new(0, 6)
+
+local importBox = Instance.new("TextBox", importBoxFrame)
+importBox.Size = UDim2.new(1, -20, 1, 0)
+importBox.Position = UDim2.new(0, 10, 0, 0)
+importBox.BackgroundTransparency = 1
+importBox.Text = ""
+importBox.PlaceholderText = "Paste your friend's config code here..."
+importBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+importBox.Font = Enum.Font.Gotham
+importBox.TextSize = 12
+importBox.TextXAlignment = Enum.TextXAlignment.Left
+importBox.ClearTextOnFocus = false
+importBox.TextTruncate = Enum.TextTruncate.AtEnd
+
+local function ManualImport()
+    local clip = importBox.Text
+    if clip and clip ~= "" then
+        local success, result = pcall(function() 
+            return HttpService:JSONDecode(clip) 
+        end)
+        
+        if success and type(result) == "table" then
+            LoadConfigFromTable(result)
+            showNotification("📥 Imported successfully!", Color3.fromRGB(100, 150, 255))
+            importBox.Text = "" -- Очищаем поле после успешного импорта
+        else
+            showNotification("❌ Invalid Config Code!", Color3.fromRGB(255, 50, 50))
+        end
+    else
+        showNotification("❌ Paste code first!", Color3.fromRGB(255, 50, 50))
+    end
+end
+
+createButton(settingsPage, "📥 Import from Textbox", ManualImport)
 createButton(settingsPage, "📋 Export to Clipboard", ExportConfig)
-createButton(settingsPage, "📥 Import from Clipboard", ImportConfig)
 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
