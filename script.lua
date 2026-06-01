@@ -23,8 +23,11 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА (ВСЕ ВЫКЛЮЧЕНО ПО УМОЛЧАНИЮ) ===
 local Mono = {
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C },
-    AutoTap = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
+    -- НОВОЕ: НАСТРОЙКИ ЛЕГИТ АИМБОТА
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2 },
+    
+    -- НОВОЕ: TRIGGERBOT ВМЕСТО АВТО-ТАПА
+    TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     
@@ -143,7 +146,7 @@ watermarkStroke.Thickness = 1
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v30 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v31 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -326,7 +329,71 @@ local function doKillEffect()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ВОЗВРАЩЕННЫЙ STATUS HUD (ПАНЕЛЬ АКТИВНЫХ ФУНКЦИЙ) ===
+local hudFrame = Instance.new("Frame", screenGui)
+hudFrame.Size = UDim2.new(0, 150, 0, 0)
+hudFrame.Position = UDim2.new(1, -160, 0, 10)
+hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+hudFrame.BackgroundTransparency = 0.2
+hudFrame.BorderSizePixel = 0
+hudFrame.ClipsDescendants = true 
+Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
+
+local hudList = Instance.new("UIListLayout", hudFrame)
+hudList.Padding = UDim.new(0, 5)
+hudList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+hudList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local hudTitle = Instance.new("TextLabel", hudFrame)
+hudTitle.Name = "0_Title"
+hudTitle.Size = UDim2.new(1, 0, 0, 30)
+hudTitle.BackgroundTransparency = 1
+hudTitle.Text = "MONOGRAMMA"
+hudTitle.TextColor3 = Color3.fromRGB(180, 130, 255)
+hudTitle.Font = Enum.Font.GothamBlack
+hudTitle.TextSize = 12
+
+local function updateHUD()
+    pcall(function()
+        for _, v in pairs(hudFrame:GetChildren()) do
+            if v:IsA("TextLabel") and v.Name ~= "0_Title" then 
+                v:Destroy() 
+            end
+        end
+
+        local activeCount = 0
+        local function addActiveFeature(name)
+            activeCount = activeCount + 1
+            local lbl = Instance.new("TextLabel", hudFrame)
+            lbl.Name = "1_" .. name
+            lbl.Size = UDim2.new(1, -20, 0, 20)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = name
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.GothamMedium
+            lbl.TextSize = 12
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            
+            local dot = Instance.new("Frame", lbl)
+            dot.Size = UDim2.new(0, 6, 0, 6)
+            dot.Position = UDim2.new(1, -10, 0.5, -3)
+            dot.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        end
+
+        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
+        if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
+        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
+        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
+        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
+        if Mono.WeatherEnabled then addActiveFeature("Weather") end
+
+        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
+        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
+    end)
+end
+
+-- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -458,6 +525,7 @@ local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
+-- Обновление кнопок меню из кода
 local function setToggleStateUI(frameName, state)
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
@@ -499,6 +567,46 @@ local function createButton(parent, text, callback, tooltip)
         tsBack:Play()
         callback()
     end)
+end
+
+local function createInput(parent, text, defaultText, callback, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 35)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.4
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "  " .. text
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0, 80, 0, 24)
+    box.Position = UDim2.new(1, -95, 0.5, -12)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    box.Text = defaultText
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+    
+    if uiName then 
+        box.Name = uiName 
+    end
+
+    box.FocusLost:Connect(function()
+        if box.Text == "" then 
+            box.Text = defaultText 
+        end
+        callback(box.Text)
+    end)
+    return 35
 end
 
 local function createSubInput(parent, text, defaultText, callback, uiName)
@@ -696,6 +804,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
                 Size = UDim2.new(1, 0, 0, 35)
             }):Play()
             callback(opt)
+            updateHUD()
         end)
     end
 end
@@ -732,6 +841,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState)
+        updateHUD()
     end)
 end
 
@@ -778,6 +888,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
+        updateHUD()
     end)
 
     bindBtn.MouseButton1Click:Connect(function()
@@ -849,6 +960,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
         status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
         btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
         onToggle(newState) 
+        updateHUD()
     end)
 
     local isOpen = false
@@ -865,8 +977,8 @@ end
 local function GetConfigTable()
     return {
         TeamCheck = Mono.TeamCheck,
-        AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name,
-        AutoTapE = Mono.AutoTap.Enabled, AutoTapK = Mono.AutoTap.Key.Name,
+        AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness,
+        TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
         
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
@@ -921,7 +1033,7 @@ end
 
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
-    setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
+    setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
     setToggleStateUI("Team Check", Mono.TeamCheck)
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
@@ -941,7 +1053,7 @@ local function ApplyConfigToUI()
         for _, v in pairs(contentArea:GetDescendants()) do
             if v:IsA("TextButton") and v.Name == "BindBtn" then
                 if v.Parent.Name == "Aimbot (Toggle)" then v.Text = Mono.Aimbot.Key.Name end
-                if v.Parent.Name == "Auto Tap (Toggle)" then v.Text = Mono.AutoTap.Key.Name end
+                if v.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
             end
             if v:IsA("TextBox") then
                 if v.Name == "FOVRadInput" then v.Text = tostring(Mono.FOV.Radius) end
@@ -954,6 +1066,7 @@ local function ApplyConfigToUI()
                 if v.Name == "CrossSInput" then v.Text = tostring(Mono.Crosshair.Size) end
                 if v.Name == "CrossGInput" then v.Text = tostring(Mono.Crosshair.Gap) end
                 if v.Name == "CrossTInput" then v.Text = tostring(Mono.Crosshair.Thickness) end
+                if v.Name == "AimSmoothInput" then v.Text = tostring(Mono.Aimbot.Smoothness) end
             end
             if v:IsA("Frame") then
                 if v.Name == "FOVCol" then v.BackgroundColor3 = Mono.FOV.Color end
@@ -966,20 +1079,27 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "TimeDrop" then 
                 v.Text = "  Time of Day: " .. Mono.TimeOfDay 
             end
+            if v:IsA("TextButton") and v.Name == "AimModeDrop" then 
+                v.Text = "  Aimbot Mode: " .. Mono.Aimbot.Mode 
+            end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
             end
         end
     end)
+    updateHUD()
 end
 
 local function LoadConfigFromTable(dec)
     Mono.TeamCheck = dec.TeamCheck or false
     Mono.Aimbot.Enabled = dec.AimbotE or false
+    Mono.Aimbot.Mode = dec.AimMode or "Rage 😡"
+    Mono.Aimbot.Smoothness = dec.AimSmooth or 0.2
     pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
-    Mono.AutoTap.Enabled = dec.AutoTapE or false
-    pcall(function() Mono.AutoTap.Key = Enum.KeyCode[dec.AutoTapK] or Enum.UserInputType[dec.AutoTapK] end)
+    
+    Mono.TriggerBot.Enabled = dec.TrigE or false
+    pcall(function() Mono.TriggerBot.Key = Enum.KeyCode[dec.TrigK] or Enum.UserInputType[dec.TrigK] end)
 
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
@@ -1067,15 +1187,18 @@ end
 -- === ЗАПОЛНЯЕМ ВКЛАДКИ ===
 
 -- 1. COMBAT
-createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", "Automatically aims at enemies inside the FOV circle.")
-createToggleWithBind(combatPage, "Auto Tap (Toggle)", Mono.AutoTap.Enabled, Mono.AutoTap.Key, function(s) Mono.AutoTap.Enabled = s end, Mono.AutoTap, "Key", "Automatically shoots when an enemy is inside the FOV circle.")
+createToggleWithBind(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", "Automatically aims at enemies.")
+createDropdown(combatPage, "Aimbot Mode", {"Rage 😡", "Legit 🎯"}, 1, function(val) Mono.Aimbot.Mode = val end, "AimModeDrop")
+createInput(combatPage, "Aimbot Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
+
+createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
 createToggle(combatPage, "Team Check", Mono.TeamCheck, function(s) Mono.TeamCheck = s end, "Ignores players on the same team.")
 
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end, "FOVRadInput")
     local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end, "FOVCol")
     return h1 + h2 + 5
-end, "Shows the area where Aimbot and Auto Tap work.")
+end, "Shows the area where Aimbot and TriggerBot work.")
 
 -- 2. VISUALS
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
@@ -1268,6 +1391,7 @@ end
 createButton(settingsPage, "📥 Import from Textbox", ManualImport)
 createButton(settingsPage, "📋 Export to Clipboard", ExportConfig)
 
+updateHUD() 
 combatBtn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
@@ -1319,11 +1443,13 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if key == Mono.Aimbot.Key then
         Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
         setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
+        updateHUD()
     end
 
-    if key == Mono.AutoTap.Key then
-        Mono.AutoTap.Enabled = not Mono.AutoTap.Enabled
-        setToggleStateUI("Auto Tap (Toggle)", Mono.AutoTap.Enabled)
+    if key == Mono.TriggerBot.Key then
+        Mono.TriggerBot.Enabled = not Mono.TriggerBot.Enabled
+        setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
+        updateHUD()
     end
 
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -1640,7 +1766,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v30 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v31 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -1685,10 +1811,18 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             Lighting.ClockTime = 0
         end
 
+        -- ЛЕГИТ И РЕЙДЖ АИМБОТ
         if Mono.Aimbot.Enabled then
             local target = getClosestVisibleEnemy()
             if target then
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+                local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+                
+                if Mono.Aimbot.Mode == "Legit 🎯" then
+                    Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Mono.Aimbot.Smoothness)
+                else
+                    Camera.CFrame = targetCFrame
+                end
+                
                 local targetPlayer = getPlayerFromPart(target)
                 if targetPlayer then
                     LastTargetHit = targetPlayer
@@ -1697,11 +1831,13 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        if Mono.AutoTap.Enabled then
+        -- НАСТОЯЩИЙ TRIGGERBOT (РАБОТАЕТ ОТ КРЕСТИКА ЭКРАНА)
+        if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCamera()
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
+                    
                     local char = targetPlayer.Character
                     local targetPart = char and getBestTargetPart(char)
                     
@@ -1710,11 +1846,12 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
+                        -- ПРОСТОЙ КЛИК ЕСЛИ ИГРОК В ЦЕНТРЕ ИЛИ В РАДИУСЕ FOV
                         if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
                             LastTargetHit = targetPlayer
                             LastTargetTime = tick()
                             
-                            if tick() - LastShootTime > Mono.AutoTap.Delay then
+                            if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
                                 simulateClick()
                             end
