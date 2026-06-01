@@ -8,10 +8,12 @@ local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- === 1. БЕЗОПАСНАЯ ЗАГРУЗКА ===
+-- === 1. БЕЗОПАСНАЯ ЗАГРУЗКА И ОЧИСТКА ===
 local targetParent = nil
 pcall(function() 
-    if type(gethui) == "function" then targetParent = gethui() end
+    if type(gethui) == "function" then 
+        targetParent = gethui() 
+    end
 end)
 if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
 if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
@@ -61,11 +63,15 @@ local LastTargetTime = 0
 
 -- БЕЗОПАСНАЯ РАБОТА С ФАЙЛАМИ
 local safeReadFile = function(file)
-    local s, r = pcall(function() if type(readfile) == "function" then return readfile(file) end end)
+    local s, r = pcall(function() 
+        if type(readfile) == "function" then return readfile(file) end 
+    end)
     return s and r or nil
 end
 local safeWriteFile = function(file, data)
-    pcall(function() if type(writefile) == "function" then writefile(file, data) end end)
+    pcall(function() 
+        if type(writefile) == "function" then writefile(file, data) end 
+    end)
 end
 
 pcall(function()
@@ -85,7 +91,7 @@ local function SaveSlotNames()
     safeWriteFile("MonoSlotNames.txt", table.concat(Mono.ConfigNames, "|"))
 end
 
--- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (СЕНСОР + ПК) ===
+-- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ ===
 local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -152,7 +158,7 @@ menuBlur.Name = "MonoMenuBlur"
 menuBlur.Size = 15
 menuBlur.Parent = Lighting
 
--- === ПЛАВАЮЩАЯ КНОПКА МЕНЮ ДЛЯ МОБИЛОК ===
+-- === ПЛАВАЮЩАЯ КНОПКА МЕНЮ ===
 local mobileToggle = Instance.new("TextButton")
 mobileToggle.Size = UDim2.new(0, 45, 0, 45)
 mobileToggle.Position = UDim2.new(0, 10, 0, 10)
@@ -181,12 +187,12 @@ Instance.new("UICorner", watermarkFrame).CornerRadius = UDim.new(0, 6)
 local watermarkStroke = Instance.new("UIStroke", watermarkFrame)
 watermarkStroke.Color = Color3.fromRGB(180, 130, 255)
 watermarkStroke.Thickness = 1
-makeDraggable(watermarkFrame)
+makeDraggable(watermarkFrame) 
 
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v34 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v35 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -379,7 +385,7 @@ hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
 hudFrame.Active = true
 Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
-makeDraggable(hudFrame)
+makeDraggable(hudFrame) 
 
 local hudList = Instance.new("UIListLayout", hudFrame)
 hudList.Padding = UDim.new(0, 5)
@@ -435,7 +441,7 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ ===
+-- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1495,35 +1501,6 @@ combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
 
--- === ПЕРЕТАСКИВАНИЕ ===
-local dragging, dragInput, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        local c; c = UserInputService.InputEnded:Connect(function(e)
-            if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then 
-                dragging = false
-                c:Disconnect() 
-            end
-        end)
-    end
-end)
-
-mainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
-        dragInput = input 
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
 -- === ОБРАБОТКА НАЖАТИЙ БИНДОВ И МЕНЮ ===
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
@@ -1594,15 +1571,55 @@ mobileToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- === ЯДРО ЧИТА ===
+-- === НЕПРОБИВАЕМЫЙ ЯДЕРНЫЙ КЛИКЕР ===
 local function simulateClick()
-    pcall(function()
-        local vim = game:GetService("VirtualInputManager")
-        local cx = Camera.ViewportSize.X / 2
-        local cy = Camera.ViewportSize.Y / 2
-        vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-        task.wait(0.05)
-        vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
+    task.spawn(function()
+        -- Метод 1: mouse1click
+        local success1 = pcall(function()
+            if type(mouse1click) == "function" then
+                mouse1click()
+                return true
+            end
+            return false
+        end)
+        if success1 == true then return end
+        
+        -- Метод 2: mouse1press + release
+        local success2 = pcall(function()
+            if type(mouse1press) == "function" and type(mouse1release) == "function" then
+                mouse1press()
+                task.wait(0.02)
+                mouse1release()
+                return true
+            end
+            return false
+        end)
+        if success2 == true then return end
+        
+        -- Метод 3: VirtualInputManager
+        local success3 = pcall(function()
+            local vim = game:GetService("VirtualInputManager")
+            local cx = Camera.ViewportSize.X / 2
+            local cy = Camera.ViewportSize.Y / 2
+            if type(vim.SendMouseButtonEvent) == "function" or vim.SendMouseButtonEvent ~= nil then
+                vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+                task.wait(0.02)
+                vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
+                return true
+            end
+            return false
+        end)
+        if success3 == true then return end
+        
+        -- Метод 4: Фолбэк VirtualUser
+        pcall(function()
+            local vu = game:GetService("VirtualUser")
+            local cx = Camera.ViewportSize.X / 2
+            local cy = Camera.ViewportSize.Y / 2
+            vu:Button1Down(Vector2.new(cx, cy))
+            task.wait(0.02)
+            vu:Button1Up(Vector2.new(cx, cy))
+        end)
     end)
 end
 
@@ -1891,7 +1908,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v34 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v35 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -1956,7 +1973,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- НАСТОЯЩИЙ TRIGGERBOT (ИДЕАЛЬНЫЙ ЦЕНТР ЭКРАНА)
+        -- НАСТОЯЩИЙ TRIGGERBOT
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCenter()
             if hitResult and hitResult.Instance then
@@ -1977,7 +1994,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             
                             if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
-                                task.spawn(simulateClick)
+                                simulateClick()
                             end
                         end
                     end
