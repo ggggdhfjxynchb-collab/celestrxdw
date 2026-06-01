@@ -37,7 +37,10 @@ local Mono = {
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
     OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
-    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false }, 
+    
+    -- ДОБАВИЛИ КНОПКУ БИНДА ДЛЯ СКРЫТИЯ МЫШКИ (ПО УМОЛЧАНИЮ UNKNOWN)
+    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
+    
     KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
@@ -733,6 +736,49 @@ local function createSubToggle(parent, text, defaultState, callback, uiName)
     return 35
 end
 
+-- НОВАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ БИНДА В ПОДМЕНЮ
+local function createSubBind(parent, text, defaultBind, bindTable, bindKeyName, uiName)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.BackgroundTransparency = 1
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "    -> " .. text
+    lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 80, 0, 24)
+    btn.Position = UDim2.new(1, -95, 0.5, -12)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = (defaultBind and defaultBind ~= Enum.KeyCode.Unknown) and defaultBind.Name or "None"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    if uiName then btn.Name = uiName end
+
+    btn.MouseButton1Click:Connect(function()
+        if BindWait then return end 
+        btn.Text = "..."
+        BindWait = function(key)
+            bindTable[bindKeyName] = key
+            local kn = key.Name
+            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
+            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
+            elseif key == Enum.KeyCode.Unknown then kn = "None"
+            end
+            btn.Text = kn
+            BindWait = nil 
+        end
+    end)
+    return 35
+end
+
 local function createSubCycleButton(parent, text, options, defaultIndex, callback, uiName)
     local frame = Instance.new("Frame", parent)
     frame.Size = UDim2.new(1, 0, 0, 30)
@@ -1090,7 +1136,6 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 end
 
--- === НЕДОСТАЮЩАЯ ФУНКЦИЯ ДЛЯ ТРИГГЕРБОТА (БЕЗ НАСТРОЕК) ===
 local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, tooltip)
     local container = Instance.new("Frame", parent)
     container.Name = text
@@ -1168,11 +1213,12 @@ local function GetConfigTable()
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
         ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
         TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
-        OffArrE = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
+        OffScreenArrows = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
         OffArr_R = Mono.OffScreenArrows.Color.R, OffArr_G = Mono.OffScreenArrows.Color.G, OffArr_B = Mono.OffScreenArrows.Color.B,
         CrossE = Mono.Crosshair.Enabled, CrossS = Mono.Crosshair.Size, CrossG = Mono.Crosshair.Gap, CrossT = Mono.Crosshair.Thickness,
         Cross_R = Mono.Crosshair.Color.R, Cross_G = Mono.Crosshair.Color.G, Cross_B = Mono.Crosshair.Color.B,
         CrossHide = Mono.Crosshair.HideDefault,
+        CrossK = Mono.Crosshair.Key.Name, -- КЛЮЧ БИНДА СКРЫТИЯ КУРСОРA В КОНФИГЕ
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
@@ -1257,6 +1303,10 @@ local function ApplyConfigToUI()
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
             end
+            -- Обновление отображения бинда мышки на UI
+            if v:IsA("TextButton") and v.Name == "CrossBindBtn" then
+                v.Text = (Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown) and Mono.Crosshair.Key.Name or "None"
+            end
         end
     end)
     updateHUD()
@@ -1293,6 +1343,7 @@ local function LoadConfigFromTable(dec)
     Mono.Crosshair.Thickness = dec.CrossT or 2
     Mono.Crosshair.Color = Color3.new(dec.Cross_R or 1, dec.Cross_G or 1, dec.Cross_B or 1)
     Mono.Crosshair.HideDefault = dec.CrossHide or false
+    pcall(function() Mono.Crosshair.Key = Enum.KeyCode[dec.CrossK] or Enum.UserInputType[dec.CrossK] end)
     
     Mono.KillEffect = dec.KillEffE or false
     Mono.KillEmoji = dec.KillEmoji or "💀"
@@ -1395,7 +1446,9 @@ createToggleWithSettings(visualsPage, "Custom Crosshair", Mono.Crosshair.Enabled
     local h3 = createSubInput(container, "Thickness", tostring(Mono.Crosshair.Thickness), function(val) Mono.Crosshair.Thickness = tonumber(val) or 2 end, "CrossTInput")
     local h4 = createSubColorPicker(container, "Color", Mono.Crosshair.Color, function(c) Mono.Crosshair.Color = c end, "CrossCol")
     local h5 = createSubToggle(container, "Hide Default Mouse", Mono.Crosshair.HideDefault, function(s) Mono.Crosshair.HideDefault = s end, "CrossHideToggle")
-    return h1 + h2 + h3 + h4 + h5 + 5
+    -- ДОБАВИЛИ КНОПКУ С БИНДОМ ВНУТРЬ МЕНЮ ПРИЦЕЛА
+    local h6 = createSubBind(container, "Hide Mouse Key", Mono.Crosshair.Key, Mono.Crosshair, "Key", "CrossBindBtn")
+    return h1 + h2 + h3 + h4 + h5 + h6 + 5
 end, "Draws a custom crosshair in the center of your screen.")
 
 createToggleWithSettings(visualsPage, "Enemy Orbits", Mono.TargetObjEnabled, function(s) Mono.TargetObjEnabled = s end, function(container)
@@ -1584,6 +1637,19 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
 
+    -- ОБРАБОТКА НАЖАТИЯ БИНДА ДЛЯ СКРЫТИЯ МЫШКИ
+    if Mono.Crosshair.Key and key == Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown then
+        Mono.Crosshair.HideDefault = not Mono.Crosshair.HideDefault
+        pcall(function()
+            for _, v in pairs(contentArea:GetDescendants()) do
+                if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
+                    v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
+                    v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
+                end
+            end
+        end)
+    end
+
     if input.KeyCode == Enum.KeyCode.RightShift then
         Mono.MenuOpen = not Mono.MenuOpen
         unlockMouseBtn.Modal = Mono.MenuOpen
@@ -1607,7 +1673,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
--- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -1629,7 +1694,7 @@ mobileToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- === ЯДРО ЧИТА ===
+-- === ЧИСТЫЙ БЕЗОПАСНЫЙ КЛИКЕР ROBLOX ===
 local function simulateClick()
     coroutine.wrap(function()
         pcall(function()
@@ -1702,22 +1767,6 @@ local function getClosestVisibleEnemy()
     end
     return closestTarget
 end
-
-Players.PlayerRemoving:Connect(function(plr)
-    pcall(function()
-        if espCache[plr] then
-            if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
-            if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
-            if espCache[plr].Orbits then
-                for _, orb in ipairs(espCache[plr].Orbits) do orb.gui:Destroy() end
-            end
-            if espCache[plr].Arrow then espCache[plr].Arrow:Destroy() end
-            espCache[plr] = nil
-        end
-        DeadCache[plr] = nil
-        PlayerData[plr] = nil
-    end)
-end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
 local espCache = {}
@@ -1792,7 +1841,11 @@ local function updateESP()
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
+                    tl.Size = UDim2.new(1, 0, 1, 0)
+                    tl.BackgroundTransparency = 1
+                    tl.Font = Enum.Font.GothamBold
+                    tl.TextSize = 12
+                    tl.TextStrokeTransparency = 0
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
@@ -1843,9 +1896,7 @@ local function updateESP()
 
                 for i, orb in ipairs(espCache[plr].Orbits) do
                     orb.gui.Enabled = true
-                    if orb.gui.Adornee ~= targetPart then 
-                        orb.gui.Adornee = targetPart 
-                    end
+                    if orb.gui.Adornee ~= targetPart then orb.gui.Adornee = targetPart end
                     orb.text.Text = Mono.OrbitEmoji
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
@@ -1853,13 +1904,11 @@ local function updateESP()
                 end
             else
                 if espCache[plr] and espCache[plr].Orbits then
-                    for _, orb in ipairs(espCache[plr].Orbits) do
-                        orb.gui.Enabled = false
-                    end
+                    for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end
                 end
             end
             
-            -- OFF-SCREEN ARROWS (С ОБВОДКОЙ)
+            -- OFF-SCREEN ARROWS
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
@@ -1893,11 +1942,8 @@ local function updateESP()
                 arrow.Position = UDim2.new(0, rX, 0, rY)
                 arrow.Rotation = math.deg(angle)
             else
-                if espCache[plr] and espCache[plr].Arrow then
-                    espCache[plr].Arrow.Visible = false
-                end
+                if pcall(function() return espCache[plr].Arrow end) and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
             end
-
         else
             if espCache[plr] then
                 if espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
@@ -1916,20 +1962,16 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
     pcall(function()
         updateESP()
         
-        -- ВОТЕРМАРКА (FPS И PING)
         frames = frames + 1
         if tick() - lastUpdate >= 1 then
             local fps = frames
             local ping = 0
-            pcall(function()
-                ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
-            end)
+            pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
             watermarkText.Text = "MONOGRAMMA v34 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
-        -- ОТРИСОВКА КРУГА FOV НА ЭКРАНЕ
         if Mono.FOV.Enabled then
             fovFrame.Visible = true
             fovFrame.Size = UDim2.new(0, Mono.FOV.Radius * 2, 0, Mono.FOV.Radius * 2)
@@ -1938,7 +1980,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             fovFrame.Visible = false
         end
         
-        -- КАСТОМНЫЙ ПРИЦЕЛ И СКРЫТИЕ МЫШИ
         if Mono.Crosshair.Enabled then
             crosshairFolder.Parent = screenGui
             local cx = Camera.ViewportSize.X / 2
@@ -1953,34 +1994,24 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             chLeft.Size = UDim2.new(0, s, 0, t); chLeft.Position = UDim2.new(0, cx - g, 0, cy); chLeft.BackgroundColor3 = col
             chRight.Size = UDim2.new(0, s, 0, t); chRight.Position = UDim2.new(0, cx + g, 0, cy); chRight.BackgroundColor3 = col
             
-            if Mono.Crosshair.HideDefault then
-                UserInputService.MouseIconEnabled = false
-            else
-                UserInputService.MouseIconEnabled = true
-            end
+            UserInputService.MouseIconEnabled = not Mono.Crosshair.HideDefault
         else
             crosshairFolder.Parent = nil
             UserInputService.MouseIconEnabled = true
         end
         
-        if Mono.TimeOfDay == "Day ☀️" then
-            Lighting.ClockTime = 14
-        elseif Mono.TimeOfDay == "Night 🌙" then
-            Lighting.ClockTime = 0
-        end
+        if Mono.TimeOfDay == "Day ☀️" then Lighting.ClockTime = 14
+        elseif Mono.TimeOfDay == "Night 🌙" then Lighting.ClockTime = 0 end
 
-        -- ЛЕГИТ И РЕЙДЖ АИМБОТ
         if Mono.Aimbot.Enabled then
             local target = getClosestVisibleEnemy()
             if target then
                 local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-                
                 if Mono.Aimbot.Mode == "Legit 🎯" then
                     Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Mono.Aimbot.Smoothness)
                 else
                     Camera.CFrame = targetCFrame
                 end
-                
                 local targetPlayer = getPlayerFromPart(target)
                 if targetPlayer then
                     LastTargetHit = targetPlayer
@@ -1989,16 +2020,13 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- НАСТОЯЩИЙ TRIGGERBOT (ИДЕАЛЬНЫЙ ЦЕНТР ЭКРАНА)
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCenter()
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
-                    
                     local char = targetPlayer.Character
                     local targetPart = char and getBestTargetPart(char)
-                    
                     if targetPart then
                         local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -2007,7 +2035,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
                             LastTargetHit = targetPlayer
                             LastTargetTime = tick()
-                            
                             if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
                                 simulateClick()
