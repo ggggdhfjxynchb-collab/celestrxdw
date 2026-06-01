@@ -558,6 +558,7 @@ local function createTab(name, icon)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     
     local pLayout = Instance.new("UIListLayout", page)
+    pLayout.SortOrder = Enum.SortOrder.LayoutOrder -- ФИКС СОРТИРОВКИ! ЖЕСТКО ЗАДАЕМ ПОРЯДОК
     pLayout.Padding = UDim.new(0, 8) 
     
     Pages[name] = page
@@ -603,10 +604,12 @@ end
 -- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
+    frame.Name = "Header_" .. text
     frame.Size = UDim2.new(1, 0, 0, 26)
     frame.BackgroundColor3 = Color3.fromRGB(130, 80, 200)
     frame.BackgroundTransparency = 0.8
     frame.BorderSizePixel = 0
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 4)
     
     local stroke = Instance.new("UIStroke", frame)
@@ -628,9 +631,11 @@ end
 
 local function createButton(parent, text, callback, tooltip)
     local frame = Instance.new("Frame", parent)
+    frame.Name = "Btn_" .. text
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(40, 30, 60)
     frame.BackgroundTransparency = 0.2
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -655,9 +660,11 @@ end
 
 local function createInput(parent, text, defaultText, callback, uiName)
     local frame = Instance.new("Frame", parent)
+    frame.Name = "Input_" .. text
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
     local lbl = Instance.new("TextLabel", frame)
@@ -865,10 +872,12 @@ end
 
 local function createDropdown(parent, text, options, defaultIndex, callback, uiName)
     local frame = Instance.new("Frame", parent)
+    frame.Name = "Drop_" .. text
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
     frame.ClipsDescendants = true
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local mainBtn = Instance.new("TextButton", frame)
@@ -934,6 +943,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
     
     local btn = Instance.new("TextButton", frame)
@@ -970,6 +980,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     frame.Size = UDim2.new(1, 0, 0, 35)
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
+    frame.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", frame)
@@ -1037,6 +1048,7 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
     container.ClipsDescendants = true 
+    container.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -1129,6 +1141,7 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     container.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     container.BackgroundTransparency = 0.4
     container.ClipsDescendants = true 
+    container.LayoutOrder = #parent:GetChildren() -- ЖЕСТКИЙ ПОРЯДОК
     Instance.new("UICorner", container).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", container)
@@ -1622,6 +1635,7 @@ local importBoxFrame = Instance.new("Frame", settingsPage)
 importBoxFrame.Size = UDim2.new(1, 0, 0, 35)
 importBoxFrame.BackgroundColor3 = Color3.fromRGB(20, 15, 30)
 Instance.new("UICorner", importBoxFrame).CornerRadius = UDim.new(0, 6)
+importBoxFrame.LayoutOrder = #settingsPage:GetChildren()
 
 local importBox = Instance.new("TextBox", importBoxFrame)
 importBox.Size = UDim2.new(1, -20, 1, 0)
@@ -2049,12 +2063,12 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v37 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v38 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
-        -- ФУНКЦИЯ SPEEDS (РАБОТАЕТ ПОСТОЯННО ЕСЛИ ВКЛЮЧЕНА)
+        -- ФУНКЦИЯ SPEEDS
         if Mono.Speed.Enabled then
             local char = LocalPlayer.Character
             if char then
