@@ -8,9 +8,11 @@ local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- === 1. ЗАГРУЗКА И ОЧИСТКА ===
+-- === 1. БЕЗОПАСНАЯ ЗАГРУЗКА ===
 local targetParent = nil
-pcall(function() targetParent = gethui() end)
+pcall(function() 
+    if type(gethui) == "function" then targetParent = gethui() end
+end)
 if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
 if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
 
@@ -27,35 +29,26 @@ local Mono = {
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
-    
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
     TeamCheck = false,
-    
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
-    
     OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
     Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false }, 
-    
     KillEffect = false,
     KillEmoji = "💀", 
     KillColor = Color3.fromRGB(255, 50, 50), 
-    
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
-    
     TintEnabled = false,
     TintColor = Color3.fromRGB(110, 60, 220),
     TimeOfDay = "Default", 
-    
     WeatherEnabled = false,
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "💸",
-    
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
-    
     WatermarkEnabled = true, 
     MenuOpen = true
 }
@@ -66,31 +59,33 @@ local PlayerData = {}
 local LastTargetHit = nil
 local LastTargetTime = 0
 
--- Загрузка названий слотов конфигов при старте
+-- БЕЗОПАСНАЯ РАБОТА С ФАЙЛАМИ
+local safeReadFile = function(file)
+    local s, r = pcall(function() if type(readfile) == "function" then return readfile(file) end end)
+    return s and r or nil
+end
+local safeWriteFile = function(file, data)
+    pcall(function() if type(writefile) == "function" then writefile(file, data) end end)
+end
+
 pcall(function()
-    if readfile then
-        local content = readfile("MonoSlotNames.txt")
-        if content and content ~= "" then
-            local names = {}
-            for name in string.gmatch(content, "([^|]+)") do
-                table.insert(names, name)
-            end
-            if #names == 6 then
-                Mono.ConfigNames = names
-            end
+    local content = safeReadFile("MonoSlotNames.txt")
+    if content and content ~= "" then
+        local names = {}
+        for name in string.gmatch(content, "([^|]+)") do
+            table.insert(names, name)
+        end
+        if #names == 6 then
+            Mono.ConfigNames = names
         end
     end
 end)
 
 local function SaveSlotNames()
-    pcall(function()
-        if writefile then
-            writefile("MonoSlotNames.txt", table.concat(Mono.ConfigNames, "|"))
-        end
-    end)
+    safeWriteFile("MonoSlotNames.txt", table.concat(Mono.ConfigNames, "|"))
 end
 
--- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (МЫШЬ + СЕНСОР) ===
+-- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ (СЕНСОР + ПК) ===
 local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
@@ -157,6 +152,23 @@ menuBlur.Name = "MonoMenuBlur"
 menuBlur.Size = 15
 menuBlur.Parent = Lighting
 
+-- === ПЛАВАЮЩАЯ КНОПКА МЕНЮ ДЛЯ МОБИЛОК ===
+local mobileToggle = Instance.new("TextButton")
+mobileToggle.Size = UDim2.new(0, 45, 0, 45)
+mobileToggle.Position = UDim2.new(0, 10, 0, 10)
+mobileToggle.BackgroundColor3 = Color3.fromRGB(30, 20, 40)
+mobileToggle.Text = "⬟"
+mobileToggle.TextColor3 = Color3.fromRGB(180, 130, 255)
+mobileToggle.TextSize = 24
+mobileToggle.Font = Enum.Font.GothamBlack
+mobileToggle.Active = true
+Instance.new("UICorner", mobileToggle).CornerRadius = UDim.new(1, 0)
+local toggleStroke = Instance.new("UIStroke", mobileToggle)
+toggleStroke.Color = Color3.fromRGB(180, 130, 255)
+toggleStroke.Thickness = 2
+mobileToggle.Parent = screenGui
+makeDraggable(mobileToggle)
+
 -- === ВОТЕРМАРКА (FPS / PING) ===
 local watermarkFrame = Instance.new("Frame", screenGui)
 watermarkFrame.Size = UDim2.new(0, 250, 0, 25)
@@ -169,12 +181,12 @@ Instance.new("UICorner", watermarkFrame).CornerRadius = UDim.new(0, 6)
 local watermarkStroke = Instance.new("UIStroke", watermarkFrame)
 watermarkStroke.Color = Color3.fromRGB(180, 130, 255)
 watermarkStroke.Thickness = 1
-makeDraggable(watermarkFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМОЙ
+makeDraggable(watermarkFrame)
 
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v33 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v34 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -357,7 +369,7 @@ local function doKillEffect()
     end)
 end
 
--- === ВОЗВРАЩЕННЫЙ STATUS HUD ===
+-- === STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
 hudFrame.Position = UDim2.new(1, -160, 0, 60)
@@ -367,7 +379,7 @@ hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
 hudFrame.Active = true
 Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
-makeDraggable(hudFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМЫМ
+makeDraggable(hudFrame)
 
 local hudList = Instance.new("UIListLayout", hudFrame)
 hudList.Padding = UDim.new(0, 5)
@@ -423,7 +435,7 @@ local function updateHUD()
     end)
 end
 
--- === ГЛАВНОЕ МЕНЮ С АНИМАЦИЕЙ ИЗ ЦЕНТРА ===
+-- === ГЛАВНОЕ МЕНЮ ===
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 500, 0, 340)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -433,7 +445,7 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 10)
-makeDraggable(mainFrame) -- СДЕЛАЛИ ПЕРЕТАСКИВАЕМЫМ (СЕНСОР + МЫШЬ)
+makeDraggable(mainFrame) 
 
 local bgGradient = Instance.new("UIGradient", mainFrame)
 bgGradient.Color = ColorSequence.new({
@@ -796,16 +808,16 @@ local function createSubColorPicker(parent, text, defaultColor, callback, uiName
     end
 
     hueFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             isDraggingHue = true
             updateHue(input.Position.X)
         end
     end)
     hueFrame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then isDraggingHue = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then isDraggingHue = false end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if isDraggingHue and input.UserInputType == Enum.UserInputType.MouseMovement then updateHue(input.Position.X) end
+        if isDraggingHue and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then updateHue(input.Position.X) end
     end)
     return 50
 end
@@ -1247,7 +1259,7 @@ end
 local function SaveConfig()
     pcall(function()
         local fileName = GetCurrentFileName()
-        if writefile then
+        if type(writefile) == "function" then
             local textData = EncodeTXT(GetConfigTable())
             writefile(fileName, textData)
             showNotification("💾 Saved as " .. fileName, Color3.fromRGB(0, 255, 100))
@@ -1258,7 +1270,10 @@ end
 local function LoadConfig()
     local fileName = GetCurrentFileName()
     local success, content = pcall(function()
-        return readfile(fileName)
+        if type(readfile) == "function" then
+            return readfile(fileName)
+        end
+        return nil
     end)
     
     if success and content and content ~= "" then
@@ -1272,7 +1287,7 @@ end
 
 local function ExportConfig()
     pcall(function()
-        if setclipboard then
+        if type(setclipboard) == "function" then
             local textData = EncodeTXT(GetConfigTable())
             setclipboard(textData)
             showNotification("📋 Copied to Clipboard!", Color3.fromRGB(100, 150, 255))
@@ -1558,20 +1573,36 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+mobileToggle.MouseButton1Click:Connect(function()
+    Mono.MenuOpen = not Mono.MenuOpen
+    unlockMouseBtn.Modal = Mono.MenuOpen
+    if Mono.MenuOpen then
+        mainFrame.Visible = true
+        menuBlur.Enabled = true
+        TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = 15}):Play()
+    else
+        local tw = TweenService:Create(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
+        tw:Play()
+        TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = 0}):Play()
+        tw.Completed:Connect(function()
+            if not Mono.MenuOpen then 
+                mainFrame.Visible = false 
+                menuBlur.Enabled = false
+            end
+        end)
+    end
+end)
+
 -- === ЯДРО ЧИТА ===
 local function simulateClick()
     pcall(function()
-        if mouse1press and mouse1release then
-            mouse1press()
-            task.wait(0.02)
-            mouse1release()
-        elseif mouse1click then
-            mouse1click()
-        else
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-            task.wait(0.02)
-            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-        end
+        local vim = game:GetService("VirtualInputManager")
+        local cx = Camera.ViewportSize.X / 2
+        local cy = Camera.ViewportSize.Y / 2
+        vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+        task.wait(0.05)
+        vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
     end)
 end
 
@@ -1590,7 +1621,7 @@ end
 local function raycastFromCenter()
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     local ray = Camera:ViewportPointToRay(center.X, center.Y)
-    return workspace:Raycast(ray.Origin, ray.Direction * 1500, GlobalRayParams)
+    return workspace:Raycast(ray.Origin, ray.Direction * 2000, GlobalRayParams)
 end
 
 local function getPlayerFromPart(part)
@@ -1795,7 +1826,7 @@ local function updateESP()
                 end
             end
             
-            -- OFF-SCREEN ARROWS
+            -- OFF-SCREEN ARROWS (С ОБВОДКОЙ)
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
@@ -1860,7 +1891,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v32 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v34 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
