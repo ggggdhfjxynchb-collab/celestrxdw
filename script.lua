@@ -143,7 +143,7 @@ watermarkStroke.Thickness = 1
 local watermarkText = Instance.new("TextLabel", watermarkFrame)
 watermarkText.Size = UDim2.new(1, 0, 1, 0)
 watermarkText.BackgroundTransparency = 1
-watermarkText.Text = "MONOGRAMMA v32 | FPS: -- | Ping: --ms"
+watermarkText.Text = "MONOGRAMMA v33 | FPS: -- | Ping: --ms"
 watermarkText.TextColor3 = Color3.fromRGB(255, 255, 255)
 watermarkText.Font = Enum.Font.GothamBold
 watermarkText.TextSize = 12
@@ -504,7 +504,10 @@ local function createTab(name, icon)
             activeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
             activeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         end
-        for _, p in pairs(Pages) do p.Visible = false end
+        for _, p in pairs(Pages) do 
+            p.Visible = false 
+        end
+        
         btn.BackgroundColor3 = Color3.fromRGB(180, 130, 255)
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         page.Visible = true
@@ -519,7 +522,6 @@ local visualsPage, visualsBtn = createTab("Visuals", "👁️")
 local worldPage, worldBtn = createTab("World", "🌍")
 local settingsPage, settingsBtn = createTab("Settings", "⚙️")
 
--- Обновление кнопок меню из кода
 local function setToggleStateUI(frameName, state)
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
@@ -834,7 +836,6 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
                 Size = UDim2.new(1, 0, 0, 35)
             }):Play()
             callback(opt)
-            updateHUD()
         end)
     end
 end
@@ -875,7 +876,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     end)
 end
 
--- === НОВАЯ СОВМЕЩЕННАЯ ФУНКЦИЯ ДЛЯ БИНДА И ШЕСТЕРЕНКИ ===
+-- НОВАЯ ФУНКЦИЯ: ТОГЛ С БИНДОМ И НАСТРОЙКАМИ (ШЕСТЕРЕНКОЙ)
 local function createToggleWithBindAndSettings(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, buildSettingsFunc, tooltip)
     local container = Instance.new("Frame", parent)
     container.Name = text
@@ -964,67 +965,6 @@ local function createToggleWithBindAndSettings(parent, text, defaultState, defau
         TweenService:Create(gearBtn, TweenInfo.new(0.3), {Rotation = isOpen and 90 or 0}):Play()
         local targetSize = isOpen and (35 + totalSettingsHeight + 5) or 35
         TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, targetSize)}):Play()
-    end)
-end
-
-local function createToggleWithBind(parent, text, defaultState, defaultBind, onToggle, bindTable, bindKeyName, tooltip)
-    local frame = Instance.new("Frame", parent)
-    frame.Name = text
-    frame.Size = UDim2.new(1, 0, 0, 35)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    frame.BackgroundTransparency = 0.4
-    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
-    
-    local btn = Instance.new("TextButton", frame)
-    btn.Name = "MainBtn"
-    btn.Size = UDim2.new(0, 200, 1, 0)
-    btn.BackgroundTransparency = 1
-    btn.Text = "  " .. text
-    btn.TextColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 13
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-
-    handleTooltip(btn, tooltip)
-
-    local status = Instance.new("Frame", frame)
-    status.Name = "Status"
-    status.Size = UDim2.new(0, 14, 0, 14)
-    status.Position = UDim2.new(0, 180, 0.5, -7)
-    status.BackgroundColor3 = defaultState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-    Instance.new("UICorner", status).CornerRadius = UDim.new(1, 0)
-    
-    local bindBtn = Instance.new("TextButton", frame)
-    bindBtn.Name = "BindBtn"
-    bindBtn.Size = UDim2.new(0, 100, 0, 24)
-    bindBtn.Position = UDim2.new(1, -110, 0.5, -12)
-    bindBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    bindBtn.Text = defaultBind and defaultBind.Name or "None"
-    bindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    bindBtn.Font = Enum.Font.Gotham
-    bindBtn.TextSize = 12
-    Instance.new("UICorner", bindBtn).CornerRadius = UDim.new(0, 4)
-
-    btn.MouseButton1Click:Connect(function() 
-        local newState = (status.BackgroundColor3 == Color3.fromRGB(60, 60, 70))
-        status.BackgroundColor3 = newState and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(60, 60, 70)
-        btn.TextColor3 = newState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        onToggle(newState) 
-        updateHUD()
-    end)
-
-    bindBtn.MouseButton1Click:Connect(function()
-        if BindWait then return end 
-        bindBtn.Text = "..."
-        BindWait = function(key)
-            bindTable[bindKeyName] = key
-            local kn = key.Name
-            if key == Enum.UserInputType.MouseButton1 then kn = "LMB" 
-            elseif key == Enum.UserInputType.MouseButton2 then kn = "RMB" 
-            end
-            bindBtn.Text = kn
-            BindWait = nil 
-        end
     end)
 end
 
@@ -1586,12 +1526,19 @@ end)
 
 -- === ЯДРО ЧИТА ===
 local function simulateClick()
-    if mouse1click then
-        mouse1click()
-    else
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-    end
+    pcall(function()
+        if mouse1press and mouse1release then
+            mouse1press()
+            task.wait(0.02)
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        else
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+            task.wait(0.02)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+        end
+    end)
 end
 
 local function isEnemy(plr)
@@ -1606,10 +1553,10 @@ local function getBestTargetPart(char)
     return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
 end
 
-local function raycastFromCamera()
-    local origin = Camera.CFrame.Position
-    local direction = Camera.CFrame.LookVector * 1500 
-    return workspace:Raycast(origin, direction, GlobalRayParams)
+local function raycastFromCenter()
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local ray = Camera:ViewportPointToRay(center.X, center.Y)
+    return workspace:Raycast(ray.Origin, ray.Direction * 1500, GlobalRayParams)
 end
 
 local function getPlayerFromPart(part)
@@ -1810,7 +1757,7 @@ local function updateESP()
                 end
             end
             
-            -- OFF-SCREEN ARROWS
+            -- OFF-SCREEN ARROWS (ПРИВЛЕКАТЕЛЬНЫЕ СТРЕЛКИ С ОБВОДКОЙ)
             if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Arrow then
@@ -1875,7 +1822,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v32 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v33 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -1940,9 +1887,9 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- НАСТОЯЩИЙ TRIGGERBOT
+        -- НАСТОЯЩИЙ TRIGGERBOT (ИДЕАЛЬНЫЙ ЦЕНТР ЭКРАНА)
         if Mono.TriggerBot.Enabled then
-            local hitResult = raycastFromCamera()
+            local hitResult = raycastFromCenter()
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
@@ -1961,7 +1908,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             
                             if tick() - LastShootTime > Mono.TriggerBot.Delay then
                                 LastShootTime = tick()
-                                simulateClick()
+                                task.spawn(simulateClick)
                             end
                         end
                     end
