@@ -91,27 +91,31 @@ local function SaveSlotNames()
     safeWriteFile("MonoSlotNames.txt", table.concat(Mono.ConfigNames, "|"))
 end
 
--- === УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ ===
+-- === УНИВЕРСАЛЬНАЯ БЕЗОПАСНАЯ ФУНКЦИЯ ПЕРЕТАСКИВАНИЯ ===
 local function makeDraggable(frame)
-    local dragging, dragInput, dragStart, startPos
+    local dragging = false
+    local dragInput, dragStart, startPos
+
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
-            local c; c = UserInputService.InputEnded:Connect(function(e)
-                if e.UserInputType == Enum.UserInputType.MouseButton1 or e.UserInputType == Enum.UserInputType.Touch then 
-                    dragging = false
-                    c:Disconnect() 
-                end
-            end)
         end
     end)
+
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
     frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then 
-            dragInput = input 
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then
             local delta = input.Position - dragStart
@@ -385,7 +389,7 @@ hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
 hudFrame.Active = true
 Instance.new("UICorner", hudFrame).CornerRadius = UDim.new(0, 8)
-makeDraggable(hudFrame) 
+makeDraggable(hudFrame)
 
 local hudList = Instance.new("UIListLayout", hudFrame)
 hudList.Padding = UDim.new(0, 5)
@@ -1086,37 +1090,28 @@ local function createToggleWithSettings(parent, text, defaultState, onToggle, bu
     end)
 end
 
--- === СИСТЕМА КОНФИГОВ (ЧИСТЫЙ ТЕКСТОВЫЙ ФОРМАТ .TXT) ===
+-- === СИСТЕМА КОНФИГОВ ===
 
 local function GetConfigTable()
     return {
         TeamCheck = Mono.TeamCheck,
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
-        
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
-        
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
         ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
-        
         TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
-        
         OffArrE = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
         OffArr_R = Mono.OffScreenArrows.Color.R, OffArr_G = Mono.OffScreenArrows.Color.G, OffArr_B = Mono.OffScreenArrows.Color.B,
-        
         CrossE = Mono.Crosshair.Enabled, CrossS = Mono.Crosshair.Size, CrossG = Mono.Crosshair.Gap, CrossT = Mono.Crosshair.Thickness,
         Cross_R = Mono.Crosshair.Color.R, Cross_G = Mono.Crosshair.Color.G, Cross_B = Mono.Crosshair.Color.B,
         CrossHide = Mono.Crosshair.HideDefault,
-        
         KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
         Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
-        
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
-        
         TintE = Mono.TintEnabled,
         Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
-        
         Time = Mono.TimeOfDay,
         WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
         WatermarkE = Mono.WatermarkEnabled
@@ -1190,12 +1185,8 @@ local function ApplyConfigToUI()
                 if v.Name == "ArrCol" then v.BackgroundColor3 = Mono.OffScreenArrows.Color end
                 if v.Name == "CrossCol" then v.BackgroundColor3 = Mono.Crosshair.Color end
             end
-            if v:IsA("TextButton") and v.Name == "TimeDrop" then 
-                v.Text = "  Time of Day: " .. Mono.TimeOfDay 
-            end
-            if v:IsA("TextButton") and v.Name == "AimModeBtn" then 
-                v.Text = Mono.Aimbot.Mode 
-            end
+            if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
+            if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Color3.fromRGB(180, 130, 255) or Color3.fromRGB(200, 200, 200)
@@ -1501,7 +1492,7 @@ combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 combatPage.Visible = true
 activeBtn = combatBtn
 
--- === ОБРАБОТКА НАЖАТИЙ БИНДОВ И МЕНЮ ===
+-- === ОБРАБОТКА НАЖАТИЙ ===
 UserInputService.InputBegan:Connect(function(input, gp)
     if BindWait then
         if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode ~= Enum.KeyCode.Escape then
@@ -1550,6 +1541,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- ПЛАВАЮЩАЯ КНОПКА (ОТКРЫТЬ/ЗАКРЫТЬ)
 mobileToggle.MouseButton1Click:Connect(function()
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
@@ -1571,56 +1563,18 @@ mobileToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- === НЕПРОБИВАЕМЫЙ ЯДЕРНЫЙ КЛИКЕР ===
+-- === ЯДРО ЧИТА ===
 local function simulateClick()
-    task.spawn(function()
-        -- Метод 1: mouse1click
-        local success1 = pcall(function()
-            if type(mouse1click) == "function" then
-                mouse1click()
-                return true
-            end
-            return false
-        end)
-        if success1 == true then return end
-        
-        -- Метод 2: mouse1press + release
-        local success2 = pcall(function()
-            if type(mouse1press) == "function" and type(mouse1release) == "function" then
-                mouse1press()
-                task.wait(0.02)
-                mouse1release()
-                return true
-            end
-            return false
-        end)
-        if success2 == true then return end
-        
-        -- Метод 3: VirtualInputManager
-        local success3 = pcall(function()
+    coroutine.wrap(function()
+        pcall(function()
             local vim = game:GetService("VirtualInputManager")
             local cx = Camera.ViewportSize.X / 2
             local cy = Camera.ViewportSize.Y / 2
-            if type(vim.SendMouseButtonEvent) == "function" or vim.SendMouseButtonEvent ~= nil then
-                vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-                task.wait(0.02)
-                vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
-                return true
-            end
-            return false
+            vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+            task.wait(0.01)
+            vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
         end)
-        if success3 == true then return end
-        
-        -- Метод 4: Фолбэк VirtualUser
-        pcall(function()
-            local vu = game:GetService("VirtualUser")
-            local cx = Camera.ViewportSize.X / 2
-            local cy = Camera.ViewportSize.Y / 2
-            vu:Button1Down(Vector2.new(cx, cy))
-            task.wait(0.02)
-            vu:Button1Up(Vector2.new(cx, cy))
-        end)
-    end)
+    end)()
 end
 
 local function isEnemy(plr)
@@ -1772,11 +1726,7 @@ local function updateESP()
                     bb.StudsOffset = Vector3.new(0, 3, 0)
                     bb.AlwaysOnTop = true
                     local tl = Instance.new("TextLabel", bb)
-                    tl.Size = UDim2.new(1, 0, 1, 0)
-                    tl.BackgroundTransparency = 1
-                    tl.Font = Enum.Font.GothamBold
-                    tl.TextSize = 12
-                    tl.TextStrokeTransparency = 0
+                    tl.Size = UDim2.new(1, 0, 1, 0); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.TextSize = 12; tl.TextStrokeTransparency = 0
                     
                     espCache[plr].Highlight = hl
                     espCache[plr].Billboard = bb
@@ -1908,7 +1858,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             pcall(function()
                 ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue())
             end)
-            watermarkText.Text = "MONOGRAMMA v35 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v34 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -1973,7 +1923,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- НАСТОЯЩИЙ TRIGGERBOT
+        -- НАСТОЯЩИЙ TRIGGERBOT (ИДЕАЛЬНЫЙ ЦЕНТР ЭКРАНА)
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCenter()
             if hitResult and hitResult.Instance then
