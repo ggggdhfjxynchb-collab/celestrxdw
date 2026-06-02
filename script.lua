@@ -31,6 +31,7 @@ local Mono = {
 
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, TargetHead = false },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
+    Wallbang = false, 
     
     Speed = { Enabled = false, Value = 50 },
     Push = { Enabled = false, Key = Enum.KeyCode.F },
@@ -40,9 +41,8 @@ local Mono = {
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
-    
     AbilityESP = false, 
-    AbilityCD = false, -- НОВАЯ НАСТРОЙКА КУЛДАУНОВ
+    AbilityCD = false, 
     
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
@@ -138,7 +138,7 @@ local function makeDraggable(frame)
     end)
 end
 
--- === ОПТИМИЗАЦИЯ ЛУЧЕЙ ===
+-- === ОПТИМИЗАЦИЯ ЛУЧЕЙ И WALLBANG ===
 local GlobalRayParams = RaycastParams.new()
 GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
 GlobalRayParams.IgnoreWater = true
@@ -160,6 +160,26 @@ task.spawn(function()
             GlobalRayParams.FilterDescendantsInstances = ignoreList
         end)
         task.wait(1)
+    end
+end)
+
+local function updateWallbang()
+    pcall(function()
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") then
+                -- Не трогаем игроков
+                if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
+                    -- Если Wallbang включен, выключаем CanQuery (пули летят сквозь)
+                    part.CanQuery = not Mono.Wallbang
+                end
+            end
+        end
+    end)
+end
+
+workspace.DescendantAdded:Connect(function(v)
+    if Mono.Wallbang and v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
+        pcall(function() v.CanQuery = false end)
     end
 end)
 
@@ -482,6 +502,7 @@ local function updateHUD()
 
         if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
         if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
+        if Mono.Wallbang then addActiveFeature("Wallbang") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
         if Mono.GodMode then addActiveFeature("God Mode") end
@@ -647,7 +668,6 @@ local function setToggleStateUI(frameName, state)
     end)
 end
 
--- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
     frame.Name = "Header_" .. text
@@ -1288,7 +1308,6 @@ local function createSubBind(parent, text, defaultBind, bindTable, bindKeyName, 
     return 35
 end
 
--- === НОВЫЙ ЭЛЕМЕНТ: ПАЛИТРА ДЛЯ ЦВЕТА СИСТЕМЫ (THEME COLOR) ===
 local function createColorPickerElement(parent, text, defaultColor, callback, uiName)
     local frame = Instance.new("Frame", parent)
     frame.Name = "ColorPicker_" .. text
@@ -1358,7 +1377,6 @@ end
 
 local slotGuis = {}
 
--- === ФУНКЦИЯ ДИНАМИЧЕСКОГО ОБНОВЛЕНИЯ ЦВЕТА СИСТЕМЫ ===
 local function ApplyTheme(color)
     Mono.ThemeColor = color
     local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
@@ -1417,6 +1435,7 @@ local function GetConfigTable()
         
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness, AimHead = Mono.Aimbot.TargetHead,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
+        Wallbang = Mono.Wallbang,
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
         
@@ -1473,6 +1492,7 @@ end
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
     setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
+    setToggleStateUI("Wallbang", Mono.Wallbang)
     setToggleStateUI("Speeds", Mono.Speed.Enabled)
     setToggleStateUI("Push", Mono.Push.Enabled)
     
@@ -1559,6 +1579,9 @@ local function LoadConfigFromTable(dec)
     
     Mono.TriggerBot.Enabled = dec.TrigE or false
     pcall(function() Mono.TriggerBot.Key = Enum.KeyCode[dec.TrigK] or Enum.UserInputType[dec.TrigK] end)
+
+    Mono.Wallbang = dec.Wallbang or false
+    applyWallbang()
 
     Mono.Speed.Enabled = dec.SpeedE or false
     Mono.Speed.Value = dec.SpeedV or 50
@@ -1673,6 +1696,11 @@ end, "Automatically aims at enemies.")
 
 createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
 
+createToggle(combatPage, "Wallbang", Mono.Wallbang, function(s) 
+    Mono.Wallbang = s 
+    applyWallbang()
+end, "Позволяет стрелять сквозь любые стены.")
+
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end, "FOVRadInput")
     local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end, "FOVCol")
@@ -1697,6 +1725,7 @@ createSectionHeader(combatPage, "🛠️ UTILITS")
 
 createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
     Mono.GodMode = s 
+    -- Если выключаем годмод, восстанавливаем коллизию
     if not s then
         pcall(function()
             local char = LocalPlayer.Character
@@ -1948,6 +1977,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
+    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2030,6 +2060,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
+    -- Вшитая проверка на тиму
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2250,7 +2281,7 @@ local function updateESP()
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
-            -- WALLHACK ESP И ABILITY ESP
+            -- WALLHACK ESP И ABILITY ESP (ЖЕСТКИЙ OFFSET)
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -2425,7 +2456,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v48 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v49 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2440,7 +2471,10 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             part.CanQuery = false
                             part.CanTouch = false
                         else
-                            part.CanQuery = true
+                            -- Восстанавливаем только если Wallbang выключен
+                            if not Mono.Wallbang then
+                                part.CanQuery = true
+                            end
                             part.CanTouch = true
                         end
                     end
