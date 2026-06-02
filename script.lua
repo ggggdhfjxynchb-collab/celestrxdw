@@ -35,6 +35,7 @@ local Mono = {
     
     Speed = { Enabled = false, Value = 50 },
     Push = { Enabled = false, Key = Enum.KeyCode.F },
+    Noclip = { Enabled = false, Key = Enum.KeyCode.N },
     
     GodMode = false,
     
@@ -163,13 +164,11 @@ task.spawn(function()
     end
 end)
 
-local function updateWallbang()
+local function applyWallbang()
     pcall(function()
         for _, part in pairs(workspace:GetDescendants()) do
             if part:IsA("BasePart") then
-                -- Не трогаем игроков
                 if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
-                    -- Если Wallbang включен, выключаем CanQuery (пули летят сквозь)
                     part.CanQuery = not Mono.Wallbang
                 end
             end
@@ -503,6 +502,7 @@ local function updateHUD()
         if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
         if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
         if Mono.Wallbang then addActiveFeature("Wallbang") end
+        if Mono.Noclip.Enabled then addActiveFeature("Noclip") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
         if Mono.GodMode then addActiveFeature("God Mode") end
@@ -668,6 +668,7 @@ local function setToggleStateUI(frameName, state)
     end)
 end
 
+-- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
     frame.Name = "Header_" .. text
@@ -1438,6 +1439,7 @@ local function GetConfigTable()
         Wallbang = Mono.Wallbang,
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
+        NoclipE = Mono.Noclip.Enabled, NoclipK = Mono.Noclip.Key.Name,
         
         GodMode = Mono.GodMode,
         AbilESPE = Mono.AbilityESP,
@@ -1492,9 +1494,10 @@ end
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
     setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
-    setToggleStateUI("Wallbang", Mono.Wallbang)
+    setToggleStateUI("Wallbang (Local Only)", Mono.Wallbang)
     setToggleStateUI("Speeds", Mono.Speed.Enabled)
     setToggleStateUI("Push", Mono.Push.Enabled)
+    setToggleStateUI("Noclip", Mono.Noclip.Enabled)
     
     setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
     setToggleStateUI("Show Abilities", Mono.AbilityESP)
@@ -1520,6 +1523,7 @@ local function ApplyConfigToUI()
                 if v.Parent.Parent.Name == "Aimbot (Toggle)" then v.Text = Mono.Aimbot.Key.Name end
                 if v.Parent.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
                 if v.Parent.Name == "Push" then v.Text = (Mono.Push.Key and Mono.Push.Key ~= Enum.KeyCode.Unknown) and Mono.Push.Key.Name or "None" end
+                if v.Parent.Parent.Name == "Noclip" then v.Text = (Mono.Noclip.Key and Mono.Noclip.Key ~= Enum.KeyCode.Unknown) and Mono.Noclip.Key.Name or "None" end
             end
             if v:IsA("TextBox") then
                 if v.Name == "FOVRadInput" then v.Text = tostring(Mono.FOV.Radius) end
@@ -1587,6 +1591,9 @@ local function LoadConfigFromTable(dec)
     Mono.Speed.Value = dec.SpeedV or 50
     Mono.Push.Enabled = dec.PushE or false
     pcall(function() Mono.Push.Key = Enum.KeyCode[dec.PushK] or Enum.UserInputType[dec.PushK] end)
+    
+    Mono.Noclip.Enabled = dec.NoclipE or false
+    pcall(function() Mono.Noclip.Key = Enum.KeyCode[dec.NoclipK] or Enum.UserInputType[dec.NoclipK] end)
 
     Mono.GodMode = dec.GodMode or false
     Mono.AbilityESP = dec.AbilESPE or false
@@ -1696,10 +1703,10 @@ end, "Automatically aims at enemies.")
 
 createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
 
-createToggle(combatPage, "Wallbang", Mono.Wallbang, function(s) 
+createToggle(combatPage, "Wallbang (Local Only)", Mono.Wallbang, function(s) 
     Mono.Wallbang = s 
     applyWallbang()
-end, "Позволяет стрелять сквозь любые стены.")
+end, "Делает стены простреливаемыми. В играх с серверной защитой урон не пройдет!")
 
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end, "FOVRadInput")
@@ -1708,6 +1715,8 @@ createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, functi
 end, "Shows the area where Aimbot and TriggerBot work.")
 
 createSectionHeader(combatPage, "🔪 KNIFE & MOVEMENT")
+
+createToggleWithBind(combatPage, "Noclip", Mono.Noclip.Enabled, Mono.Noclip.Key, function(s) Mono.Noclip.Enabled = s end, Mono.Noclip, "Key", "Хождение сквозь стены (Осторожно, можно провалиться!).")
 
 createToggleWithSettings(combatPage, "Speeds", Mono.Speed.Enabled, function(s) 
     Mono.Speed.Enabled = s 
@@ -1725,7 +1734,6 @@ createSectionHeader(combatPage, "🛠️ UTILITS")
 
 createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
     Mono.GodMode = s 
-    -- Если выключаем годмод, восстанавливаем коллизию
     if not s then
         pcall(function()
             local char = LocalPlayer.Character
@@ -1977,7 +1985,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
-    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -1986,6 +1993,12 @@ UserInputService.InputBegan:Connect(function(input, gp)
                 hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 50, hrp.AssemblyLinearVelocity.Z)
             end
         end
+    end
+    
+    if key == Mono.Noclip.Key and Mono.Noclip.Key ~= Enum.KeyCode.Unknown then
+        Mono.Noclip.Enabled = not Mono.Noclip.Enabled
+        setToggleStateUI("Noclip", Mono.Noclip.Enabled)
+        updateHUD()
     end
     
     if Mono.Crosshair.Key and key == Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown then
@@ -2060,7 +2073,6 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2281,7 +2293,7 @@ local function updateESP()
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
-            -- WALLHACK ESP И ABILITY ESP (ЖЕСТКИЙ OFFSET)
+            -- WALLHACK ESP И ABILITY ESP
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
@@ -2447,6 +2459,22 @@ end
 local frames = 0
 local lastUpdate = tick()
 
+RunService.Stepped:Connect(function()
+    -- NOCLIP ЛОГИКА (ВЫПОЛНЯЕТСЯ КАЖДЫЙ КАДР ФИЗИКИ)
+    if Mono.Noclip.Enabled then
+        local char = LocalPlayer.Character
+        if char then
+            pcall(function()
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end)
+        end
+    end
+end)
+
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
     pcall(function()
         updateESP()
@@ -2456,12 +2484,12 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v49 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v50 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
-        -- GOD MODE (BYPASS) - ТЕПЕРЬ ТЫ НЕ ПРОВАЛИШЬСЯ
+        -- GOD MODE (BYPASS)
         local char = LocalPlayer.Character
         if char then
             pcall(function()
@@ -2471,7 +2499,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                             part.CanQuery = false
                             part.CanTouch = false
                         else
-                            -- Восстанавливаем только если Wallbang выключен
                             if not Mono.Wallbang then
                                 part.CanQuery = true
                             end
@@ -2563,6 +2590,24 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                     end
                 end
             end
+        end
+    end)
+end)
+
+-- === AUTO-LOAD CONFIG НА СТАРТЕ ===
+task.delay(1, function()
+    pcall(function()
+        local fileName = GetCurrentFileName()
+        local success, content = pcall(function()
+            if type(readfile) == "function" then
+                return readfile(fileName)
+            end
+            return nil
+        end)
+        if success and content and content ~= "" then
+            local decoded = DecodeTXT(content)
+            LoadConfigFromTable(decoded)
+            showNotification("📂 Auto-Loaded " .. fileName, Color3.fromRGB(0, 255, 100))
         end
     end)
 end)
