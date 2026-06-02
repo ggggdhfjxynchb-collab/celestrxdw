@@ -30,12 +30,13 @@ local Mono = {
     ThemeColor = Color3.fromRGB(180, 130, 255),
 
     Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, TargetHead = false },
-    TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Delay = 0.05 },
+    TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Mode = "Legit 🎯", Delay = 0.15 },
     Wallbang = false, 
     
     Speed = { Enabled = false, Value = 50 },
     Push = { Enabled = false, Key = Enum.KeyCode.F },
     Noclip = { Enabled = false, Key = Enum.KeyCode.N },
+    Dash = { Enabled = false, Key = Enum.KeyCode.X, Distance = 20, Direction = "Forward ⬆️" },
     
     GodMode = false,
     
@@ -71,6 +72,9 @@ local Mono = {
 }
 
 local LastShootTime = 0
+local TriggerHoverTarget = nil
+local TriggerHoverStartTime = 0
+
 local BindWait = nil 
 local PlayerData = {} 
 local LastTargetHit = nil
@@ -500,8 +504,9 @@ local function updateHUD()
         end
 
         if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
-        if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
+        if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot ("..Mono.TriggerBot.Mode..")") end
         if Mono.Wallbang then addActiveFeature("Wallbang") end
+        if Mono.Dash.Enabled then addActiveFeature("Dash ("..Mono.Dash.Direction..")") end
         if Mono.Noclip.Enabled then addActiveFeature("Noclip") end
         if Mono.Speed.Enabled then addActiveFeature("Speeds") end
         if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
@@ -668,7 +673,6 @@ local function setToggleStateUI(frameName, state)
     end)
 end
 
--- === ФУНКЦИИ GUI: ЭЛЕМЕНТЫ ===
 local function createSectionHeader(parent, text)
     local frame = Instance.new("Frame", parent)
     frame.Name = "Header_" .. text
@@ -1435,11 +1439,12 @@ local function GetConfigTable()
         ThemeR = Mono.ThemeColor.R, ThemeG = Mono.ThemeColor.G, ThemeB = Mono.ThemeColor.B,
         
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness, AimHead = Mono.Aimbot.TargetHead,
-        TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name,
+        TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name, TrigMode = Mono.TriggerBot.Mode, TrigDelay = Mono.TriggerBot.Delay,
         Wallbang = Mono.Wallbang,
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
         NoclipE = Mono.Noclip.Enabled, NoclipK = Mono.Noclip.Key.Name,
+        DashE = Mono.Dash.Enabled, DashK = Mono.Dash.Key.Name, DashDist = Mono.Dash.Distance, DashDir = Mono.Dash.Direction,
         
         GodMode = Mono.GodMode,
         AbilESPE = Mono.AbilityESP,
@@ -1498,6 +1503,7 @@ local function ApplyConfigToUI()
     setToggleStateUI("Speeds", Mono.Speed.Enabled)
     setToggleStateUI("Push", Mono.Push.Enabled)
     setToggleStateUI("Noclip", Mono.Noclip.Enabled)
+    setToggleStateUI("Dash", Mono.Dash.Enabled)
     
     setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
     setToggleStateUI("Show Abilities", Mono.AbilityESP)
@@ -1524,6 +1530,7 @@ local function ApplyConfigToUI()
                 if v.Parent.Parent.Name == "TriggerBot (Toggle)" then v.Text = Mono.TriggerBot.Key.Name end
                 if v.Parent.Name == "Push" then v.Text = (Mono.Push.Key and Mono.Push.Key ~= Enum.KeyCode.Unknown) and Mono.Push.Key.Name or "None" end
                 if v.Parent.Parent.Name == "Noclip" then v.Text = (Mono.Noclip.Key and Mono.Noclip.Key ~= Enum.KeyCode.Unknown) and Mono.Noclip.Key.Name or "None" end
+                if v.Parent.Parent.Name == "Dash" then v.Text = (Mono.Dash.Key and Mono.Dash.Key ~= Enum.KeyCode.Unknown) and Mono.Dash.Key.Name or "None" end
             end
             if v:IsA("TextBox") then
                 if v.Name == "FOVRadInput" then v.Text = tostring(Mono.FOV.Radius) end
@@ -1538,6 +1545,8 @@ local function ApplyConfigToUI()
                 if v.Name == "CrossTInput" then v.Text = tostring(Mono.Crosshair.Thickness) end
                 if v.Name == "AimSmoothInput" then v.Text = tostring(Mono.Aimbot.Smoothness) end
                 if v.Name == "SpeedValInput" then v.Text = tostring(Mono.Speed.Value) end
+                if v.Name == "DashDistInput" then v.Text = tostring(Mono.Dash.Distance) end
+                if v.Name == "TrigDelayInput" then v.Text = tostring(Mono.TriggerBot.Delay) end
             end
             if v:IsA("Frame") then
                 if v.Name == "ColorPreview_ThemeColor" then v.BackgroundColor3 = Mono.ThemeColor end
@@ -1550,6 +1559,8 @@ local function ApplyConfigToUI()
             end
             if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
+            if v:IsA("TextButton") and v.Name == "TrigModeBtn" then v.Text = Mono.TriggerBot.Mode end
+            if v:IsA("TextButton") and v.Name == "DashDirBtn" then v.Text = Mono.Dash.Direction end
             if v:IsA("TextButton") and v.Name == "AimHeadToggle" then
                 v.Text = Mono.Aimbot.TargetHead and "ON" or "OFF"
                 v.TextColor3 = Mono.Aimbot.TargetHead and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
@@ -1582,6 +1593,8 @@ local function LoadConfigFromTable(dec)
     pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
     
     Mono.TriggerBot.Enabled = dec.TrigE or false
+    Mono.TriggerBot.Mode = dec.TrigMode or "Legit 🎯"
+    Mono.TriggerBot.Delay = dec.TrigDelay or 0.15
     pcall(function() Mono.TriggerBot.Key = Enum.KeyCode[dec.TrigK] or Enum.UserInputType[dec.TrigK] end)
 
     Mono.Wallbang = dec.Wallbang or false
@@ -1594,6 +1607,11 @@ local function LoadConfigFromTable(dec)
     
     Mono.Noclip.Enabled = dec.NoclipE or false
     pcall(function() Mono.Noclip.Key = Enum.KeyCode[dec.NoclipK] or Enum.UserInputType[dec.NoclipK] end)
+
+    Mono.Dash.Enabled = dec.DashE or false
+    Mono.Dash.Distance = dec.DashDist or 20
+    Mono.Dash.Direction = dec.DashDir or "Forward ⬆️"
+    pcall(function() Mono.Dash.Key = Enum.KeyCode[dec.DashK] or Enum.UserInputType[dec.DashK] end)
 
     Mono.GodMode = dec.GodMode or false
     Mono.AbilityESP = dec.AbilESPE or false
@@ -1701,7 +1719,11 @@ createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabl
     return h1 + h2 + h3 + 5
 end, "Automatically aims at enemies.")
 
-createToggleWithBind(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", "Automatically shoots when your crosshair is exactly on an enemy.")
+createToggleWithBindAndSettings(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", function(container)
+    local h1 = createSubCycleButton(container, "Mode", {"Rage 😡", "Legit 🎯"}, Mono.TriggerBot.Mode == "Rage 😡" and 1 or 2, function(val) Mono.TriggerBot.Mode = val end, "TrigModeBtn")
+    local h2 = createSubInput(container, "Reaction Delay (s)", tostring(Mono.TriggerBot.Delay), function(val) Mono.TriggerBot.Delay = tonumber(val) or 0.15 end, "TrigDelayInput")
+    return h1 + h2 + 5
+end, "Automatically shoots when your crosshair is exactly on an enemy.")
 
 createToggle(combatPage, "Wallbang (Local Only)", Mono.Wallbang, function(s) 
     Mono.Wallbang = s 
@@ -1716,7 +1738,22 @@ end, "Shows the area where Aimbot and TriggerBot work.")
 
 createSectionHeader(combatPage, "🔪 KNIFE & MOVEMENT")
 
-createToggleWithBind(combatPage, "Noclip", Mono.Noclip.Enabled, Mono.Noclip.Key, function(s) Mono.Noclip.Enabled = s end, Mono.Noclip, "Key", "Хождение сквозь стены (Осторожно, можно провалиться!).")
+createToggleWithBindAndSettings(combatPage, "Noclip", Mono.Noclip.Enabled, Mono.Noclip.Key, function(s) Mono.Noclip.Enabled = s end, Mono.Noclip, "Key", function(container)
+    return 0
+end, "Хождение сквозь стены (Осторожно, можно провалиться!).")
+
+local function getDashDirIndex(dir)
+    if dir == "Backward ⬇️" then return 2 end
+    if dir == "Left ⬅️" then return 3 end
+    if dir == "Right ➡️" then return 4 end
+    return 1
+end
+
+createToggleWithBindAndSettings(combatPage, "Dash", Mono.Dash.Enabled, Mono.Dash.Key, function(s) Mono.Dash.Enabled = s end, Mono.Dash, "Key", function(container)
+    local h1 = createSubInput(container, "Distance (Studs)", tostring(Mono.Dash.Distance), function(val) Mono.Dash.Distance = tonumber(val) or 20 end, "DashDistInput")
+    local h2 = createSubCycleButton(container, "Direction", {"Forward ⬆️", "Backward ⬇️", "Left ⬅️", "Right ➡️"}, getDashDirIndex(Mono.Dash.Direction), function(val) Mono.Dash.Direction = val end, "DashDirBtn")
+    return h1 + h2 + 5
+end, "Мгновенный телепорт (дэш) в выбранную сторону.")
 
 createToggleWithSettings(combatPage, "Speeds", Mono.Speed.Enabled, function(s) 
     Mono.Speed.Enabled = s 
@@ -1728,7 +1765,7 @@ end, function(container)
     return h1 + 5
 end, "Увеличивает вашу скорость.")
 
-createToggleWithBind(combatPage, "Push", Mono.Push.Enabled, Mono.Push.Key, function(s) Mono.Push.Enabled = s end, Mono.Push, "Key", "Подбрасывает вас вверх (можно спамить в воздухе).")
+createToggleWithBindAndSettings(combatPage, "Push", Mono.Push.Enabled, Mono.Push.Key, function(s) Mono.Push.Enabled = s end, Mono.Push, "Key", function(container) return 0 end, "Подбрасывает вас вверх (можно спамить в воздухе).")
 
 createSectionHeader(combatPage, "🛠️ UTILITS")
 
@@ -1995,6 +2032,29 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
     
+    -- БИНД DASH (ТЕЛЕПОРТ)
+    if key == Mono.Dash.Key and Mono.Dash.Enabled and Mono.Dash.Key ~= Enum.KeyCode.Unknown then
+        local char = LocalPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = Mono.Dash.Distance
+                local offset = CFrame.new(0, 0, 0)
+                if Mono.Dash.Direction == "Forward ⬆️" then
+                    offset = CFrame.new(0, 0, -dist)
+                elseif Mono.Dash.Direction == "Backward ⬇️" then
+                    offset = CFrame.new(0, 0, dist)
+                elseif Mono.Dash.Direction == "Left ⬅️" then
+                    offset = CFrame.new(-dist, 0, 0)
+                elseif Mono.Dash.Direction == "Right ➡️" then
+                    offset = CFrame.new(dist, 0, 0)
+                end
+                
+                hrp.CFrame = hrp.CFrame * offset
+            end
+        end
+    end
+    
     if key == Mono.Noclip.Key and Mono.Noclip.Key ~= Enum.KeyCode.Unknown then
         Mono.Noclip.Enabled = not Mono.Noclip.Enabled
         setToggleStateUI("Noclip", Mono.Noclip.Enabled)
@@ -2073,6 +2133,7 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
+    -- Вшитая проверка на тиму
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2484,7 +2545,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v50 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v52 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2567,8 +2628,11 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
+        -- TRIGGERBOT С ИМИТАЦИЕЙ РЕАКЦИИ
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCenter()
+            local validTarget = false
+            
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
@@ -2580,16 +2644,32 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
                         if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
-                            LastTargetHit = targetPlayer
-                            LastTargetTime = tick()
-                            if tick() - LastShootTime > Mono.TriggerBot.Delay then
-                                LastShootTime = tick()
-                                simulateClick()
+                            validTarget = true
+                            if TriggerHoverTarget ~= targetPlayer then
+                                TriggerHoverTarget = targetPlayer
+                                TriggerHoverStartTime = tick()
+                            end
+                            
+                            local reqDelay = (Mono.TriggerBot.Mode == "Legit 🎯") and Mono.TriggerBot.Delay or 0
+                            
+                            if tick() - TriggerHoverStartTime >= reqDelay then
+                                LastTargetHit = targetPlayer
+                                LastTargetTime = tick()
+                                if tick() - LastShootTime > 0.05 then
+                                    LastShootTime = tick()
+                                    simulateClick()
+                                end
                             end
                         end
                     end
                 end
             end
+            
+            if not validTarget then
+                TriggerHoverTarget = nil
+            end
+        else
+            TriggerHoverTarget = nil
         end
     end)
 end)
