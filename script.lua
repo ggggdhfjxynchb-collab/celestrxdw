@@ -40,7 +40,9 @@ local Mono = {
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
     ESP = { Enabled = false, MaxDistance = 350 },
     ESPColor = Color3.fromRGB(180, 130, 255),
+    
     AbilityESP = false, 
+    AbilityCD = false, -- НОВАЯ НАСТРОЙКА КУЛДАУНОВ
     
     TargetObjEnabled = false,
     OrbitEmoji = "🦋",
@@ -1420,6 +1422,7 @@ local function GetConfigTable()
         
         GodMode = Mono.GodMode,
         AbilESPE = Mono.AbilityESP,
+        AbilCDE = Mono.AbilityCD,
         
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
@@ -1527,6 +1530,10 @@ local function ApplyConfigToUI()
                 v.Text = Mono.Aimbot.TargetHead and "ON" or "OFF"
                 v.TextColor3 = Mono.Aimbot.TargetHead and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
             end
+            if v:IsA("TextButton") and v.Name == "AbilCDToggle" then
+                v.Text = Mono.AbilityCD and "ON" or "OFF"
+                v.TextColor3 = Mono.AbilityCD and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
+            end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
                 v.TextColor3 = Mono.Crosshair.HideDefault and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
@@ -1560,6 +1567,7 @@ local function LoadConfigFromTable(dec)
 
     Mono.GodMode = dec.GodMode or false
     Mono.AbilityESP = dec.AbilESPE or false
+    Mono.AbilityCD = dec.AbilCDE or false
 
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
@@ -1689,7 +1697,6 @@ createSectionHeader(combatPage, "🛠️ UTILITS")
 
 createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s) 
     Mono.GodMode = s 
-    -- Если выключаем годмод, восстанавливаем коллизию
     if not s then
         pcall(function()
             local char = LocalPlayer.Character
@@ -1708,7 +1715,10 @@ end, "Убирает регистрацию урона локально (пул�
 -- 2. VISUALS
 createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
 
-createToggle(visualsPage, "Show Abilities", Mono.AbilityESP, function(s) Mono.AbilityESP = s end, "Показывает способности врагов под ником.")
+createToggleWithSettings(visualsPage, "Show Abilities", Mono.AbilityESP, function(s) Mono.AbilityESP = s end, function(container)
+    local h1 = createSubToggle(container, "Cooldown Check", Mono.AbilityCD, function(val) Mono.AbilityCD = val end, "AbilCDToggle")
+    return h1 + 5
+end, "Показывает способности врагов под ником.")
 
 createToggleWithSettings(visualsPage, "Wallhack (ESP)", Mono.ESP.Enabled, function(s) Mono.ESP.Enabled = s end, function(container)
     local h1 = createSubColorPicker(container, "ESP Color", Mono.ESPColor, function(c) Mono.ESPColor = c end, "ESPCol")
@@ -1938,7 +1948,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         updateHUD()
     end
     
-    -- БИНД PUSH (FLYHACK)
     if key == Mono.Push.Key and Mono.Push.Enabled and Mono.Push.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2021,7 +2030,6 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму
     if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
         return false 
     end
@@ -2083,33 +2091,57 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК (УМНЫЙ СКАНЕР БЕЗ ИНВЕНТАРЯ)
+-- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК И УМНЫЙ СКАНЕР КУЛДАУНОВ
 local function getPlayerAbilities(plr)
     local abilities = {}
+    local cds = {}
+    
+    local function isValid(str)
+        if type(str) ~= "string" then return false end
+        local lowerStr = str:lower()
+        if lowerStr:match("rbxassetid") or lowerStr:match("http") or lowerStr:match("rbxthumb") or lowerStr:match("asset") then return false end
+        if string.len(str) < 2 or string.len(str) > 30 then return false end
+        return true
+    end
+
+    local function checkCD(val)
+        if type(val) == "number" then
+            if val > 1000000000 then 
+                local r = val - os.time()
+                if r > 0 and r < 300 then table.insert(cds, r) end
+            elseif val > 10000 then 
+                local r = val - tick()
+                if r > 0 and r < 300 then table.insert(cds, r) end
+            elseif val > 0.1 and val < 300 then
+                table.insert(cds, val)
+            end
+        end
+    end
+
     pcall(function()
-        -- 1. Сначала ищем в Attributes
         for name, val in pairs(plr:GetAttributes()) do
             local s = tostring(val)
-            if not s:lower():match("rbxasset") and not s:lower():match("http") then
-                if name:lower():match("ability") or name:lower():match("skill") or name == "Q" or name == "E" then
-                    table.insert(abilities, s)
-                end
+            if (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip") or name == "Q" or name == "E") then
+                if isValid(s) then table.insert(abilities, s) end
+            end
+            if name:lower():match("cd") or name:lower():match("cooldown") or name:lower():match("time") then
+                checkCD(val)
             end
         end
         
-        -- 2. Ищем в StringValue
         for _, obj in pairs(plr:GetDescendants()) do
             if obj:IsA("StringValue") then
                 local s = tostring(obj.Value)
-                if s ~= "" and not s:lower():match("rbxasset") and not s:lower():match("http") then
-                    if obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E" or obj.Name:lower():match("name") then
-                        table.insert(abilities, s)
-                    end
+                if isValid(s) and (obj.Name:lower():match("ability") or obj.Name:lower():match("skill") or obj.Name == "Q" or obj.Name == "E" or obj.Name:lower():match("name")) then
+                    table.insert(abilities, s)
+                end
+            elseif obj:IsA("NumberValue") or obj:IsA("IntValue") or obj:IsA("DoubleConstrainedValue") then
+                if obj.Name:lower():match("cd") or obj.Name:lower():match("cooldown") or obj.Name:lower():match("time") then
+                    checkCD(obj.Value)
                 end
             end
         end
         
-        -- 3. ФОЛБЭК: Если мы находим только картинки, возможно само название объекта — это название абилки!
         if #abilities == 0 then
             for _, obj in pairs(plr:GetDescendants()) do
                 if obj:IsA("StringValue") and (obj.Value:lower():match("rbxasset") or obj.Value:lower():match("http")) then
@@ -2121,7 +2153,6 @@ local function getPlayerAbilities(plr)
         end
     end)
     
-    -- Убираем дубликаты
     local unique = {}
     local res = {}
     for _, v in ipairs(abilities) do
@@ -2136,6 +2167,14 @@ local function getPlayerAbilities(plr)
     
     if string.len(a1) > 15 then a1 = string.sub(a1, 1, 13) .. ".." end
     if string.len(a2) > 15 then a2 = string.sub(a2, 1, 13) .. ".." end
+    
+    if Mono.AbilityCD then
+        table.sort(cds)
+        local cd1 = cds[1]
+        local cd2 = cds[2]
+        if cd1 then a1 = a1 .. string.format(" (%.1fs)", cd1) end
+        if cd2 then a2 = a2 .. string.format(" (%.1fs)", cd2) end
+    end
     
     return a1, a2
 end
@@ -2211,7 +2250,7 @@ local function updateESP()
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
             
-            -- WALLHACK ESP И ABILITY ESP (ЖЕСТКИЙ OFFSET)
+            -- WALLHACK ESP И ABILITY ESP
             if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
                 if not espCache[plr] then espCache[plr] = {} end
                 if not espCache[plr].Highlight then
