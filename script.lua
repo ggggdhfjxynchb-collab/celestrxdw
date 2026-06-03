@@ -23,7 +23,15 @@ pcall(function()
     if oldGui then oldGui:Destroy() end
     local oldBlur = Lighting:FindFirstChild("MonoMenuBlur")
     if oldBlur then oldBlur:Destroy() end
+    local oldGeiger = targetParent:FindFirstChild("MonoGeiger")
+    if oldGeiger then oldGeiger:Destroy() end
 end)
+
+local geigerSound = Instance.new("Sound")
+geigerSound.Name = "MonoGeiger"
+geigerSound.SoundId = "rbxassetid://15666462"
+geigerSound.Volume = 0.5
+geigerSound.Parent = targetParent
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
@@ -51,6 +59,9 @@ local Mono = {
     ESPColor = Color3.fromRGB(255, 255, 255),
     AbilityESP = false, 
     AbilityCD = false, 
+
+    Geiger = { Enabled = false, Radius = 200, Volume = 50 },
+    ViewModel = { Enabled = false, AnimMode = "Spin 🌪️", Speed = 5 },
     
     TargetObjEnabled = false,
     OrbitEmoji = "👁️",
@@ -70,6 +81,7 @@ local Mono = {
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "🕸️",
     CleanWorld = false, 
+    Stretch = { Enabled = false, Value = 90 },
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
@@ -80,10 +92,11 @@ local Mono = {
 local LastShootTime = 0
 local TriggerHoverTarget = nil
 local TriggerHoverStartTime = 0
+local lastGeigerTick = 0
 
 local BindWait = nil 
 local PlayerData = {} 
-local DeadCache = {}  -- БЫЛО ПРОПУЩЕНО
+local DeadCache = {}  
 local LastTargetHit = nil
 local LastTargetTime = 0
 
@@ -459,10 +472,10 @@ local function doKillEffect()
     end)
 end
 
--- === STATUS HUD & WIDGETS ===
+-- === STATUS HUD ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
-hudFrame.Position = UDim2.new(0, 20, 0.5, -100)
+hudFrame.Position = UDim2.new(1, -160, 0, 60)
 hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 hudFrame.BackgroundTransparency = Mono.MenuTransp
 hudFrame.BorderSizePixel = 0
@@ -485,64 +498,18 @@ hudTitle.TextColor3 = Mono.ThemeColor
 hudTitle.Font = Enum.Font.GothamBlack
 hudTitle.TextSize = 12
 
-local bindsFrame = Instance.new("Frame", screenGui)
-bindsFrame.Size = UDim2.new(0, 150, 0, 0)
-bindsFrame.Position = UDim2.new(0, 20, 0.5, 100)
-bindsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-bindsFrame.BackgroundTransparency = Mono.MenuTransp
-bindsFrame.BorderSizePixel = 0
-bindsFrame.ClipsDescendants = true 
-bindsFrame.Active = true
-Instance.new("UICorner", bindsFrame).CornerRadius = UDim.new(0, 8)
-makeDraggable(bindsFrame)
-
-local bindsList = Instance.new("UIListLayout", bindsFrame)
-bindsList.Padding = UDim.new(0, 5)
-bindsList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-bindsList.SortOrder = Enum.SortOrder.LayoutOrder
-
-local bindsTitle = Instance.new("TextLabel", bindsFrame)
-bindsTitle.Name = "0_Title"
-bindsTitle.Size = UDim2.new(1, 0, 0, 30)
-bindsTitle.BackgroundTransparency = 1
-bindsTitle.Text = "KEYBINDS"
-bindsTitle.TextColor3 = Mono.ThemeColor
-bindsTitle.Font = Enum.Font.GothamBlack
-bindsTitle.TextSize = 12
-
-local specFrame = Instance.new("Frame", screenGui)
-specFrame.Size = UDim2.new(0, 150, 0, 0)
-specFrame.Position = UDim2.new(1, -170, 0.5, -100)
-specFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-specFrame.BackgroundTransparency = Mono.MenuTransp
-specFrame.BorderSizePixel = 0
-specFrame.ClipsDescendants = true 
-specFrame.Active = true
-Instance.new("UICorner", specFrame).CornerRadius = UDim.new(0, 8)
-makeDraggable(specFrame)
-
-local specList = Instance.new("UIListLayout", specFrame)
-specList.Padding = UDim.new(0, 5)
-specList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-specList.SortOrder = Enum.SortOrder.LayoutOrder
-
-local specTitle = Instance.new("TextLabel", specFrame)
-specTitle.Name = "0_Title"
-specTitle.Size = UDim2.new(1, 0, 0, 30)
-specTitle.BackgroundTransparency = 1
-specTitle.Text = "SPECTATORS"
-specTitle.TextColor3 = Mono.ThemeColor
-specTitle.Font = Enum.Font.GothamBlack
-specTitle.TextSize = 12
-
 local function updateHUD()
     pcall(function()
-        for _, v in pairs(hudFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
-        for _, v in pairs(bindsFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
-        for _, v in pairs(specFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
+        for _, v in pairs(hudFrame:GetChildren()) do
+            if v:IsA("TextLabel") and v.Name ~= "0_Title" then 
+                v:Destroy() 
+            end
+        end
 
-        local function addStat(f, name, rightText, color)
-            local lbl = Instance.new("TextLabel", f)
+        local activeCount = 0
+        local function addActiveFeature(name)
+            activeCount = activeCount + 1
+            local lbl = Instance.new("TextLabel", hudFrame)
             lbl.Name = "1_" .. name
             lbl.Size = UDim2.new(1, -20, 0, 20)
             lbl.BackgroundTransparency = 1
@@ -552,58 +519,29 @@ local function updateHUD()
             lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             
-            if rightText then
-                local rt = Instance.new("TextLabel", lbl)
-                rt.Size = UDim2.new(0, 50, 1, 0)
-                rt.Position = UDim2.new(1, -50, 0, 0)
-                rt.BackgroundTransparency = 1
-                rt.Text = rightText
-                rt.TextColor3 = color or Color3.fromRGB(200, 200, 200)
-                rt.Font = Enum.Font.GothamBold
-                rt.TextSize = 11
-                rt.TextXAlignment = Enum.TextXAlignment.Right
-            else
-                local dot = Instance.new("Frame", lbl)
-                dot.Size = UDim2.new(0, 6, 0, 6)
-                dot.Position = UDim2.new(1, -10, 0.5, -3)
-                dot.BackgroundColor3 = color or Mono.ThemeColor
-                Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
-            end
+            local dot = Instance.new("Frame", lbl)
+            dot.Size = UDim2.new(0, 6, 0, 6)
+            dot.Position = UDim2.new(1, -10, 0.5, -3)
+            dot.BackgroundColor3 = Mono.ThemeColor
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
         end
 
-        local activeCount = 0
-        if Mono.Aimbot.Enabled then addStat(hudFrame, "Aimbot", "["..Mono.Aimbot.Mode.."]"); activeCount = activeCount + 1 end
-        if Mono.TriggerBot.Enabled then addStat(hudFrame, "TriggerBot", "["..Mono.TriggerBot.Mode.."]"); activeCount = activeCount + 1 end
-        if Mono.Dash.Enabled then addStat(hudFrame, "Dash", nil); activeCount = activeCount + 1 end
-        if Mono.Noclip.Enabled then addStat(hudFrame, "Noclip", nil); activeCount = activeCount + 1 end
-        if Mono.Speed.Enabled then addStat(hudFrame, "Speeds", nil); activeCount = activeCount + 1 end
-        if Mono.Push.Enabled then addStat(hudFrame, "Push", nil); activeCount = activeCount + 1 end
-        if Mono.GodMode then addStat(hudFrame, "God Mode", nil); activeCount = activeCount + 1 end
-        if Mono.ESP.Enabled then addStat(hudFrame, "Wallhack", nil); activeCount = activeCount + 1 end
-        TweenService:Create(hudFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (activeCount > 0) and (activeCount * 25 + 35) or 0)}):Play()
+        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
+        if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot") end
+        if Mono.Wallbang then addActiveFeature("Wallbang") end
+        if Mono.Dash.Enabled then addActiveFeature("Dash ("..Mono.Dash.Direction..")") end
+        if Mono.Noclip.Enabled then addActiveFeature("Noclip") end
+        if Mono.Speed.Enabled then addActiveFeature("Speeds") end
+        if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
+        if Mono.GodMode then addActiveFeature("God Mode") end
+        if Mono.CleanWorld then addActiveFeature("Max FPS") end
+        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
+        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
+        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
+        if Mono.WeatherEnabled then addActiveFeature("Weather") end
 
-        local bCount = 0
-        if Mono.Aimbot.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Aimbot", Mono.Aimbot.Key.Name); bCount = bCount + 1 end
-        if Mono.TriggerBot.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Trigger", Mono.TriggerBot.Key.Name); bCount = bCount + 1 end
-        if Mono.Dash.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Dash", Mono.Dash.Key.Name); bCount = bCount + 1 end
-        if Mono.Noclip.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Noclip", Mono.Noclip.Key.Name); bCount = bCount + 1 end
-        if Mono.Push.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Push", Mono.Push.Key.Name); bCount = bCount + 1 end
-        TweenService:Create(bindsFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (bCount > 0) and (bCount * 25 + 35) or 0)}):Play()
-
-        local sCount = 0
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                pcall(function()
-                    local target = p.Character and p.Character:FindFirstChild("Humanoid")
-                    if target and workspace.CurrentCamera.CameraSubject == target then
-                        addStat(specFrame, p.Name, "👀", Color3.fromRGB(255,50,50))
-                        sCount = sCount + 1
-                    end
-                end)
-            end
-        end
-        if sCount == 0 then addStat(specFrame, "No one", "", Color3.fromRGB(100,100,100)); sCount = 1 end
-        TweenService:Create(specFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (sCount * 25 + 35))}):Play()
+        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
+        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
     end)
 end
 
@@ -641,6 +579,7 @@ unlockMouseBtn.Parent = mainFrame
 local uiStroke = Instance.new("UIStroke", mainFrame)
 uiStroke.Thickness = 1
 uiStroke.Color = Mono.ThemeColor
+Instance.new("UICorner", uiStroke).CornerRadius = UDim.new(0, 10)
 
 local header = Instance.new("Frame", mainFrame)
 header.Size = UDim2.new(1, 0, 0, 40)
@@ -773,6 +712,7 @@ local function createSectionHeader(parent, text)
     stroke.Color = Mono.ThemeColor
     stroke.Thickness = 1
     stroke.Transparency = 0.2
+    Instance.new("UICorner", stroke).CornerRadius = UDim.new(0, 4)
     
     local lbl = Instance.new("TextLabel", frame)
     lbl.Size = UDim2.new(1, 0, 1, 0)
@@ -802,6 +742,7 @@ local function createButton(parent, text, callback, tooltip)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 13
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     
     handleTooltip(btn, tooltip)
     
@@ -1062,6 +1003,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
     mainBtn.Font = Enum.Font.GothamMedium
     mainBtn.TextSize = 13
     mainBtn.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", mainBtn).CornerRadius = UDim.new(0, 6)
     if uiName then mainBtn.Name = uiName end
 
     local arrow = Instance.new("TextLabel", mainBtn)
@@ -1076,6 +1018,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
     dropList.Size = UDim2.new(1, 0, 0, #options * 30)
     dropList.Position = UDim2.new(0, 0, 0, 35)
     dropList.BackgroundTransparency = 1
+    Instance.new("UICorner", dropList).CornerRadius = UDim.new(0, 6)
 
     local isOpen = false
     mainBtn.MouseButton1Click:Connect(function()
@@ -1098,6 +1041,7 @@ local function createDropdown(parent, text, options, defaultIndex, callback, uiN
         optBtn.Font = Enum.Font.Gotham
         optBtn.TextSize = 12
         optBtn.TextXAlignment = Enum.TextXAlignment.Left
+        Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 6)
 
         optBtn.MouseButton1Click:Connect(function()
             mainBtn.Text = "  " .. text .. ": " .. opt
@@ -1129,6 +1073,7 @@ local function createToggle(parent, text, defaultState, onToggle, tooltip)
     btn.Font = Enum.Font.GothamMedium
     btn.TextSize = 13
     btn.TextXAlignment = Enum.TextXAlignment.Left
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
     handleTooltip(btn, tooltip)
 
@@ -1155,6 +1100,7 @@ local function createToggleWithBind(parent, text, defaultState, defaultBind, onT
     frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     frame.BackgroundTransparency = 0.4
     frame.LayoutOrder = #parent:GetChildren() 
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
 
     local topBar = Instance.new("Frame", frame)
     topBar.Size = UDim2.new(1, 0, 0, 35)
@@ -1547,7 +1493,6 @@ local function ApplyTheme(color)
     ApplyFullTheme(color)
 end
 
--- Легковесное обновление только анимированных элементов (градиент, обводка)
 local function UpdateDynamicTheme(color)
     local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
     if uiStroke then uiStroke.Color = color end
@@ -1607,6 +1552,8 @@ local function GetConfigTable()
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
         ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
         AbilESPE = Mono.AbilityESP, AbilCDE = Mono.AbilityCD,
+        GeigerE = Mono.Geiger.Enabled, GeigerRad = Mono.Geiger.Radius, GeigerVol = Mono.Geiger.Volume,
+        VME = Mono.ViewModel.Enabled, VMAnim = Mono.ViewModel.AnimMode, VMSpeed = Mono.ViewModel.Speed,
         TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
         OffArrE = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
         OffArr_R = Mono.OffScreenArrows.Color.R, OffArr_G = Mono.OffScreenArrows.Color.G, OffArr_B = Mono.OffScreenArrows.Color.B,
@@ -1617,7 +1564,7 @@ local function GetConfigTable()
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
         TintE = Mono.TintEnabled, Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
         Time = Mono.TimeOfDay, WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
-        CleanW = Mono.CleanWorld, WatermarkE = Mono.WatermarkEnabled
+        CleanW = Mono.CleanWorld, StretchE = Mono.Stretch.Enabled, StretchVal = Mono.Stretch.Value, WatermarkE = Mono.WatermarkEnabled
     }
 end
 
@@ -1652,6 +1599,8 @@ local function ApplyConfigToUI()
     setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
     setToggleStateUI("Streamer Mode", Mono.StreamerMode.Enabled)
     setToggleStateUI("Show Abilities", Mono.AbilityESP)
+    setToggleStateUI("WH Sound Check (Geiger)", Mono.Geiger.Enabled)
+    setToggleStateUI("Left Hand Item", Mono.ViewModel.Enabled)
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
     setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
@@ -1662,6 +1611,7 @@ local function ApplyConfigToUI()
     setToggleStateUI("Screen Tint", Mono.TintEnabled)
     setToggleStateUI("Weather Event", Mono.WeatherEnabled)
     setToggleStateUI("Clean World (FPS Boost)", Mono.CleanWorld)
+    setToggleStateUI("Screen Stretch (FOV)", Mono.Stretch.Enabled)
     setToggleStateUI("Show Watermark", Mono.WatermarkEnabled)
     
     tintFrame.BackgroundTransparency = Mono.TintEnabled and 0.85 or 1
@@ -1701,6 +1651,10 @@ local function ApplyConfigToUI()
                 if v.Name == "MenuBlurInput" then v.Text = tostring(Mono.MenuBlur) end
                 if v.Name == "RCSPowInput" then v.Text = tostring(Mono.RCS.Power) end
                 if v.Name == "MissChanceInput" then v.Text = tostring(Mono.Aimbot.MissChance) end
+                if v.Name == "GeigerRadInput" then v.Text = tostring(Mono.Geiger.Radius) end
+                if v.Name == "GeigerVolInput" then v.Text = tostring(Mono.Geiger.Volume) end
+                if v.Name == "VMSpeedInput" then v.Text = tostring(Mono.ViewModel.Speed) end
+                if v.Name == "StretchValInput" then v.Text = tostring(Mono.Stretch.Value) end
             end
             if v:IsA("Frame") then
                 if v.Name == "ColorPreview_ThemeColor" then v.BackgroundColor3 = Mono.ThemeColor end
@@ -1718,6 +1672,7 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "DashDirBtn" then v.Text = Mono.Dash.Direction end
             if v:IsA("TextButton") and v.Name == "ThemeModeBtn" then v.Text = Mono.ThemeMode end
             if v:IsA("TextButton") and v.Name == "UIFontBtn" then v.Text = Mono.UIFont end
+            if v:IsA("TextButton") and v.Name == "VMAnimBtn" then v.Text = Mono.ViewModel.AnimMode end
             
             if v:IsA("TextButton") and v.Name == "AimHeadToggle" then
                 v.Text = Mono.Aimbot.TargetHead and "ON" or "OFF"
@@ -1786,6 +1741,12 @@ local function LoadConfigFromTable(dec)
 
     Mono.AbilityESP = dec.AbilESPE or false
     Mono.AbilityCD = dec.AbilCDE or false
+    Mono.Geiger.Enabled = dec.GeigerE or false
+    Mono.Geiger.Radius = dec.GeigerRad or 200
+    Mono.Geiger.Volume = dec.GeigerVol or 50
+    Mono.ViewModel.Enabled = dec.VME or false
+    Mono.ViewModel.AnimMode = dec.VMAnim or "Spin 🌪️"
+    Mono.ViewModel.Speed = dec.VMSpeed or 5
 
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
@@ -1826,6 +1787,8 @@ local function LoadConfigFromTable(dec)
     Mono.WeatherType = dec.WeatherType or "Rain 🌧️"
     Mono.WeatherEmoji = dec.WeathEmoji or "💸"
     
+    Mono.Stretch.Enabled = dec.StretchE or false
+    Mono.Stretch.Value = dec.StretchVal or 90
     Mono.CleanWorld = dec.CleanW or false
     executeMaxFPS()
     
@@ -1965,6 +1928,24 @@ end, "Убирает регистрацию урона локально (пул�
 -- 2. VISUALS
 createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
 
+createToggleWithSettings(visualsPage, "WH Sound Check (Geiger)", Mono.Geiger.Enabled, function(s) Mono.Geiger.Enabled = s end, function(container)
+    local h1 = createSubInput(container, "Scan Radius", tostring(Mono.Geiger.Radius), function(val) Mono.Geiger.Radius = tonumber(val) or 200 end, "GeigerRadInput")
+    local h2 = createSubInput(container, "Volume (%)", tostring(Mono.Geiger.Volume), function(val) Mono.Geiger.Volume = tonumber(val) or 50 end, "GeigerVolInput")
+    return h1 + h2 + 5
+end, "Издает треск счетчика Гейгера, если враг попадает под прицел (даже за стеной).")
+
+local function getVMAnimIndex(m)
+    if m == "Flip 🌀" then return 2 end
+    if m == "Hover ☁️" then return 3 end
+    return 1
+end
+
+createToggleWithSettings(visualsPage, "Left Hand Item", Mono.ViewModel.Enabled, function(s) Mono.ViewModel.Enabled = s end, function(container)
+    local h1 = createSubCycleButton(container, "Animation", {"Spin 🌪️", "Flip 🌀", "Hover ☁️"}, getVMAnimIndex(Mono.ViewModel.AnimMode), function(val) Mono.ViewModel.AnimMode = val end, "VMAnimBtn")
+    local h2 = createSubInput(container, "Anim Speed", tostring(Mono.ViewModel.Speed), function(val) Mono.ViewModel.Speed = tonumber(val) or 5 end, "VMSpeedInput")
+    return h1 + h2 + 5
+end, "Ищет нож/оружие в инвентаре и рендерит его в левой руке на экране.")
+
 createToggleWithSettings(visualsPage, "Show Abilities", Mono.AbilityESP, function(s) Mono.AbilityESP = s end, function(container)
     local h1 = createSubToggle(container, "Cooldown Check", Mono.AbilityCD, function(val) Mono.AbilityCD = val end, "AbilCDToggle")
     return h1 + 5
@@ -2012,6 +1993,11 @@ end, "Creates a screen flash and emoji explosion when you get a kill.")
 
 -- 3. WORLD
 createSectionHeader(worldPage, "🌍 ENVIRONMENT")
+
+createToggleWithSettings(worldPage, "Screen Stretch (FOV)", Mono.Stretch.Enabled, function(s) Mono.Stretch.Enabled = s end, function(container)
+    local h1 = createSubInput(container, "FOV (70-120)", tostring(Mono.Stretch.Value), function(val) Mono.Stretch.Value = math.clamp(tonumber(val) or 90, 10, 120) end, "StretchValInput")
+    return h1 + 5
+end, "Принудительно меняет Field of View (дает эффект растяга/зума).")
 
 createToggle(worldPage, "Clean World (FPS Boost)", Mono.CleanWorld, function(s) 
     Mono.CleanWorld = s 
@@ -2358,6 +2344,26 @@ local function isHoldingGun()
     return true
 end
 
+local function getKnifeTool(char)
+    for _, obj in pairs(char:GetChildren()) do
+        if obj:IsA("Tool") then
+            local n = string.lower(obj.Name)
+            if string.find(n, "knife") or string.find(n, "karambit") or string.find(n, "blade") or string.find(n, "sword") or string.find(n, "dagger") or string.find(n, "melee") then
+                return obj
+            end
+        end
+    end
+    for _, obj in pairs(LocalPlayer:WaitForChild("Backpack"):GetChildren()) do
+        if obj:IsA("Tool") then
+            local n = string.lower(obj.Name)
+            if string.find(n, "knife") or string.find(n, "karambit") or string.find(n, "blade") or string.find(n, "sword") or string.find(n, "dagger") or string.find(n, "melee") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
 local function getBestTargetPart(char)
     if Mono.Aimbot.Hitbox == "Head" then
         return char:FindFirstChild("Head")
@@ -2528,193 +2534,7 @@ Players.PlayerRemoving:Connect(function(plr)
     end)
 end)
 
--- === ESP, РАДАР И ЛОГИКА ===
-local espCache = {}
-
-local function updateESP()
-    local t = tick()
-    local camPos = Camera.CFrame.Position
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    local sm = Mono.StreamerMode.Enabled
-    
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr == LocalPlayer then continue end
-        if not PlayerData[plr] then PlayerData[plr] = { isDead = false, lastPos = Vector3.zero } end
-        
-        local char = plr.Character
-        local isEnem = isEnemy(plr)
-        
-        if char and char:FindFirstChild("HumanoidRootPart") then PlayerData[plr].lastPos = char.HumanoidRootPart.Position end
-        
-        local isDead = false
-        if char then
-            local hum = char:FindFirstChild("Humanoid")
-            if hum and hum.Health <= 0 then isDead = true end
-            if not char.Parent then isDead = true end 
-        else isDead = true end
-
-        if isDead then
-            if PlayerData[plr].isDead == false then
-                PlayerData[plr].isDead = true
-                local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
-                if isEnem then
-                    if LastTargetHit == plr and (tick() - LastTargetTime < 3) then doKillEffect() end
-                else
-                    if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then showNotification("☠️ " .. plr.Name .. " УМЕР", Mono.KillColor) end
-                end
-            end
-        else PlayerData[plr].isDead = false end
-
-        if char and char:FindFirstChild("HumanoidRootPart") and not isDead and not sm then
-            local targetPart = char.HumanoidRootPart
-            local distToPlayer = (targetPart.Position - camPos).Magnitude
-            local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-            
-            -- WALLHACK ESP И ABILITY ESP
-            if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
-                if not espCache[plr] then espCache[plr] = {} end
-                if not espCache[plr].Highlight then
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "MonoESP"
-                    hl.FillColor = Mono.ESPColor
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.FillTransparency = 0.5
-                    hl.OutlineTransparency = 0.2
-                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-                    
-                    local bb = Instance.new("BillboardGui")
-                    bb.Name = "MonoName"
-                    bb.Size = UDim2.new(0, 250, 0, 60) 
-                    bb.StudsOffset = Vector3.new(0, 4, 0)
-                    bb.AlwaysOnTop = true
-                    
-                    local list = Instance.new("UIListLayout", bb)
-                    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-                    list.VerticalAlignment = Enum.VerticalAlignment.Bottom
-                    list.SortOrder = Enum.SortOrder.LayoutOrder
-                    
-                    local abilText = Instance.new("TextLabel", bb)
-                    abilText.Name = "Abilities"
-                    abilText.Size = UDim2.new(1, 0, 0, 20)
-                    abilText.BackgroundTransparency = 1
-                    abilText.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBlack
-                    abilText.TextSize = 16 
-                    abilText.TextColor3 = Color3.fromRGB(255, 200, 50) 
-                    abilText.TextStrokeTransparency = 0
-                    abilText.LayoutOrder = 1 
-                    
-                    local tl = Instance.new("TextLabel", bb)
-                    tl.Name = "Name"
-                    tl.Size = UDim2.new(1, 0, 0, 15)
-                    tl.BackgroundTransparency = 1
-                    tl.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBold
-                    tl.TextSize = 12
-                    tl.TextStrokeTransparency = 0
-                    tl.LayoutOrder = 2 
-                    
-                    espCache[plr].Highlight = hl
-                    espCache[plr].Billboard = bb
-                    espCache[plr].Text = tl
-                    espCache[plr].AbilityText = abilText
-                    
-                    hl.Parent = screenGui
-                    bb.Parent = screenGui
-                end
-                
-                espCache[plr].Highlight.Enabled = true
-                espCache[plr].Billboard.Enabled = true
-                if espCache[plr].Highlight.Adornee ~= char then espCache[plr].Highlight.Adornee = char end
-                if espCache[plr].Billboard.Adornee ~= targetPart then espCache[plr].Billboard.Adornee = targetPart end
-                espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
-                espCache[plr].Highlight.FillColor = Mono.ESPColor
-                espCache[plr].Text.TextColor3 = Mono.ESPColor
-                
-                if Mono.AbilityESP then
-                    local a1, a2 = "?", "?"
-                    if AbilCache[plr] then
-                        a1, a2 = AbilCache[plr][1], AbilCache[plr][2]
-                    end
-                    espCache[plr].AbilityText.Text = "[ " .. a1 .. " | " .. a2 .. " ]"
-                    espCache[plr].AbilityText.Visible = true
-                else
-                    espCache[plr].AbilityText.Visible = false
-                end
-            else
-                if espCache[plr] and espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
-            end
-
-            -- ORBITS
-            if Mono.TargetObjEnabled and isEnem then
-                if not espCache[plr] then espCache[plr] = {} end
-                if not espCache[plr].Orbits then
-                    espCache[plr].Orbits = {}
-                    for i = 1, 3 do
-                        local bb = Instance.new("BillboardGui")
-                        bb.Size = UDim2.new(2, 0, 2, 0) 
-                        bb.AlwaysOnTop = true
-                        bb.Parent = screenGui
-                        local tl = Instance.new("TextLabel", bb)
-                        tl.Size = UDim2.new(1, 0, 1, 0)
-                        tl.BackgroundTransparency = 1
-                        tl.TextScaled = true 
-                        table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
-                    end
-                end
-                for i, orb in ipairs(espCache[plr].Orbits) do
-                    orb.gui.Enabled = true
-                    if orb.gui.Adornee ~= targetPart then orb.gui.Adornee = targetPart end
-                    orb.text.Text = Mono.OrbitEmoji
-                    local angle = t * 2 + (i * (math.pi * 2 / 3))
-                    local radius = 3.5
-                    orb.gui.StudsOffset = Vector3.new(math.cos(angle) * radius, math.sin(t * 3) * 1.5, math.sin(angle) * radius)
-                end
-            else
-                if espCache[plr] and espCache[plr].Orbits then
-                    for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end
-                end
-            end
-            
-            -- OFF-SCREEN ARROWS
-            if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
-                if not espCache[plr] then espCache[plr] = {} end
-                if not espCache[plr].Arrow then
-                    local arr = Instance.new("TextLabel")
-                    arr.Text = "▲"
-                    arr.Font = Enum.Font.GothamBlack
-                    arr.TextSize = 22
-                    arr.BackgroundTransparency = 1
-                    arr.Size = UDim2.new(0, 20, 0, 20)
-                    arr.AnchorPoint = Vector2.new(0.5, 0.5)
-                    local stroke = Instance.new("UIStroke", arr)
-                    stroke.Color = Color3.fromRGB(0, 0, 0)
-                    stroke.Thickness = 1.5
-                    stroke.Transparency = 0.2
-                    arr.Parent = screenGui
-                    espCache[plr].Arrow = arr
-                end
-                local arrow = espCache[plr].Arrow
-                arrow.Visible = true
-                arrow.TextColor3 = Mono.OffScreenArrows.Color
-                local proj = Camera.CFrame:PointToObjectSpace(targetPart.Position)
-                local angle = math.atan2(proj.X, -proj.Y)
-                local rX = center.X + math.sin(angle) * Mono.OffScreenArrows.Radius
-                local rY = center.Y - math.cos(angle) * Mono.OffScreenArrows.Radius
-                arrow.Position = UDim2.new(0, rX, 0, rY)
-                arrow.Rotation = math.deg(angle)
-            else
-                if espCache[plr] and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
-            end
-        else
-            if espCache[plr] then
-                if espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
-                if espCache[plr].Orbits then for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end end
-                if espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
-            end
-        end
-    end
-end
-
--- === ОСНОВНОЙ ЦИКЛ ===
+-- === ОСНОВНОЙ ЦИКЛ РЕНДЕРА ===
 local frames = 0
 local lastUpdate = tick()
 
@@ -2739,6 +2559,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         bindsFrame.Visible = not sm
         specFrame.Visible = not sm
         mobileToggle.Visible = not sm
+        
         if sm and Mono.MenuOpen then
             mainFrame.Visible = false
             menuBlur.Size = 0
@@ -2747,7 +2568,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             menuBlur.Size = Mono.MenuBlur
         end
 
-        -- Динамическая тема (легкое обновление, не грузит)
+        -- Динамическая тема (легкое обновление)
         local themeColor = Mono.ThemeColor
         if Mono.ThemeMode == "RGB 🌈" then
             themeColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
@@ -2756,14 +2577,91 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         end
         UpdateDynamicTheme(themeColor)
 
-        updateESP()
-        
+        -- РАСТЯГ ЭКРАНА (SCREEN STRETCH / FOV)
+        if Mono.Stretch.Enabled then
+            Camera.FieldOfView = Mono.Stretch.Value
+        end
+
+        -- СЧЕТЧИК ГЕЙГЕРА (WH SOUND CHECK)
+        if Mono.Geiger.Enabled then
+            local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local closestDist = math.huge
+            for _, plr in pairs(Players:GetPlayers()) do
+                if isEnemy(plr) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+                    local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                    if pos.Z > 0 then
+                        local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if dist < closestDist then closestDist = dist end
+                    end
+                end
+            end
+            if closestDist <= Mono.Geiger.Radius then
+                local rate = math.clamp(closestDist / Mono.Geiger.Radius, 0.05, 1) * 0.5
+                if tick() - lastGeigerTick > rate then
+                    lastGeigerTick = tick()
+                    geigerSound.Volume = (Mono.Geiger.Volume / 100) * (1 - (closestDist / Mono.Geiger.Radius))
+                    geigerSound:Play()
+                end
+            end
+        end
+
+        -- LEFT HAND VIEWMODEL
+        local vmFolder = Camera:FindFirstChild("MonoViewModel")
+        if not vmFolder then
+            vmFolder = Instance.new("Folder", Camera)
+            vmFolder.Name = "MonoViewModel"
+        end
+        if Mono.ViewModel.Enabled and not sm then
+            local char = LocalPlayer.Character
+            if char then
+                local knife = getKnifeTool(char)
+                if knife then
+                    local handle = knife:FindFirstChild("Handle") or knife:FindFirstChildOfClass("Part") or knife:FindFirstChildOfClass("MeshPart")
+                    if handle then
+                        local clone = vmFolder:FindFirstChild("VM_Item")
+                        if not clone or clone:GetAttribute("Source") ~= knife.Name then
+                            vmFolder:ClearAllChildren()
+                            clone = handle:Clone()
+                            clone.Name = "VM_Item"
+                            clone:SetAttribute("Source", knife.Name)
+                            clone.Anchored = true
+                            clone.CanCollide = false
+                            -- Очищаем лишние скрипты из клона
+                            for _, v in pairs(clone:GetDescendants()) do if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end end
+                            clone.Parent = vmFolder
+                        end
+                        
+                        local speed = Mono.ViewModel.Speed
+                        local t = tick() * speed
+                        local offset = CFrame.new(-1.5, -1, -2.5) -- Оффсет левой руки
+                        local animRot = CFrame.new()
+                        
+                        if Mono.ViewModel.AnimMode == "Spin 🌪️" then animRot = CFrame.Angles(0, t, 0)
+                        elseif Mono.ViewModel.AnimMode == "Flip 🌀" then animRot = CFrame.Angles(t, 0, 0)
+                        elseif Mono.ViewModel.AnimMode == "Hover ☁️" then 
+                            offset = offset * CFrame.new(0, math.sin(t) * 0.2, 0)
+                            animRot = CFrame.Angles(0, math.sin(t * 0.5) * 0.5, 0)
+                        end
+                        
+                        clone.CFrame = Camera.CFrame * offset * animRot
+                    else
+                        vmFolder:ClearAllChildren()
+                    end
+                else
+                    vmFolder:ClearAllChildren()
+                end
+            end
+        else
+            vmFolder:ClearAllChildren()
+        end
+
+        -- FPS И PING
         frames = frames + 1
         if tick() - lastUpdate >= 1 then
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v54 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v57 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2827,6 +2725,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local target = getClosestVisibleEnemy()
             if target then
                 local targetPos = target.Position
+                -- Miss Chance (Humanizer)
                 if Mono.Aimbot.MissChance > 0 and math.random(1, 100) <= Mono.Aimbot.MissChance then
                     targetPos = targetPos + Vector3.new(math.random(-20, 20)/10, math.random(-20, 20)/10, math.random(-20, 20)/10)
                 end
