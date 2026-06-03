@@ -83,6 +83,7 @@ local TriggerHoverStartTime = 0
 
 local BindWait = nil 
 local PlayerData = {} 
+local DeadCache = {}  -- БЫЛО ПРОПУЩЕНО
 local LastTargetHit = nil
 local LastTargetTime = 0
 
@@ -1500,7 +1501,10 @@ end
 
 local slotGuis = {}
 
-local function ApplyThemeVisuals(color)
+-- === ОПТИМИЗИРОВАННОЕ ОБНОВЛЕНИЕ ТЕМЫ ===
+local lastAppliedColor = nil
+local function ApplyFullTheme(color)
+    Mono.ThemeColor = color
     local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
     if watermarkStroke then watermarkStroke.Color = color end
     if mobileToggle then mobileToggle.TextColor3 = color end
@@ -1536,11 +1540,31 @@ local function ApplyThemeVisuals(color)
     for i, slot in ipairs(slotGuis) do
         if Mono.SelectedConfigSlot == i then slot.BackgroundColor3 = color end
     end
+    lastAppliedColor = color
 end
 
 local function ApplyTheme(color)
-    Mono.ThemeColor = color
-    ApplyThemeVisuals(color)
+    ApplyFullTheme(color)
+end
+
+-- Легковесное обновление только анимированных элементов (градиент, обводка)
+local function UpdateDynamicTheme(color)
+    local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
+    if uiStroke then uiStroke.Color = color end
+    if headerLine then headerLine.BackgroundColor3 = color end
+    if bgGradient then
+        bgGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, dimColor), 
+            ColorSequenceKeypoint.new(0.70, Color3.fromRGB(15, 15, 15)),   
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 10))
+        })
+    end
+    if hudTitle then hudTitle.TextColor3 = color end
+    if bindsTitle then bindsTitle.TextColor3 = color end
+    if specTitle then specTitle.TextColor3 = color end
+    if activeBtn then activeBtn.BackgroundColor3 = color end
+    if watermarkStroke then watermarkStroke.Color = color end
+    if toggleStroke then toggleStroke.Color = color end
 end
 
 local function ApplyFont(fontName)
@@ -2505,6 +2529,8 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
+local espCache = {}
+
 local function updateESP()
     local t = tick()
     local camPos = Camera.CFrame.Position
@@ -2676,7 +2702,7 @@ local function updateESP()
                 arrow.Position = UDim2.new(0, rX, 0, rY)
                 arrow.Rotation = math.deg(angle)
             else
-                if pcall(function() return espCache[plr].Arrow end) and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
+                if espCache[plr] and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
             end
         else
             if espCache[plr] then
@@ -2721,9 +2747,14 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             menuBlur.Size = Mono.MenuBlur
         end
 
-        if Mono.ThemeMode == "RGB 🌈" then ApplyThemeVisuals(Color3.fromHSV(tick() % 5 / 5, 1, 1))
-        elseif Mono.ThemeMode == "Fade 🌊" then ApplyThemeVisuals(Mono.ThemeColor:Lerp(Color3.new(1,1,1), (math.sin(tick() * 2) + 1) / 4))
-        else ApplyThemeVisuals(Mono.ThemeColor) end
+        -- Динамическая тема (легкое обновление, не грузит)
+        local themeColor = Mono.ThemeColor
+        if Mono.ThemeMode == "RGB 🌈" then
+            themeColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+        elseif Mono.ThemeMode == "Fade 🌊" then
+            themeColor = Mono.ThemeColor:Lerp(Color3.new(1,1,1), (math.sin(tick() * 2) + 1) / 4)
+        end
+        UpdateDynamicTheme(themeColor)
 
         updateESP()
         
@@ -2796,7 +2827,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local target = getClosestVisibleEnemy()
             if target then
                 local targetPos = target.Position
-                -- Miss Chance (Humanizer)
                 if Mono.Aimbot.MissChance > 0 and math.random(1, 100) <= Mono.Aimbot.MissChance then
                     targetPos = targetPos + Vector3.new(math.random(-20, 20)/10, math.random(-20, 20)/10, math.random(-20, 20)/10)
                 end
