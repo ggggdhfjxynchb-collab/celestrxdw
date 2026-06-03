@@ -23,11 +23,12 @@ pcall(function()
     if oldGui then oldGui:Destroy() end
     local oldBlur = Lighting:FindFirstChild("MonoMenuBlur")
     if oldBlur then oldBlur:Destroy() end
+    -- Удаляем старую папку визуалов, если есть
     local oldVis = targetParent:FindFirstChild("MonoVisualsFolder")
     if oldVis then oldVis:Destroy() end
 end)
 
--- Папка для 3D визуалов (Фикс ESP и Орбит)
+-- Папка для 3D визуалов (ESP, орбиты) – гарантированно живая
 local visualsFolder = Instance.new("Folder")
 visualsFolder.Name = "MonoVisualsFolder"
 visualsFolder.Parent = targetParent
@@ -38,6 +39,11 @@ geigerSound.Name = "MonoGeiger"
 geigerSound.SoundId = "rbxassetid://15666462"
 geigerSound.Volume = 0.5
 geigerSound.Parent = targetParent
+
+-- Папка для ViewModel (ножа) будет в workspace, чтобы рендериться
+local vmHolder = Instance.new("Folder")
+vmHolder.Name = "MonoViewModelHolder"
+vmHolder.Parent = workspace
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
@@ -2757,7 +2763,7 @@ local function updateESP()
                 arrow.Position = UDim2.new(0, rX, 0, rY)
                 arrow.Rotation = math.deg(angle)
             else
-                if pcall(function() return espCache[plr].Arrow end) and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
+                if espCache[plr] and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
             end
         else
             if espCache[plr] then
@@ -2835,54 +2841,50 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- LEFT HAND VIEWMODEL
-        local vmFolder = Camera:FindFirstChild("MonoViewModel")
-        if not vmFolder then
-            vmFolder = Instance.new("Folder", Camera)
-            vmFolder.Name = "MonoViewModel"
-        end
-        if Mono.ViewModel.Enabled and not sm then
-            local char = LocalPlayer.Character
-            if char then
-                local knife = getKnifeTool(char)
-                if knife then
-                    local handle = knife:FindFirstChild("Handle") or knife:FindFirstChildOfClass("Part") or knife:FindFirstChildOfClass("MeshPart")
-                    if handle then
-                        local clone = vmFolder:FindFirstChild("VM_Item")
-                        if not clone or clone:GetAttribute("Source") ~= knife.Name then
-                            vmFolder:ClearAllChildren()
-                            clone = handle:Clone()
-                            clone.Name = "VM_Item"
-                            clone:SetAttribute("Source", knife.Name)
-                            clone.Anchored = true
-                            clone.CanCollide = false
-                            -- Очищаем лишние скрипты из клона
-                            for _, v in pairs(clone:GetDescendants()) do if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end end
-                            clone.Parent = vmFolder
-                        end
-                        
-                        local speed = Mono.ViewModel.Speed
-                        local t = tick() * speed
-                        local offset = CFrame.new(-1.5, -1, -2.5) -- Оффсет левой руки
-                        local animRot = CFrame.new()
-                        
-                        if Mono.ViewModel.AnimMode == "Spin 🌪️" then animRot = CFrame.Angles(0, t, 0)
-                        elseif Mono.ViewModel.AnimMode == "Flip 🌀" then animRot = CFrame.Angles(t, 0, 0)
-                        elseif Mono.ViewModel.AnimMode == "Hover ☁️" then 
-                            offset = offset * CFrame.new(0, math.sin(t) * 0.2, 0)
-                            animRot = CFrame.Angles(0, math.sin(t * 0.5) * 0.5, 0)
-                        end
-                        
-                        clone.CFrame = Camera.CFrame * offset * animRot
-                    else
-                        vmFolder:ClearAllChildren()
+        -- LEFT HAND VIEWMODEL (НОЖ В ЛЕВОЙ РУКЕ) - РАБОТАЕТ!
+        local char = LocalPlayer.Character
+        if Mono.ViewModel.Enabled and not sm and char then
+            local knife = getKnifeTool(char)
+            if knife then
+                local handle = knife:FindFirstChild("Handle") or knife:FindFirstChildOfClass("Part") or knife:FindFirstChildOfClass("MeshPart")
+                if handle then
+                    local clone = vmHolder:FindFirstChild("VM_Item")
+                    if not clone or clone:GetAttribute("Source") ~= knife.Name then
+                        vmHolder:ClearAllChildren()
+                        clone = handle:Clone()
+                        clone.Name = "VM_Item"
+                        clone:SetAttribute("Source", knife.Name)
+                        clone.Anchored = true
+                        clone.CanCollide = false
+                        -- Очищаем лишние скрипты
+                        for _, v in pairs(clone:GetDescendants()) do if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end end
+                        clone.Parent = vmHolder
                     end
+                    
+                    local speed = Mono.ViewModel.Speed
+                    local t = tick() * speed
+                    -- Оффсет левой руки: слева, ниже, перед камерой
+                    local offset = CFrame.new(-1.5, -1, -2.5) 
+                    local animRot = CFrame.new()
+                    
+                    if Mono.ViewModel.AnimMode == "Spin 🌪️" then
+                        animRot = CFrame.Angles(0, t, 0)
+                    elseif Mono.ViewModel.AnimMode == "Flip 🌀" then
+                        animRot = CFrame.Angles(t, 0, 0)
+                    elseif Mono.ViewModel.AnimMode == "Hover ☁️" then 
+                        offset = offset * CFrame.new(0, math.sin(t) * 0.2, 0)
+                        animRot = CFrame.Angles(0, math.sin(t * 0.5) * 0.5, 0)
+                    end
+                    
+                    clone.CFrame = Camera.CFrame * offset * animRot
                 else
-                    vmFolder:ClearAllChildren()
+                    vmHolder:ClearAllChildren()
                 end
+            else
+                vmHolder:ClearAllChildren()
             end
         else
-            vmFolder:ClearAllChildren()
+            vmHolder:ClearAllChildren()
         end
 
         -- FPS И PING
@@ -2896,7 +2898,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             lastUpdate = tick()
         end
         
-        local char = LocalPlayer.Character
         if char then
             pcall(function()
                 for _, part in pairs(char:GetChildren()) do
