@@ -23,7 +23,14 @@ pcall(function()
     if oldGui then oldGui:Destroy() end
     local oldBlur = Lighting:FindFirstChild("MonoMenuBlur")
     if oldBlur then oldBlur:Destroy() end
+    local oldVis = targetParent:FindFirstChild("MonoVisualsFolder")
+    if oldVis then oldVis:Destroy() end
 end)
+
+-- Папка для 3D визуалов (Фикс ESP и Орбит)
+local visualsFolder = Instance.new("Folder")
+visualsFolder.Name = "MonoVisualsFolder"
+visualsFolder.Parent = targetParent
 
 -- Создаем звук Гейгера
 local geigerSound = Instance.new("Sound")
@@ -51,7 +58,6 @@ local Mono = {
     
     GodMode = false,
     StreamerMode = { Enabled = false, Key = Enum.KeyCode.F8 },
-    Wallbang = false,
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(255, 255, 255), Dynamic = false },
     ESP = { Enabled = false, MaxDistance = 350 },
@@ -80,7 +86,6 @@ local Mono = {
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "🕸️",
     CleanWorld = false, 
-    Stretch = { Enabled = false, Value = 90 },
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
@@ -184,24 +189,6 @@ task.spawn(function()
             GlobalRayParams.FilterDescendantsInstances = ignoreList
         end)
         task.wait(1)
-    end
-end)
-
-local function applyWallbang()
-    pcall(function()
-        for _, part in pairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
-                    part.CanQuery = not Mono.Wallbang
-                end
-            end
-        end
-    end)
-end
-
-workspace.DescendantAdded:Connect(function(v)
-    if Mono.Wallbang and v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
-        pcall(function() v.CanQuery = false end)
     end
 end)
 
@@ -1521,10 +1508,7 @@ end
 
 local slotGuis = {}
 
--- === ОПТИМИЗИРОВАННОЕ ОБНОВЛЕНИЕ ТЕМЫ ===
-local lastAppliedColor = nil
-local function ApplyFullTheme(color)
-    Mono.ThemeColor = color
+local function ApplyThemeVisuals(color)
     local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
     if watermarkStroke then watermarkStroke.Color = color end
     if mobileToggle then mobileToggle.TextColor3 = color end
@@ -1560,11 +1544,11 @@ local function ApplyFullTheme(color)
     for i, slot in ipairs(slotGuis) do
         if Mono.SelectedConfigSlot == i then slot.BackgroundColor3 = color end
     end
-    lastAppliedColor = color
 end
 
 local function ApplyTheme(color)
-    ApplyFullTheme(color)
+    Mono.ThemeColor = color
+    ApplyThemeVisuals(color)
 end
 
 local function UpdateDynamicTheme(color)
@@ -1619,7 +1603,7 @@ local function GetConfigTable()
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
         NoclipE = Mono.Noclip.Enabled, NoclipK = Mono.Noclip.Key.Name,
         DashE = Mono.Dash.Enabled, DashK = Mono.Dash.Key.Name, DashDist = Mono.Dash.Distance, DashDir = Mono.Dash.Direction,
-        GodMode = Mono.GodMode, StreamE = Mono.StreamerMode.Enabled, StreamK = Mono.StreamerMode.Key.Name, Wallbang = Mono.Wallbang,
+        GodMode = Mono.GodMode, StreamE = Mono.StreamerMode.Enabled, StreamK = Mono.StreamerMode.Key.Name,
         
         FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius, FOVDyn = Mono.FOV.Dynamic,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
@@ -1638,7 +1622,7 @@ local function GetConfigTable()
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
         TintE = Mono.TintEnabled, Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
         Time = Mono.TimeOfDay, WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
-        CleanW = Mono.CleanWorld, StretchE = Mono.Stretch.Enabled, StretchVal = Mono.Stretch.Value, WatermarkE = Mono.WatermarkEnabled
+        CleanW = Mono.CleanWorld, WatermarkE = Mono.WatermarkEnabled
     }
 end
 
@@ -1671,7 +1655,6 @@ local function ApplyConfigToUI()
     setToggleStateUI("Noclip", Mono.Noclip.Enabled)
     setToggleStateUI("Dash", Mono.Dash.Enabled)
     setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
-    setToggleStateUI("Wallbang (Local Only)", Mono.Wallbang)
     setToggleStateUI("Streamer Mode", Mono.StreamerMode.Enabled)
     setToggleStateUI("Show Abilities", Mono.AbilityESP)
     setToggleStateUI("WH Sound Check (Geiger)", Mono.Geiger.Enabled)
@@ -1686,7 +1669,6 @@ local function ApplyConfigToUI()
     setToggleStateUI("Screen Tint", Mono.TintEnabled)
     setToggleStateUI("Weather Event", Mono.WeatherEnabled)
     setToggleStateUI("Clean World (FPS Boost)", Mono.CleanWorld)
-    setToggleStateUI("Screen Stretch (FOV)", Mono.Stretch.Enabled)
     setToggleStateUI("Show Watermark", Mono.WatermarkEnabled)
     
     tintFrame.BackgroundTransparency = Mono.TintEnabled and 0.85 or 1
@@ -1729,7 +1711,6 @@ local function ApplyConfigToUI()
                 if v.Name == "GeigerRadInput" then v.Text = tostring(Mono.Geiger.Radius) end
                 if v.Name == "GeigerVolInput" then v.Text = tostring(Mono.Geiger.Volume) end
                 if v.Name == "VMSpeedInput" then v.Text = tostring(Mono.ViewModel.Speed) end
-                if v.Name == "StretchValInput" then v.Text = tostring(Mono.Stretch.Value) end
             end
             if v:IsA("Frame") then
                 if v.Name == "ColorPreview_ThemeColor" then v.BackgroundColor3 = Mono.ThemeColor end
@@ -1814,8 +1795,6 @@ local function LoadConfigFromTable(dec)
     Mono.StreamerMode.Enabled = dec.StreamE or false
     pcall(function() Mono.StreamerMode.Key = Enum.KeyCode[dec.StreamK] or Enum.UserInputType[dec.StreamK] end)
     
-    Mono.Wallbang = dec.Wallbang or false
-
     Mono.AbilityESP = dec.AbilESPE or false
     Mono.AbilityCD = dec.AbilCDE or false
     Mono.Geiger.Enabled = dec.GeigerE or false
@@ -1864,8 +1843,6 @@ local function LoadConfigFromTable(dec)
     Mono.WeatherType = dec.WeatherType or "Rain 🌧️"
     Mono.WeatherEmoji = dec.WeathEmoji or "💸"
     
-    Mono.Stretch.Enabled = dec.StretchE or false
-    Mono.Stretch.Value = dec.StretchVal or 90
     Mono.CleanWorld = dec.CleanW or false
     executeMaxFPS()
     
@@ -2002,11 +1979,6 @@ createToggle(combatPage, "God Mode (Bypass)", Mono.GodMode, function(s)
     end
 end, "Убирает регистрацию урона локально (пули пролетают сквозь).")
 
-createToggle(combatPage, "Wallbang (Local Only)", Mono.Wallbang, function(s) 
-    Mono.Wallbang = s 
-    applyWallbang()
-end, "Прострел стен (только локально!).")
-
 -- 2. VISUALS
 createSectionHeader(visualsPage, "👁️ ESP & OVERLAYS")
 
@@ -2075,11 +2047,6 @@ end, "Creates a screen flash and emoji explosion when you get a kill.")
 
 -- 3. WORLD
 createSectionHeader(worldPage, "🌍 ENVIRONMENT")
-
-createToggleWithSettings(worldPage, "Screen Stretch (FOV)", Mono.Stretch.Enabled, function(s) Mono.Stretch.Enabled = s end, function(container)
-    local h1 = createSubInput(container, "FOV (70-120)", tostring(Mono.Stretch.Value), function(val) Mono.Stretch.Value = math.clamp(tonumber(val) or 90, 10, 120) end, "StretchValInput")
-    return h1 + 5
-end, "Принудительно меняет Field of View (дает эффект растяга/зума).")
 
 createToggle(worldPage, "Clean World (FPS Boost)", Mono.CleanWorld, function(s) 
     Mono.CleanWorld = s 
@@ -2616,6 +2583,192 @@ Players.PlayerRemoving:Connect(function(plr)
     end)
 end)
 
+-- === ESP, РАДАР И ЛОГИКА ===
+local espCache = {}
+
+local function updateESP()
+    local t = tick()
+    local camPos = Camera.CFrame.Position
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local sm = Mono.StreamerMode.Enabled
+    
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
+        if not PlayerData[plr] then PlayerData[plr] = { isDead = false, lastPos = Vector3.zero } end
+        
+        local char = plr.Character
+        local isEnem = isEnemy(plr)
+        
+        if char and char:FindFirstChild("HumanoidRootPart") then PlayerData[plr].lastPos = char.HumanoidRootPart.Position end
+        
+        local isDead = false
+        if char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum and hum.Health <= 0 then isDead = true end
+            if not char.Parent then isDead = true end 
+        else isDead = true end
+
+        if isDead then
+            if PlayerData[plr].isDead == false then
+                PlayerData[plr].isDead = true
+                local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
+                if isEnem then
+                    if LastTargetHit == plr and (tick() - LastTargetTime < 3) then doKillEffect() end
+                else
+                    if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then showNotification("☠️ " .. plr.Name .. " УМЕР", Mono.KillColor) end
+                end
+            end
+        else PlayerData[plr].isDead = false end
+
+        if char and char:FindFirstChild("HumanoidRootPart") and not isDead and not sm then
+            local targetPart = char.HumanoidRootPart
+            local distToPlayer = (targetPart.Position - camPos).Magnitude
+            local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            
+            -- WALLHACK ESP И ABILITY ESP
+            if Mono.ESP.Enabled and isEnem and distToPlayer <= Mono.ESP.MaxDistance then
+                if not espCache[plr] then espCache[plr] = {} end
+                if not espCache[plr].Highlight then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "MonoESP"
+                    hl.FillColor = Mono.ESPColor
+                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    hl.FillTransparency = 0.5
+                    hl.OutlineTransparency = 0.2
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    
+                    local bb = Instance.new("BillboardGui")
+                    bb.Name = "MonoName"
+                    bb.Size = UDim2.new(0, 250, 0, 60) 
+                    bb.StudsOffset = Vector3.new(0, 4, 0)
+                    bb.AlwaysOnTop = true
+                    
+                    local list = Instance.new("UIListLayout", bb)
+                    list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                    list.VerticalAlignment = Enum.VerticalAlignment.Bottom
+                    list.SortOrder = Enum.SortOrder.LayoutOrder
+                    
+                    local abilText = Instance.new("TextLabel", bb)
+                    abilText.Name = "Abilities"
+                    abilText.Size = UDim2.new(1, 0, 0, 20)
+                    abilText.BackgroundTransparency = 1
+                    abilText.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBlack
+                    abilText.TextSize = 16 
+                    abilText.TextColor3 = Color3.fromRGB(255, 200, 50) 
+                    abilText.TextStrokeTransparency = 0
+                    abilText.LayoutOrder = 1 
+                    
+                    local tl = Instance.new("TextLabel", bb)
+                    tl.Name = "Name"
+                    tl.Size = UDim2.new(1, 0, 0, 15)
+                    tl.BackgroundTransparency = 1
+                    tl.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBold
+                    tl.TextSize = 12
+                    tl.TextStrokeTransparency = 0
+                    tl.LayoutOrder = 2 
+                    
+                    espCache[plr].Highlight = hl
+                    espCache[plr].Billboard = bb
+                    espCache[plr].Text = tl
+                    espCache[plr].AbilityText = abilText
+                    
+                    hl.Parent = visualsFolder
+                    bb.Parent = visualsFolder
+                end
+                
+                espCache[plr].Highlight.Enabled = true
+                espCache[plr].Billboard.Enabled = true
+                if espCache[plr].Highlight.Adornee ~= char then espCache[plr].Highlight.Adornee = char end
+                if espCache[plr].Billboard.Adornee ~= targetPart then espCache[plr].Billboard.Adornee = targetPart end
+                espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
+                espCache[plr].Highlight.FillColor = Mono.ESPColor
+                espCache[plr].Text.TextColor3 = Mono.ESPColor
+                
+                if Mono.AbilityESP then
+                    local a1, a2 = "?", "?"
+                    if AbilCache[plr] then
+                        a1, a2 = AbilCache[plr][1], AbilCache[plr][2]
+                    end
+                    espCache[plr].AbilityText.Text = "[ " .. a1 .. " | " .. a2 .. " ]"
+                    espCache[plr].AbilityText.Visible = true
+                else
+                    espCache[plr].AbilityText.Visible = false
+                end
+            else
+                if espCache[plr] and espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
+            end
+
+            -- ORBITS
+            if Mono.TargetObjEnabled and isEnem then
+                if not espCache[plr] then espCache[plr] = {} end
+                if not espCache[plr].Orbits then
+                    espCache[plr].Orbits = {}
+                    for i = 1, 3 do
+                        local bb = Instance.new("BillboardGui")
+                        bb.Size = UDim2.new(2, 0, 2, 0) 
+                        bb.AlwaysOnTop = true
+                        bb.Parent = visualsFolder
+                        local tl = Instance.new("TextLabel", bb)
+                        tl.Size = UDim2.new(1, 0, 1, 0)
+                        tl.BackgroundTransparency = 1
+                        tl.TextScaled = true 
+                        table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
+                    end
+                end
+                for i, orb in ipairs(espCache[plr].Orbits) do
+                    orb.gui.Enabled = true
+                    if orb.gui.Adornee ~= targetPart then orb.gui.Adornee = targetPart end
+                    orb.text.Text = Mono.OrbitEmoji
+                    local angle = t * 2 + (i * (math.pi * 2 / 3))
+                    local radius = 3.5
+                    orb.gui.StudsOffset = Vector3.new(math.cos(angle) * radius, math.sin(t * 3) * 1.5, math.sin(angle) * radius)
+                end
+            else
+                if espCache[plr] and espCache[plr].Orbits then
+                    for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end
+                end
+            end
+            
+            -- OFF-SCREEN ARROWS
+            if Mono.OffScreenArrows.Enabled and isEnem and not onScreen and distToPlayer <= 500 then
+                if not espCache[plr] then espCache[plr] = {} end
+                if not espCache[plr].Arrow then
+                    local arr = Instance.new("TextLabel")
+                    arr.Text = "▲"
+                    arr.Font = Enum.Font.GothamBlack
+                    arr.TextSize = 22
+                    arr.BackgroundTransparency = 1
+                    arr.Size = UDim2.new(0, 20, 0, 20)
+                    arr.AnchorPoint = Vector2.new(0.5, 0.5)
+                    local stroke = Instance.new("UIStroke", arr)
+                    stroke.Color = Color3.fromRGB(0, 0, 0)
+                    stroke.Thickness = 1.5
+                    stroke.Transparency = 0.2
+                    arr.Parent = screenGui
+                    espCache[plr].Arrow = arr
+                end
+                local arrow = espCache[plr].Arrow
+                arrow.Visible = true
+                arrow.TextColor3 = Mono.OffScreenArrows.Color
+                local proj = Camera.CFrame:PointToObjectSpace(targetPart.Position)
+                local angle = math.atan2(proj.X, -proj.Y)
+                local rX = center.X + math.sin(angle) * Mono.OffScreenArrows.Radius
+                local rY = center.Y - math.cos(angle) * Mono.OffScreenArrows.Radius
+                arrow.Position = UDim2.new(0, rX, 0, rY)
+                arrow.Rotation = math.deg(angle)
+            else
+                if pcall(function() return espCache[plr].Arrow end) and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
+            end
+        else
+            if espCache[plr] then
+                if espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
+                if espCache[plr].Orbits then for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end end
+                if espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
+            end
+        end
+    end
+end
+
 -- === ОСНОВНОЙ ЦИКЛ РЕНДЕРА ===
 local frames = 0
 local lastUpdate = tick()
@@ -2658,11 +2811,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             themeColor = Mono.ThemeColor:Lerp(Color3.new(1,1,1), (math.sin(tick() * 2) + 1) / 4)
         end
         UpdateDynamicTheme(themeColor)
-
-        -- РАСТЯГ ЭКРАНА (SCREEN STRETCH / FOV)
-        if Mono.Stretch.Enabled then
-            Camera.FieldOfView = Mono.Stretch.Value
-        end
 
         -- СЧЕТЧИК ГЕЙГЕРА (WH SOUND CHECK)
         if Mono.Geiger.Enabled then
@@ -2743,7 +2891,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v55 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v56 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2754,7 +2902,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                 for _, part in pairs(char:GetChildren()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                         if Mono.GodMode then part.CanQuery = false; part.CanTouch = false
-                        else if not Mono.Wallbang then part.CanQuery = true end part.CanTouch = true end
+                        else part.CanQuery = true; part.CanTouch = true end
                     end
                 end
             end)
