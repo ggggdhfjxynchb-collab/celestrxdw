@@ -33,7 +33,7 @@ local Mono = {
     MenuBlur = 15,
     MenuTransp = 0.2,
 
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, Hitbox = "Head", MissChance = 0 },
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, Hitbox = "Head", MissChance = 0, TargetHead = false },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Mode = "Legit 🎯", Delay = 0.15 },
     RCS = { Enabled = false, Power = 10 },
     
@@ -44,6 +44,7 @@ local Mono = {
     
     GodMode = false,
     StreamerMode = { Enabled = false, Key = Enum.KeyCode.F8 },
+    Wallbang = false,
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(255, 255, 255), Dynamic = false },
     ESP = { Enabled = false, MaxDistance = 350 },
@@ -170,6 +171,24 @@ task.spawn(function()
             GlobalRayParams.FilterDescendantsInstances = ignoreList
         end)
         task.wait(1)
+    end
+end)
+
+local function applyWallbang()
+    pcall(function()
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
+                    part.CanQuery = not Mono.Wallbang
+                end
+            end
+        end
+    end)
+end
+
+workspace.DescendantAdded:Connect(function(v)
+    if Mono.Wallbang and v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
+        pcall(function() v.CanQuery = false end)
     end
 end)
 
@@ -465,7 +484,6 @@ hudTitle.TextColor3 = Mono.ThemeColor
 hudTitle.Font = Enum.Font.GothamBlack
 hudTitle.TextSize = 12
 
--- Binds Widget
 local bindsFrame = Instance.new("Frame", screenGui)
 bindsFrame.Size = UDim2.new(0, 150, 0, 0)
 bindsFrame.Position = UDim2.new(0, 20, 0.5, 100)
@@ -491,7 +509,6 @@ bindsTitle.TextColor3 = Mono.ThemeColor
 bindsTitle.Font = Enum.Font.GothamBlack
 bindsTitle.TextSize = 12
 
--- Specs Widget
 local specFrame = Instance.new("Frame", screenGui)
 specFrame.Size = UDim2.new(0, 150, 0, 0)
 specFrame.Position = UDim2.new(1, -170, 0.5, -100)
@@ -575,7 +592,6 @@ local function updateHUD()
         local sCount = 0
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer then
-                -- Попытка прочитать камеру (работает не во всех играх)
                 pcall(function()
                     local target = p.Character and p.Character:FindFirstChild("Humanoid")
                     if target and workspace.CurrentCamera.CameraSubject == target then
@@ -1469,7 +1485,8 @@ local function createColorPickerElement(parent, text, defaultColor, callback, ui
 
     hueFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDraggingHue = true; updateHue(input.Position.X)
+            isDraggingHue = true
+            updateHue(input.Position.X)
         end
     end)
     hueFrame.InputEnded:Connect(function(input)
@@ -2456,6 +2473,22 @@ local function getPlayerAbilities(plr)
     return a1, a2
 end
 
+-- === КЭШИРОВАНИЕ АБИЛОК (ФИКС FPS) ===
+local AbilCache = {}
+task.spawn(function()
+    while true do
+        pcall(function()
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer and plr.Character then
+                    local a1, a2 = getPlayerAbilities(plr)
+                    AbilCache[plr] = {a1, a2}
+                end
+            end
+        end)
+        task.wait(0.5) 
+    end
+end)
+
 Players.PlayerRemoving:Connect(function(plr)
     pcall(function()
         if espCache[plr] then
@@ -2467,6 +2500,7 @@ Players.PlayerRemoving:Connect(function(plr)
         end
         DeadCache[plr] = nil
         PlayerData[plr] = nil
+        AbilCache[plr] = nil
     end)
 end)
 
@@ -2570,7 +2604,10 @@ local function updateESP()
                 espCache[plr].Text.TextColor3 = Mono.ESPColor
                 
                 if Mono.AbilityESP then
-                    local a1, a2 = getPlayerAbilities(plr)
+                    local a1, a2 = "?", "?"
+                    if AbilCache[plr] then
+                        a1, a2 = AbilCache[plr][1], AbilCache[plr][2]
+                    end
                     espCache[plr].AbilityText.Text = "[ " .. a1 .. " | " .. a2 .. " ]"
                     espCache[plr].AbilityText.Visible = true
                 else
@@ -2695,7 +2732,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v53 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v54 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
