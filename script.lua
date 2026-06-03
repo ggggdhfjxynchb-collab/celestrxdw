@@ -27,11 +27,15 @@ end)
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
-    ThemeColor = Color3.fromRGB(180, 130, 255),
+    ThemeColor = Color3.fromRGB(255, 255, 255),
+    ThemeMode = "Static", 
+    UIFont = "Gotham",
+    MenuBlur = 15,
+    MenuTransp = 0.2,
 
-    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, TargetHead = false },
+    Aimbot = { Enabled = false, Key = Enum.KeyCode.C, Mode = "Rage 😡", Smoothness = 0.2, Hitbox = "Head", MissChance = 0 },
     TriggerBot = { Enabled = false, Key = Enum.KeyCode.V, Mode = "Legit 🎯", Delay = 0.15 },
-    Wallbang = false, 
+    RCS = { Enabled = false, Power = 10 },
     
     Speed = { Enabled = false, Value = 50 },
     Push = { Enabled = false, Key = Enum.KeyCode.F },
@@ -39,30 +43,31 @@ local Mono = {
     Dash = { Enabled = false, Key = Enum.KeyCode.X, Distance = 20, Direction = "Forward ⬆️" },
     
     GodMode = false,
+    StreamerMode = { Enabled = false, Key = Enum.KeyCode.F8 },
     
-    FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(180, 130, 255) },
+    FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(255, 255, 255), Dynamic = false },
     ESP = { Enabled = false, MaxDistance = 350 },
-    ESPColor = Color3.fromRGB(180, 130, 255),
+    ESPColor = Color3.fromRGB(255, 255, 255),
     AbilityESP = false, 
     AbilityCD = false, 
     
     TargetObjEnabled = false,
-    OrbitEmoji = "🦋",
-    OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 50, 50) }, 
-    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(180, 130, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
+    OrbitEmoji = "👁️",
+    OffScreenArrows = { Enabled = false, Radius = 100, Color = Color3.fromRGB(255, 255, 255) }, 
+    Crosshair = { Enabled = false, Size = 8, Gap = 4, Thickness = 2, Color = Color3.fromRGB(255, 255, 255), HideDefault = false, Key = Enum.KeyCode.Unknown }, 
     
     KillEffect = false,
     KillEmoji = "💀", 
-    KillColor = Color3.fromRGB(255, 50, 50), 
+    KillColor = Color3.fromRGB(255, 255, 255), 
     TeammateNotifs = false,
     DeathNotifDistance = 150, 
     
     TintEnabled = false,
-    TintColor = Color3.fromRGB(110, 60, 220),
+    TintColor = Color3.fromRGB(255, 255, 255),
     TimeOfDay = "Default", 
     WeatherEnabled = false,
     WeatherType = "Rain 🌧️",       
-    WeatherEmoji = "💸",
+    WeatherEmoji = "🕸️",
     CleanWorld = false, 
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
@@ -143,7 +148,7 @@ local function makeDraggable(frame)
     end)
 end
 
--- === ОПТИМИЗАЦИЯ ЛУЧЕЙ И WALLBANG ===
+-- === ОПТИМИЗАЦИЯ ЛУЧЕЙ ===
 local GlobalRayParams = RaycastParams.new()
 GlobalRayParams.FilterType = Enum.RaycastFilterType.Exclude
 GlobalRayParams.IgnoreWater = true
@@ -165,24 +170,6 @@ task.spawn(function()
             GlobalRayParams.FilterDescendantsInstances = ignoreList
         end)
         task.wait(1)
-    end
-end)
-
-local function applyWallbang()
-    pcall(function()
-        for _, part in pairs(workspace:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
-                    part.CanQuery = not Mono.Wallbang
-                end
-            end
-        end
-    end)
-end
-
-workspace.DescendantAdded:Connect(function(v)
-    if Mono.Wallbang and v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
-        pcall(function() v.CanQuery = false end)
     end
 end)
 
@@ -229,7 +216,7 @@ screenGui.Parent = targetParent
 -- === BLUR ФОНА ===
 local menuBlur = Instance.new("BlurEffect")
 menuBlur.Name = "MonoMenuBlur"
-menuBlur.Size = 15
+menuBlur.Size = Mono.MenuBlur
 menuBlur.Parent = Lighting
 
 -- === ПЛАВАЮЩАЯ КНОПКА МЕНЮ ===
@@ -308,7 +295,7 @@ task.spawn(function()
     while true do
         task.wait(0.08) 
         pcall(function()
-            if Mono.WeatherEnabled then
+            if Mono.WeatherEnabled and not Mono.StreamerMode.Enabled then
                 local isRain = (Mono.WeatherType == "Rain 🌧️")
                 local wDrop = Instance.new("TextLabel", weatherContainer)
                 wDrop.BackgroundTransparency = 1
@@ -355,6 +342,7 @@ ttText.TextWrapped = true
 local function handleTooltip(uiElement, text)
     if not text then return end
     uiElement.MouseEnter:Connect(function()
+        if Mono.StreamerMode.Enabled then return end
         ttText.Text = text
         local textBounds = ttText.TextBounds
         tooltipGui.Size = UDim2.new(0, textBounds.X + 20, 0, textBounds.Y + 20)
@@ -382,6 +370,7 @@ notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 notifLayout.Padding = UDim.new(0, 8)
 
 local function showNotification(text, color)
+    if Mono.StreamerMode.Enabled then return end
     pcall(function()
         local notif = Instance.new("TextLabel")
         notif.Text = text 
@@ -417,6 +406,7 @@ flashFrame.ZIndex = 9999
 flashFrame.Parent = screenGui
 
 local function doKillEffect()
+    if Mono.StreamerMode.Enabled then return end
     pcall(function()
         if not Mono.KillEffect then return end
         
@@ -449,12 +439,12 @@ local function doKillEffect()
     end)
 end
 
--- === STATUS HUD ===
+-- === STATUS HUD & WIDGETS ===
 local hudFrame = Instance.new("Frame", screenGui)
 hudFrame.Size = UDim2.new(0, 150, 0, 0)
-hudFrame.Position = UDim2.new(1, -160, 0, 60)
+hudFrame.Position = UDim2.new(0, 20, 0.5, -100)
 hudFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-hudFrame.BackgroundTransparency = 0.2
+hudFrame.BackgroundTransparency = Mono.MenuTransp
 hudFrame.BorderSizePixel = 0
 hudFrame.ClipsDescendants = true 
 hudFrame.Active = true
@@ -475,18 +465,66 @@ hudTitle.TextColor3 = Mono.ThemeColor
 hudTitle.Font = Enum.Font.GothamBlack
 hudTitle.TextSize = 12
 
+-- Binds Widget
+local bindsFrame = Instance.new("Frame", screenGui)
+bindsFrame.Size = UDim2.new(0, 150, 0, 0)
+bindsFrame.Position = UDim2.new(0, 20, 0.5, 100)
+bindsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+bindsFrame.BackgroundTransparency = Mono.MenuTransp
+bindsFrame.BorderSizePixel = 0
+bindsFrame.ClipsDescendants = true 
+bindsFrame.Active = true
+Instance.new("UICorner", bindsFrame).CornerRadius = UDim.new(0, 8)
+makeDraggable(bindsFrame)
+
+local bindsList = Instance.new("UIListLayout", bindsFrame)
+bindsList.Padding = UDim.new(0, 5)
+bindsList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+bindsList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local bindsTitle = Instance.new("TextLabel", bindsFrame)
+bindsTitle.Name = "0_Title"
+bindsTitle.Size = UDim2.new(1, 0, 0, 30)
+bindsTitle.BackgroundTransparency = 1
+bindsTitle.Text = "KEYBINDS"
+bindsTitle.TextColor3 = Mono.ThemeColor
+bindsTitle.Font = Enum.Font.GothamBlack
+bindsTitle.TextSize = 12
+
+-- Specs Widget
+local specFrame = Instance.new("Frame", screenGui)
+specFrame.Size = UDim2.new(0, 150, 0, 0)
+specFrame.Position = UDim2.new(1, -170, 0.5, -100)
+specFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+specFrame.BackgroundTransparency = Mono.MenuTransp
+specFrame.BorderSizePixel = 0
+specFrame.ClipsDescendants = true 
+specFrame.Active = true
+Instance.new("UICorner", specFrame).CornerRadius = UDim.new(0, 8)
+makeDraggable(specFrame)
+
+local specList = Instance.new("UIListLayout", specFrame)
+specList.Padding = UDim.new(0, 5)
+specList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+specList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local specTitle = Instance.new("TextLabel", specFrame)
+specTitle.Name = "0_Title"
+specTitle.Size = UDim2.new(1, 0, 0, 30)
+specTitle.BackgroundTransparency = 1
+specTitle.Text = "SPECTATORS"
+specTitle.TextColor3 = Mono.ThemeColor
+specTitle.Font = Enum.Font.GothamBlack
+specTitle.TextSize = 12
+
 local function updateHUD()
     pcall(function()
-        for _, v in pairs(hudFrame:GetChildren()) do
-            if v:IsA("TextLabel") and v.Name ~= "0_Title" then 
-                v:Destroy() 
-            end
-        end
+        for _, v in pairs(hudFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
+        for _, v in pairs(bindsFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
+        for _, v in pairs(specFrame:GetChildren()) do if v:IsA("TextLabel") and v.Name ~= "0_Title" then v:Destroy() end end
 
-        local activeCount = 0
-        local function addActiveFeature(name)
-            activeCount = activeCount + 1
-            local lbl = Instance.new("TextLabel", hudFrame)
+        local function addStat(f, name, rightText, color)
+            local lbl = Instance.new("TextLabel", f)
             lbl.Name = "1_" .. name
             lbl.Size = UDim2.new(1, -20, 0, 20)
             lbl.BackgroundTransparency = 1
@@ -496,29 +534,59 @@ local function updateHUD()
             lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             
-            local dot = Instance.new("Frame", lbl)
-            dot.Size = UDim2.new(0, 6, 0, 6)
-            dot.Position = UDim2.new(1, -10, 0.5, -3)
-            dot.BackgroundColor3 = Mono.ThemeColor
-            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+            if rightText then
+                local rt = Instance.new("TextLabel", lbl)
+                rt.Size = UDim2.new(0, 50, 1, 0)
+                rt.Position = UDim2.new(1, -50, 0, 0)
+                rt.BackgroundTransparency = 1
+                rt.Text = rightText
+                rt.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+                rt.Font = Enum.Font.GothamBold
+                rt.TextSize = 11
+                rt.TextXAlignment = Enum.TextXAlignment.Right
+            else
+                local dot = Instance.new("Frame", lbl)
+                dot.Size = UDim2.new(0, 6, 0, 6)
+                dot.Position = UDim2.new(1, -10, 0.5, -3)
+                dot.BackgroundColor3 = color or Mono.ThemeColor
+                Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+            end
         end
 
-        if Mono.Aimbot.Enabled then addActiveFeature("Aimbot (".. Mono.Aimbot.Mode ..")") end
-        if Mono.TriggerBot.Enabled then addActiveFeature("TriggerBot ("..Mono.TriggerBot.Mode..")") end
-        if Mono.Wallbang then addActiveFeature("Wallbang") end
-        if Mono.Dash.Enabled then addActiveFeature("Dash ("..Mono.Dash.Direction..")") end
-        if Mono.Noclip.Enabled then addActiveFeature("Noclip") end
-        if Mono.Speed.Enabled then addActiveFeature("Speeds") end
-        if Mono.Push.Enabled then addActiveFeature("Push (Fly)") end
-        if Mono.GodMode then addActiveFeature("God Mode") end
-        if Mono.CleanWorld then addActiveFeature("Max FPS") end
-        if Mono.ESP.Enabled then addActiveFeature("Wallhack") end
-        if Mono.TargetObjEnabled then addActiveFeature("Orbits") end
-        if Mono.TintEnabled then addActiveFeature("Screen Tint") end
-        if Mono.WeatherEnabled then addActiveFeature("Weather") end
+        local activeCount = 0
+        if Mono.Aimbot.Enabled then addStat(hudFrame, "Aimbot", "["..Mono.Aimbot.Mode.."]"); activeCount = activeCount + 1 end
+        if Mono.TriggerBot.Enabled then addStat(hudFrame, "TriggerBot", "["..Mono.TriggerBot.Mode.."]"); activeCount = activeCount + 1 end
+        if Mono.Dash.Enabled then addStat(hudFrame, "Dash", nil); activeCount = activeCount + 1 end
+        if Mono.Noclip.Enabled then addStat(hudFrame, "Noclip", nil); activeCount = activeCount + 1 end
+        if Mono.Speed.Enabled then addStat(hudFrame, "Speeds", nil); activeCount = activeCount + 1 end
+        if Mono.Push.Enabled then addStat(hudFrame, "Push", nil); activeCount = activeCount + 1 end
+        if Mono.GodMode then addStat(hudFrame, "God Mode", nil); activeCount = activeCount + 1 end
+        if Mono.ESP.Enabled then addStat(hudFrame, "Wallhack", nil); activeCount = activeCount + 1 end
+        TweenService:Create(hudFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (activeCount > 0) and (activeCount * 25 + 35) or 0)}):Play()
 
-        local targetHeight = (activeCount > 0) and (activeCount * 25 + 35) or 0
-        TweenService:Create(hudFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, targetHeight)}):Play()
+        local bCount = 0
+        if Mono.Aimbot.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Aimbot", Mono.Aimbot.Key.Name); bCount = bCount + 1 end
+        if Mono.TriggerBot.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Trigger", Mono.TriggerBot.Key.Name); bCount = bCount + 1 end
+        if Mono.Dash.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Dash", Mono.Dash.Key.Name); bCount = bCount + 1 end
+        if Mono.Noclip.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Noclip", Mono.Noclip.Key.Name); bCount = bCount + 1 end
+        if Mono.Push.Key ~= Enum.KeyCode.Unknown then addStat(bindsFrame, "Push", Mono.Push.Key.Name); bCount = bCount + 1 end
+        TweenService:Create(bindsFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (bCount > 0) and (bCount * 25 + 35) or 0)}):Play()
+
+        local sCount = 0
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                -- Попытка прочитать камеру (работает не во всех играх)
+                pcall(function()
+                    local target = p.Character and p.Character:FindFirstChild("Humanoid")
+                    if target and workspace.CurrentCamera.CameraSubject == target then
+                        addStat(specFrame, p.Name, "👀", Color3.fromRGB(255,50,50))
+                        sCount = sCount + 1
+                    end
+                end)
+            end
+        end
+        if sCount == 0 then addStat(specFrame, "No one", "", Color3.fromRGB(100,100,100)); sCount = 1 end
+        TweenService:Create(specFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 150, 0, (sCount * 25 + 35))}):Play()
     end)
 end
 
@@ -528,6 +596,7 @@ mainFrame.Size = UDim2.new(0, 500, 0, 370)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainFrame.BackgroundTransparency = Mono.MenuTransp
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Parent = screenGui
@@ -901,6 +970,20 @@ local function createSubColorPicker(parent, text, defaultColor, callback, uiName
     
     if uiName then colorPreview.Name = uiName end
 
+    local wBtn = Instance.new("TextButton", frame)
+    wBtn.Size = UDim2.new(0, 16, 0, 16)
+    wBtn.Position = UDim2.new(1, -65, 0, 7)
+    wBtn.BackgroundColor3 = Color3.new(1,1,1)
+    wBtn.Text = ""
+    Instance.new("UICorner", wBtn).CornerRadius = UDim.new(0, 4)
+    
+    local bBtn = Instance.new("TextButton", frame)
+    bBtn.Size = UDim2.new(0, 16, 0, 16)
+    bBtn.Position = UDim2.new(1, -85, 0, 7)
+    bBtn.BackgroundColor3 = Color3.new(0,0,0)
+    bBtn.Text = ""
+    Instance.new("UICorner", bBtn).CornerRadius = UDim.new(0, 4)
+
     local hueFrame = Instance.new("Frame", frame)
     hueFrame.Size = UDim2.new(0.9, 0, 0, 10)
     hueFrame.Position = UDim2.new(0.05, 0, 0, 30)
@@ -916,6 +999,9 @@ local function createSubColorPicker(parent, text, defaultColor, callback, uiName
         ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255, 0, 255)),
         ColorSequenceKeypoint.new(1.000, Color3.fromRGB(255, 0, 0))
     })
+
+    wBtn.MouseButton1Click:Connect(function() callback(Color3.new(1,1,1)); colorPreview.BackgroundColor3 = Color3.new(1,1,1) end)
+    bBtn.MouseButton1Click:Connect(function() callback(Color3.new(0,0,0)); colorPreview.BackgroundColor3 = Color3.new(0,0,0) end)
 
     local isDraggingHue = false
     local function updateHue(inputX)
@@ -1337,8 +1423,21 @@ local function createColorPickerElement(parent, text, defaultColor, callback, ui
     colorPreview.Position = UDim2.new(1, -45, 0, 7)
     colorPreview.BackgroundColor3 = defaultColor
     Instance.new("UICorner", colorPreview).CornerRadius = UDim.new(0, 4)
-    
     if uiName then colorPreview.Name = uiName end
+
+    local wBtn = Instance.new("TextButton", frame)
+    wBtn.Size = UDim2.new(0, 16, 0, 16)
+    wBtn.Position = UDim2.new(1, -65, 0, 7)
+    wBtn.BackgroundColor3 = Color3.new(1,1,1)
+    wBtn.Text = ""
+    Instance.new("UICorner", wBtn).CornerRadius = UDim.new(0, 4)
+    
+    local bBtn = Instance.new("TextButton", frame)
+    bBtn.Size = UDim2.new(0, 16, 0, 16)
+    bBtn.Position = UDim2.new(1, -85, 0, 7)
+    bBtn.BackgroundColor3 = Color3.new(0,0,0)
+    bBtn.Text = ""
+    Instance.new("UICorner", bBtn).CornerRadius = UDim.new(0, 4)
 
     local hueFrame = Instance.new("Frame", frame)
     hueFrame.Size = UDim2.new(0.9, 0, 0, 10)
@@ -1356,6 +1455,9 @@ local function createColorPickerElement(parent, text, defaultColor, callback, ui
         ColorSequenceKeypoint.new(1.000, Color3.fromRGB(255, 0, 0))
     })
 
+    wBtn.MouseButton1Click:Connect(function() callback(Color3.new(1,1,1)); colorPreview.BackgroundColor3 = Color3.new(1,1,1) end)
+    bBtn.MouseButton1Click:Connect(function() callback(Color3.new(0,0,0)); colorPreview.BackgroundColor3 = Color3.new(0,0,0) end)
+
     local isDraggingHue = false
     local function updateHue(inputX)
         local posX = math.clamp(inputX - hueFrame.AbsolutePosition.X, 0, hueFrame.AbsoluteSize.X)
@@ -1367,8 +1469,7 @@ local function createColorPickerElement(parent, text, defaultColor, callback, ui
 
     hueFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDraggingHue = true
-            updateHue(input.Position.X)
+            isDraggingHue = true; updateHue(input.Position.X)
         end
     end)
     hueFrame.InputEnded:Connect(function(input)
@@ -1382,10 +1483,8 @@ end
 
 local slotGuis = {}
 
-local function ApplyTheme(color)
-    Mono.ThemeColor = color
+local function ApplyThemeVisuals(color)
     local dimColor = Color3.new(color.R * 0.7, color.G * 0.7, color.B * 0.7)
-    
     if watermarkStroke then watermarkStroke.Color = color end
     if mobileToggle then mobileToggle.TextColor3 = color end
     if toggleStroke then toggleStroke.Color = color end
@@ -1393,6 +1492,8 @@ local function ApplyTheme(color)
     if uiStroke then uiStroke.Color = color end
     if headerLine then headerLine.BackgroundColor3 = color end
     if hudTitle then hudTitle.TextColor3 = color end
+    if bindsTitle then bindsTitle.TextColor3 = color end
+    if specTitle then specTitle.TextColor3 = color end
     if bgGradient then
         bgGradient.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0.00, dimColor), 
@@ -1400,85 +1501,88 @@ local function ApplyTheme(color)
             ColorSequenceKeypoint.new(1.00, Color3.fromRGB(10, 10, 10))
         })
     end
-    
-    for _, p in pairs(Pages) do
-        p.ScrollBarImageColor3 = color
-    end
-    
-    if activeBtn then
-        activeBtn.BackgroundColor3 = color
-    end
+    for _, p in pairs(Pages) do p.ScrollBarImageColor3 = color end
+    if activeBtn then activeBtn.BackgroundColor3 = color end
     
     for _, v in pairs(screenGui:GetDescendants()) do
         if v:IsA("Frame") and v.Name == "Status" and v.BackgroundColor3 ~= Color3.fromRGB(60, 60, 70) then
             v.BackgroundColor3 = color
-        elseif v:IsA("TextLabel") and v.Text == "▼" then
-            v.TextColor3 = color
-        elseif v:IsA("UIStroke") and v.Parent and v.Parent.Name:match("^Header_") then
-            v.Color = color
-        elseif v:IsA("Frame") and v.Name:match("^Header_") then
-            v.BackgroundColor3 = dimColor
-        elseif v:IsA("TextButton") and v.Name == "CrossHideToggle" and v.Text == "ON" then
-            v.TextColor3 = color
-        elseif v:IsA("Frame") and v.Size == UDim2.new(0, 6, 0, 6) and v.Parent and v.Parent.Name:match("^1_") then
-            v.BackgroundColor3 = color
+        elseif v:IsA("TextLabel") and v.Text == "▼" then v.TextColor3 = color
+        elseif v:IsA("UIStroke") and v.Parent and v.Parent.Name:match("^Header_") then v.Color = color
+        elseif v:IsA("Frame") and v.Name:match("^Header_") then v.BackgroundColor3 = dimColor
+        elseif v:IsA("TextButton") and v.Name == "CrossHideToggle" and v.Text == "ON" then v.TextColor3 = color
+        elseif v:IsA("TextButton") and v.Name == "AbilCDToggle" and v.Text == "ON" then v.TextColor3 = color
+        elseif v:IsA("TextButton") and v.Name == "DynFOVToggle" and v.Text == "ON" then v.TextColor3 = color
+        elseif v:IsA("Frame") and v.Size == UDim2.new(0, 6, 0, 6) and v.Parent and v.Parent.Name:match("^1_") then v.BackgroundColor3 = color
         end
     end
-    
     for i, slot in ipairs(slotGuis) do
-        if Mono.SelectedConfigSlot == i then
-            slot.BackgroundColor3 = color
+        if Mono.SelectedConfigSlot == i then slot.BackgroundColor3 = color end
+    end
+end
+
+local function ApplyTheme(color)
+    Mono.ThemeColor = color
+    ApplyThemeVisuals(color)
+end
+
+local function ApplyFont(fontName)
+    Mono.UIFont = fontName
+    local fMain, fBold, fBlack
+    if fontName == "Gotham" then fMain = Enum.Font.GothamMedium; fBold = Enum.Font.GothamBold; fBlack = Enum.Font.GothamBlack
+    elseif fontName == "Roboto" then fMain = Enum.Font.Roboto; fBold = Enum.Font.Roboto; fBlack = Enum.Font.Roboto
+    elseif fontName == "Code" then fMain = Enum.Font.Code; fBold = Enum.Font.Code; fBlack = Enum.Font.Code
+    elseif fontName == "Arcade" then fMain = Enum.Font.Arcade; fBold = Enum.Font.Arcade; fBlack = Enum.Font.Arcade
+    else fMain = Enum.Font.GothamMedium; fBold = Enum.Font.GothamBold; fBlack = Enum.Font.GothamBlack end
+    
+    for _, v in pairs(screenGui:GetDescendants()) do
+        if v:IsA("TextLabel") or v:IsA("TextBox") or v:IsA("TextButton") then
+            if v.Font == Enum.Font.GothamBlack or v.Font == Enum.Font.Arcade then v.Font = fBlack
+            elseif v.Font == Enum.Font.GothamBold then v.Font = fBold
+            else v.Font = fMain end
         end
     end
 end
 
 -- === СИСТЕМА КОНФИГОВ ===
-
 local function GetConfigTable()
     return {
         ThemeR = Mono.ThemeColor.R, ThemeG = Mono.ThemeColor.G, ThemeB = Mono.ThemeColor.B,
+        ThemeMode = Mono.ThemeMode, UIFont = Mono.UIFont, MenuBlur = Mono.MenuBlur, MenuTransp = Mono.MenuTransp,
         
         AimbotE = Mono.Aimbot.Enabled, AimbotK = Mono.Aimbot.Key.Name, AimMode = Mono.Aimbot.Mode, AimSmooth = Mono.Aimbot.Smoothness, AimHead = Mono.Aimbot.TargetHead,
+        AimHitbox = Mono.Aimbot.Hitbox, MissChance = Mono.Aimbot.MissChance,
         TrigE = Mono.TriggerBot.Enabled, TrigK = Mono.TriggerBot.Key.Name, TrigMode = Mono.TriggerBot.Mode, TrigDelay = Mono.TriggerBot.Delay,
-        Wallbang = Mono.Wallbang,
+        RCSE = Mono.RCS.Enabled, RCSPow = Mono.RCS.Power,
+        
         SpeedE = Mono.Speed.Enabled, SpeedV = Mono.Speed.Value,
         PushE = Mono.Push.Enabled, PushK = Mono.Push.Key.Name,
         NoclipE = Mono.Noclip.Enabled, NoclipK = Mono.Noclip.Key.Name,
         DashE = Mono.Dash.Enabled, DashK = Mono.Dash.Key.Name, DashDist = Mono.Dash.Distance, DashDir = Mono.Dash.Direction,
+        GodMode = Mono.GodMode, StreamE = Mono.StreamerMode.Enabled, StreamK = Mono.StreamerMode.Key.Name,
         
-        GodMode = Mono.GodMode,
-        AbilESPE = Mono.AbilityESP,
-        AbilCDE = Mono.AbilityCD,
-        
-        FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius,
+        FOVE = Mono.FOV.Enabled, FOVRad = Mono.FOV.Radius, FOVDyn = Mono.FOV.Dynamic,
         FOV_R = Mono.FOV.Color.R, FOV_G = Mono.FOV.Color.G, FOV_B = Mono.FOV.Color.B,
         ESPE = Mono.ESP.Enabled, ESPMaxDist = Mono.ESP.MaxDistance,
         ESP_R = Mono.ESPColor.R, ESP_G = Mono.ESPColor.G, ESP_B = Mono.ESPColor.B,
+        AbilESPE = Mono.AbilityESP, AbilCDE = Mono.AbilityCD,
         TargetObjE = Mono.TargetObjEnabled, ObjEmoji = Mono.OrbitEmoji,
         OffArrE = Mono.OffScreenArrows.Enabled, OffArrRad = Mono.OffScreenArrows.Radius, 
         OffArr_R = Mono.OffScreenArrows.Color.R, OffArr_G = Mono.OffScreenArrows.Color.G, OffArr_B = Mono.OffScreenArrows.Color.B,
         CrossE = Mono.Crosshair.Enabled, CrossS = Mono.Crosshair.Size, CrossG = Mono.Crosshair.Gap, CrossT = Mono.Crosshair.Thickness,
         Cross_R = Mono.Crosshair.Color.R, Cross_G = Mono.Crosshair.Color.G, Cross_B = Mono.Crosshair.Color.B,
         CrossHide = Mono.Crosshair.HideDefault,
-        CrossK = (Mono.Crosshair.Key and Mono.Crosshair.Key ~= Enum.KeyCode.Unknown) and Mono.Crosshair.Key.Name or "Unknown",
-        KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji,
-        Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
+        KillEffE = Mono.KillEffect, KillEmoji = Mono.KillEmoji, Kill_R = Mono.KillColor.R, Kill_G = Mono.KillColor.G, Kill_B = Mono.KillColor.B,
         TeamNotifE = Mono.TeammateNotifs, DeathDist = Mono.DeathNotifDistance,
-        
-        TintE = Mono.TintEnabled,
-        Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
-        Time = Mono.TimeOfDay,
-        WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
-        CleanW = Mono.CleanWorld,
-        WatermarkE = Mono.WatermarkEnabled
+        TintE = Mono.TintEnabled, Tint_R = Mono.TintColor.R, Tint_G = Mono.TintColor.G, Tint_B = Mono.TintColor.B,
+        Time = Mono.TimeOfDay, WeatherEnabled = Mono.WeatherEnabled, WeatherType = Mono.WeatherType, WeathEmoji = Mono.WeatherEmoji,
+        CleanW = Mono.CleanWorld, WatermarkE = Mono.WatermarkEnabled
     }
 end
 
 local function EncodeTXT(tbl)
     local str = ""
-    for k, v in pairs(tbl) do
-        str = str .. tostring(k) .. "=" .. tostring(v) .. "\n"
-    end
+    for k, v in pairs(tbl) do str = str .. tostring(k) .. "=" .. tostring(v) .. "\n" end
     return str
 end
 
@@ -1499,15 +1603,14 @@ end
 local function ApplyConfigToUI()
     setToggleStateUI("Aimbot (Toggle)", Mono.Aimbot.Enabled)
     setToggleStateUI("TriggerBot (Toggle)", Mono.TriggerBot.Enabled)
-    setToggleStateUI("Wallbang (Local Only)", Mono.Wallbang)
+    setToggleStateUI("RCS (Anti-Recoil)", Mono.RCS.Enabled)
     setToggleStateUI("Speeds", Mono.Speed.Enabled)
     setToggleStateUI("Push", Mono.Push.Enabled)
     setToggleStateUI("Noclip", Mono.Noclip.Enabled)
     setToggleStateUI("Dash", Mono.Dash.Enabled)
-    
     setToggleStateUI("God Mode (Bypass)", Mono.GodMode)
+    setToggleStateUI("Streamer Mode", Mono.StreamerMode.Enabled)
     setToggleStateUI("Show Abilities", Mono.AbilityESP)
-    
     setToggleStateUI("Draw FOV Circle", Mono.FOV.Enabled)
     setToggleStateUI("Wallhack (ESP)", Mono.ESP.Enabled)
     setToggleStateUI("Teammate Death Notifs", Mono.TeammateNotifs)
@@ -1522,7 +1625,12 @@ local function ApplyConfigToUI()
     
     tintFrame.BackgroundTransparency = Mono.TintEnabled and 0.85 or 1
     tintFrame.BackgroundColor3 = Mono.TintColor
-    
+    hudFrame.BackgroundTransparency = Mono.MenuTransp
+    bindsFrame.BackgroundTransparency = Mono.MenuTransp
+    specFrame.BackgroundTransparency = Mono.MenuTransp
+    mainFrame.BackgroundTransparency = Mono.MenuTransp
+    menuBlur.Size = Mono.MenuOpen and Mono.MenuBlur or 0
+
     pcall(function()
         for _, v in pairs(contentArea:GetDescendants()) do
             if v:IsA("TextButton") and v.Name == "BindBtn" then
@@ -1531,6 +1639,7 @@ local function ApplyConfigToUI()
                 if v.Parent.Name == "Push" then v.Text = (Mono.Push.Key and Mono.Push.Key ~= Enum.KeyCode.Unknown) and Mono.Push.Key.Name or "None" end
                 if v.Parent.Parent.Name == "Noclip" then v.Text = (Mono.Noclip.Key and Mono.Noclip.Key ~= Enum.KeyCode.Unknown) and Mono.Noclip.Key.Name or "None" end
                 if v.Parent.Parent.Name == "Dash" then v.Text = (Mono.Dash.Key and Mono.Dash.Key ~= Enum.KeyCode.Unknown) and Mono.Dash.Key.Name or "None" end
+                if v.Parent.Parent.Name == "Streamer Mode" then v.Text = (Mono.StreamerMode.Key and Mono.StreamerMode.Key ~= Enum.KeyCode.Unknown) and Mono.StreamerMode.Key.Name or "None" end
             end
             if v:IsA("TextBox") then
                 if v.Name == "FOVRadInput" then v.Text = tostring(Mono.FOV.Radius) end
@@ -1547,6 +1656,10 @@ local function ApplyConfigToUI()
                 if v.Name == "SpeedValInput" then v.Text = tostring(Mono.Speed.Value) end
                 if v.Name == "DashDistInput" then v.Text = tostring(Mono.Dash.Distance) end
                 if v.Name == "TrigDelayInput" then v.Text = tostring(Mono.TriggerBot.Delay) end
+                if v.Name == "MenuTranspInput" then v.Text = tostring(Mono.MenuTransp) end
+                if v.Name == "MenuBlurInput" then v.Text = tostring(Mono.MenuBlur) end
+                if v.Name == "RCSPowInput" then v.Text = tostring(Mono.RCS.Power) end
+                if v.Name == "MissChanceInput" then v.Text = tostring(Mono.Aimbot.MissChance) end
             end
             if v:IsA("Frame") then
                 if v.Name == "ColorPreview_ThemeColor" then v.BackgroundColor3 = Mono.ThemeColor end
@@ -1559,8 +1672,12 @@ local function ApplyConfigToUI()
             end
             if v:IsA("TextButton") and v.Name == "TimeDrop" then v.Text = "  Time of Day: " .. Mono.TimeOfDay end
             if v:IsA("TextButton") and v.Name == "AimModeBtn" then v.Text = Mono.Aimbot.Mode end
+            if v:IsA("TextButton") and v.Name == "AimHitboxBtn" then v.Text = Mono.Aimbot.Hitbox end
             if v:IsA("TextButton") and v.Name == "TrigModeBtn" then v.Text = Mono.TriggerBot.Mode end
             if v:IsA("TextButton") and v.Name == "DashDirBtn" then v.Text = Mono.Dash.Direction end
+            if v:IsA("TextButton") and v.Name == "ThemeModeBtn" then v.Text = Mono.ThemeMode end
+            if v:IsA("TextButton") and v.Name == "UIFontBtn" then v.Text = Mono.UIFont end
+            
             if v:IsA("TextButton") and v.Name == "AimHeadToggle" then
                 v.Text = Mono.Aimbot.TargetHead and "ON" or "OFF"
                 v.TextColor3 = Mono.Aimbot.TargetHead and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
@@ -1568,6 +1685,10 @@ local function ApplyConfigToUI()
             if v:IsA("TextButton") and v.Name == "AbilCDToggle" then
                 v.Text = Mono.AbilityCD and "ON" or "OFF"
                 v.TextColor3 = Mono.AbilityCD and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
+            end
+            if v:IsA("TextButton") and v.Name == "DynFOVToggle" then
+                v.Text = Mono.FOV.Dynamic and "ON" or "OFF"
+                v.TextColor3 = Mono.FOV.Dynamic and Mono.ThemeColor or Color3.fromRGB(200, 200, 200)
             end
             if v:IsA("TextButton") and v.Name == "CrossHideToggle" then
                 v.Text = Mono.Crosshair.HideDefault and "ON" or "OFF"
@@ -1578,18 +1699,23 @@ local function ApplyConfigToUI()
             end
         end
     end)
+    ApplyFont(Mono.UIFont)
     updateHUD()
 end
 
 local function LoadConfigFromTable(dec)
-    if dec.ThemeR and dec.ThemeG and dec.ThemeB then
-        ApplyTheme(Color3.new(dec.ThemeR, dec.ThemeG, dec.ThemeB))
-    end
+    if dec.ThemeR and dec.ThemeG and dec.ThemeB then ApplyTheme(Color3.new(dec.ThemeR, dec.ThemeG, dec.ThemeB)) end
+    Mono.ThemeMode = dec.ThemeMode or "Static"
+    Mono.UIFont = dec.UIFont or "Gotham"
+    Mono.MenuBlur = dec.MenuBlur or 15
+    Mono.MenuTransp = dec.MenuTransp or 0.2
 
     Mono.Aimbot.Enabled = dec.AimbotE or false
     Mono.Aimbot.Mode = dec.AimMode or "Rage 😡"
+    Mono.Aimbot.Hitbox = dec.AimHitbox or "Head"
     Mono.Aimbot.Smoothness = dec.AimSmooth or 0.2
     Mono.Aimbot.TargetHead = dec.AimHead or false
+    Mono.Aimbot.MissChance = dec.MissChance or 0
     pcall(function() Mono.Aimbot.Key = Enum.KeyCode[dec.AimbotK] or Enum.UserInputType[dec.AimbotK] end)
     
     Mono.TriggerBot.Enabled = dec.TrigE or false
@@ -1597,8 +1723,8 @@ local function LoadConfigFromTable(dec)
     Mono.TriggerBot.Delay = dec.TrigDelay or 0.15
     pcall(function() Mono.TriggerBot.Key = Enum.KeyCode[dec.TrigK] or Enum.UserInputType[dec.TrigK] end)
 
-    Mono.Wallbang = dec.Wallbang or false
-    applyWallbang()
+    Mono.RCS.Enabled = dec.RCSE or false
+    Mono.RCS.Power = dec.RCSPow or 10
 
     Mono.Speed.Enabled = dec.SpeedE or false
     Mono.Speed.Value = dec.SpeedV or 50
@@ -1614,11 +1740,15 @@ local function LoadConfigFromTable(dec)
     pcall(function() Mono.Dash.Key = Enum.KeyCode[dec.DashK] or Enum.UserInputType[dec.DashK] end)
 
     Mono.GodMode = dec.GodMode or false
+    Mono.StreamerMode.Enabled = dec.StreamE or false
+    pcall(function() Mono.StreamerMode.Key = Enum.KeyCode[dec.StreamK] or Enum.UserInputType[dec.StreamK] end)
+
     Mono.AbilityESP = dec.AbilESPE or false
     Mono.AbilityCD = dec.AbilCDE or false
 
     Mono.FOV.Enabled = dec.FOVE or false
     Mono.FOV.Radius = dec.FOVRad or 150
+    Mono.FOV.Dynamic = dec.FOVDyn or false
     Mono.FOV.Color = Color3.new(dec.FOV_R or 1, dec.FOV_G or 1, dec.FOV_B or 1)
 
     Mono.ESP.Enabled = dec.ESPE or false
@@ -1682,12 +1812,9 @@ end
 local function LoadConfig()
     local fileName = GetCurrentFileName()
     local success, content = pcall(function()
-        if type(readfile) == "function" then
-            return readfile(fileName)
-        end
+        if type(readfile) == "function" then return readfile(fileName) end
         return nil
     end)
-    
     if success and content and content ~= "" then
         local decoded = DecodeTXT(content)
         LoadConfigFromTable(decoded)
@@ -1712,11 +1839,18 @@ end
 -- 1. COMBAT
 createSectionHeader(combatPage, "🔫 GUN SETTINGS")
 
+local function getHitboxIndex(hb)
+    if hb == "Torso" then return 2 end
+    if hb == "Closest" then return 3 end
+    return 1
+end
+
 createToggleWithBindAndSettings(combatPage, "Aimbot (Toggle)", Mono.Aimbot.Enabled, Mono.Aimbot.Key, function(s) Mono.Aimbot.Enabled = s end, Mono.Aimbot, "Key", function(container)
     local h1 = createSubCycleButton(container, "Mode", {"Rage 😡", "Legit 🎯"}, Mono.Aimbot.Mode == "Rage 😡" and 1 or 2, function(val) Mono.Aimbot.Mode = val end, "AimModeBtn")
-    local h2 = createSubInput(container, "Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
-    local h3 = createSubToggle(container, "Target Head Only", Mono.Aimbot.TargetHead, function(val) Mono.Aimbot.TargetHead = val end, "AimHeadToggle")
-    return h1 + h2 + h3 + 5
+    local h2 = createSubCycleButton(container, "Hitbox", {"Head", "Torso", "Closest"}, getHitboxIndex(Mono.Aimbot.Hitbox), function(val) Mono.Aimbot.Hitbox = val end, "AimHitboxBtn")
+    local h3 = createSubInput(container, "Smoothness", tostring(Mono.Aimbot.Smoothness), function(val) Mono.Aimbot.Smoothness = tonumber(val) or 0.2 end, "AimSmoothInput")
+    local h4 = createSubInput(container, "Miss Chance (%)", tostring(Mono.Aimbot.MissChance), function(val) Mono.Aimbot.MissChance = tonumber(val) or 0 end, "MissChanceInput")
+    return h1 + h2 + h3 + h4 + 5
 end, "Automatically aims at enemies.")
 
 createToggleWithBindAndSettings(combatPage, "TriggerBot (Toggle)", Mono.TriggerBot.Enabled, Mono.TriggerBot.Key, function(s) Mono.TriggerBot.Enabled = s end, Mono.TriggerBot, "Key", function(container)
@@ -1725,15 +1859,16 @@ createToggleWithBindAndSettings(combatPage, "TriggerBot (Toggle)", Mono.TriggerB
     return h1 + h2 + 5
 end, "Automatically shoots when your crosshair is exactly on an enemy.")
 
-createToggle(combatPage, "Wallbang (Local Only)", Mono.Wallbang, function(s) 
-    Mono.Wallbang = s 
-    applyWallbang()
-end, "Делает стены простреливаемыми. В играх с серверной защитой урон не пройдет!")
+createToggleWithSettings(combatPage, "RCS (Anti-Recoil)", Mono.RCS.Enabled, function(s) Mono.RCS.Enabled = s end, function(container)
+    local h1 = createSubInput(container, "RCS Power", tostring(Mono.RCS.Power), function(val) Mono.RCS.Power = tonumber(val) or 10 end, "RCSPowInput")
+    return h1 + 5
+end, "Сдвигает камеру вниз при стрельбе.")
 
 createToggleWithSettings(combatPage, "Draw FOV Circle", Mono.FOV.Enabled, function(s) Mono.FOV.Enabled = s end, function(container)
     local h1 = createSubInput(container, "Radius", tostring(Mono.FOV.Radius), function(val) Mono.FOV.Radius = tonumber(val) or 150 end, "FOVRadInput")
-    local h2 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end, "FOVCol")
-    return h1 + h2 + 5
+    local h2 = createSubToggle(container, "Dynamic", Mono.FOV.Dynamic, function(val) Mono.FOV.Dynamic = val end, "DynFOVToggle")
+    local h3 = createSubColorPicker(container, "Circle Color", Mono.FOV.Color, function(c) Mono.FOV.Color = c end, "FOVCol")
+    return h1 + h2 + h3 + 5
 end, "Shows the area where Aimbot and TriggerBot work.")
 
 createSectionHeader(combatPage, "🔪 KNIFE & MOVEMENT")
@@ -1859,13 +1994,47 @@ createToggleWithSettings(worldPage, "Weather Event", Mono.WeatherEnabled, functi
 end, "Creates falling emojis (like rain or snow).")
 
 -- 4. SETTINGS
-createSectionHeader(settingsPage, "🎨 THEME SETTINGS")
-createColorPickerElement(settingsPage, "Theme Color", Mono.ThemeColor, function(c)
-    ApplyTheme(c)
-end, "ColorPreview_ThemeColor")
+createSectionHeader(settingsPage, "🎨 THEME & UI")
 
-createSectionHeader(settingsPage, "📺 UI SETTINGS")
-createToggle(settingsPage, "Show Watermark", Mono.WatermarkEnabled, function(s) Mono.WatermarkEnabled = s; watermarkFrame.Visible = s end, "Displays Ping and FPS in the top right corner.")
+createColorPickerElement(settingsPage, "Theme Color", Mono.ThemeColor, function(c) ApplyTheme(c) end, "ColorPreview_ThemeColor")
+
+local function getThemeModeIndex(mode)
+    if mode == "Fade 🌊" then return 2 end
+    if mode == "RGB 🌈" then return 3 end
+    return 1
+end
+createDropdown(settingsPage, "Theme Mode", {"Static", "Fade 🌊", "RGB 🌈"}, getThemeModeIndex(Mono.ThemeMode), function(val) Mono.ThemeMode = val end, "ThemeModeBtn")
+
+local function getFontIndex(f)
+    if f == "Roboto" then return 2 end
+    if f == "Code" then return 3 end
+    if f == "Arcade" then return 4 end
+    return 1
+end
+createDropdown(settingsPage, "UI Font", {"Gotham", "Roboto", "Code", "Arcade"}, getFontIndex(Mono.UIFont), function(val) ApplyFont(val) end, "UIFontBtn")
+
+createToggle(settingsPage, "Show Watermark", Mono.WatermarkEnabled, function(s) Mono.WatermarkEnabled = s; watermarkFrame.Visible = (s and not Mono.StreamerMode.Enabled) end, "Displays Ping and FPS.")
+
+createToggleWithBindAndSettings(settingsPage, "Streamer Mode", Mono.StreamerMode.Enabled, Mono.StreamerMode.Key, function(s) Mono.StreamerMode.Enabled = s end, Mono.StreamerMode, "Key", function(container) return 0 end, "Скрывает все визуалы (ESP, Меню), оставляя Аим/Триггербот рабочими.")
+
+createInput(settingsPage, "Menu Transparency (0-1)", tostring(Mono.MenuTransp), function(val)
+    local num = tonumber(val)
+    if num then 
+        Mono.MenuTransp = math.clamp(num, 0, 1)
+        hudFrame.BackgroundTransparency = Mono.MenuTransp
+        bindsFrame.BackgroundTransparency = Mono.MenuTransp
+        specFrame.BackgroundTransparency = Mono.MenuTransp
+        mainFrame.BackgroundTransparency = Mono.MenuTransp
+    end
+end, "MenuTranspInput")
+
+createInput(settingsPage, "Menu Blur (0-50)", tostring(Mono.MenuBlur), function(val)
+    local num = tonumber(val)
+    if num then 
+        Mono.MenuBlur = math.clamp(num, 0, 50)
+        if Mono.MenuOpen then menuBlur.Size = Mono.MenuBlur end
+    end
+end, "MenuBlurInput")
 
 -- 5. CONFIGS (CNFGS)
 local configTitle = Instance.new("TextLabel", cnfgsPage)
@@ -1921,9 +2090,7 @@ for i = 1, 6 do
     Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 4)
     
     nameBox.FocusLost:Connect(function()
-        if nameBox.Text == "" then 
-            nameBox.Text = "Config " .. i 
-        end
+        if nameBox.Text == "" then nameBox.Text = "Config " .. i end
         Mono.ConfigNames[i] = nameBox.Text
         SaveSlotNames()
     end)
@@ -1932,7 +2099,6 @@ for i = 1, 6 do
         Mono.SelectedConfigSlot = i
         updateSlotSelection()
     end)
-    
     table.insert(slotGuis, slotFrame)
 end
 updateSlotSelection()
@@ -1990,6 +2156,7 @@ createButton(cnfgsPage, "📋 Export to Clipboard", ExportConfig)
 
 -- === ФИНАЛЬНЫЙ СЕТАП ===
 ApplyTheme(Mono.ThemeColor)
+ApplyFont(Mono.UIFont)
 updateHUD() 
 combatBtn.BackgroundColor3 = Mono.ThemeColor
 combatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -2009,6 +2176,12 @@ UserInputService.InputBegan:Connect(function(input, gp)
 
     if gp then return end
     local key = (input.UserInputType == Enum.UserInputType.Keyboard) and input.KeyCode or input.UserInputType
+
+    if key == Mono.StreamerMode.Key and Mono.StreamerMode.Key ~= Enum.KeyCode.Unknown then
+        Mono.StreamerMode.Enabled = not Mono.StreamerMode.Enabled
+        setToggleStateUI("Streamer Mode", Mono.StreamerMode.Enabled)
+        updateHUD()
+    end
 
     if key == Mono.Aimbot.Key then
         Mono.Aimbot.Enabled = not Mono.Aimbot.Enabled
@@ -2032,7 +2205,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
     
-    -- БИНД DASH (ТЕЛЕПОРТ)
     if key == Mono.Dash.Key and Mono.Dash.Enabled and Mono.Dash.Key ~= Enum.KeyCode.Unknown then
         local char = LocalPlayer.Character
         if char then
@@ -2040,16 +2212,10 @@ UserInputService.InputBegan:Connect(function(input, gp)
             if hrp then
                 local dist = Mono.Dash.Distance
                 local offset = CFrame.new(0, 0, 0)
-                if Mono.Dash.Direction == "Forward ⬆️" then
-                    offset = CFrame.new(0, 0, -dist)
-                elseif Mono.Dash.Direction == "Backward ⬇️" then
-                    offset = CFrame.new(0, 0, dist)
-                elseif Mono.Dash.Direction == "Left ⬅️" then
-                    offset = CFrame.new(-dist, 0, 0)
-                elseif Mono.Dash.Direction == "Right ➡️" then
-                    offset = CFrame.new(dist, 0, 0)
-                end
-                
+                if Mono.Dash.Direction == "Forward ⬆️" then offset = CFrame.new(0, 0, -dist)
+                elseif Mono.Dash.Direction == "Backward ⬇️" then offset = CFrame.new(0, 0, dist)
+                elseif Mono.Dash.Direction == "Left ⬅️" then offset = CFrame.new(-dist, 0, 0)
+                elseif Mono.Dash.Direction == "Right ➡️" then offset = CFrame.new(dist, 0, 0) end
                 hrp.CFrame = hrp.CFrame * offset
             end
         end
@@ -2074,6 +2240,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 
     if input.KeyCode == Enum.KeyCode.RightShift then
+        if Mono.StreamerMode.Enabled then return end
         Mono.MenuOpen = not Mono.MenuOpen
         unlockMouseBtn.Modal = Mono.MenuOpen
         
@@ -2081,7 +2248,7 @@ UserInputService.InputBegan:Connect(function(input, gp)
             mainFrame.Visible = true
             menuBlur.Enabled = true
             TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-            TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = 15}):Play()
+            TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = Mono.MenuBlur}):Play()
         else
             local tw = TweenService:Create(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
             tw:Play()
@@ -2097,13 +2264,14 @@ UserInputService.InputBegan:Connect(function(input, gp)
 end)
 
 mobileToggle.MouseButton1Click:Connect(function()
+    if Mono.StreamerMode.Enabled then return end
     Mono.MenuOpen = not Mono.MenuOpen
     unlockMouseBtn.Modal = Mono.MenuOpen
     if Mono.MenuOpen then
         mainFrame.Visible = true
         menuBlur.Enabled = true
         TweenService:Create(uiScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-        TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = 15}):Play()
+        TweenService:Create(menuBlur, TweenInfo.new(0.3), {Size = Mono.MenuBlur}):Play()
     else
         local tw = TweenService:Create(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0})
         tw:Play()
@@ -2133,18 +2301,44 @@ end
 
 local function isEnemy(plr)
     if plr == LocalPlayer then return false end
-    -- Вшитая проверка на тиму
-    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then 
-        return false 
+    if plr.Team and LocalPlayer.Team and plr.Team == LocalPlayer.Team then return false end
+    return true
+end
+
+local function isHoldingGun()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return false end 
+    local n = string.lower(tool.Name)
+    if string.find(n, "knife") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "melee") or string.find(n, "fist") or string.find(n, "bat") or string.find(n, "punch") or string.find(n, "hand") then
+        return false
     end
     return true
 end
 
 local function getBestTargetPart(char)
-    if Mono.Aimbot.TargetHead then
+    if Mono.Aimbot.Hitbox == "Head" then
         return char:FindFirstChild("Head")
+    elseif Mono.Aimbot.Hitbox == "Torso" then
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    elseif Mono.Aimbot.Hitbox == "Closest" then
+        local parts = {char:FindFirstChild("Head"), char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("UpperTorso"), char:FindFirstChild("LowerTorso")}
+        local bestP = nil
+        local minDist = math.huge
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        for _, p in pairs(parts) do
+            if p then
+                local pos, onS = Camera:WorldToViewportPoint(p.Position)
+                if onS then
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < minDist then minDist = d; bestP = p end
+                end
+            end
+        end
+        return bestP or char:FindFirstChild("HumanoidRootPart")
     end
-    return char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    return char:FindFirstChild("Head")
 end
 
 local function raycastFromCenter()
@@ -2167,6 +2361,12 @@ local function getClosestVisibleEnemy()
     local shortestDistance = math.huge
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
+    local currentFovRad = Mono.FOV.Radius
+    if Mono.FOV.Dynamic and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local vel = LocalPlayer.Character.HumanoidRootPart.Velocity.Magnitude
+        currentFovRad = Mono.FOV.Radius + (vel * 1.5)
+    end
+
     for _, plr in pairs(Players:GetPlayers()) do
         local char = plr.Character
         if isEnemy(plr) and char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
@@ -2175,12 +2375,10 @@ local function getClosestVisibleEnemy()
                 local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
                     local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    
-                    if (not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius) then
+                    if (not Mono.FOV.Enabled) or (dist <= currentFovRad) then
                         local origin = Camera.CFrame.Position
                         local dir = (targetPart.Position - origin).Unit * 1000
                         local result = workspace:Raycast(origin, dir, GlobalRayParams)
-                        
                         if result and result.Instance and result.Instance:IsDescendantOf(char) then
                             if dist < shortestDistance then
                                 shortestDistance = dist
@@ -2195,11 +2393,9 @@ local function getClosestVisibleEnemy()
     return closestTarget
 end
 
--- ФУНКЦИЯ ПОЛУЧЕНИЯ АБИЛОК И УМНЫЙ СКАНЕР КУЛДАУНОВ
 local function getPlayerAbilities(plr)
     local abilities = {}
     local cds = {}
-    
     local function isValid(str)
         if type(str) ~= "string" then return false end
         local lowerStr = str:lower()
@@ -2207,18 +2403,11 @@ local function getPlayerAbilities(plr)
         if string.len(str) < 2 or string.len(str) > 30 then return false end
         return true
     end
-
     local function checkCD(val)
         if type(val) == "number" then
-            if val > 1000000000 then 
-                local r = val - os.time()
-                if r > 0 and r < 300 then table.insert(cds, r) end
-            elseif val > 10000 then 
-                local r = val - tick()
-                if r > 0 and r < 300 then table.insert(cds, r) end
-            elseif val > 0.1 and val < 300 then
-                table.insert(cds, val)
-            end
+            if val > 1000000000 then local r = val - os.time(); if r > 0 and r < 300 then table.insert(cds, r) end
+            elseif val > 10000 then local r = val - tick(); if r > 0 and r < 300 then table.insert(cds, r) end
+            elseif val > 0.1 and val < 300 then table.insert(cds, val) end
         end
     end
 
@@ -2228,11 +2417,8 @@ local function getPlayerAbilities(plr)
             if (name:lower():match("ability") or name:lower():match("skill") or name:lower():match("equip") or name == "Q" or name == "E") then
                 if isValid(s) then table.insert(abilities, s) end
             end
-            if name:lower():match("cd") or name:lower():match("cooldown") or name:lower():match("time") then
-                checkCD(val)
-            end
+            if name:lower():match("cd") or name:lower():match("cooldown") or name:lower():match("time") then checkCD(val) end
         end
-        
         for _, obj in pairs(plr:GetDescendants()) do
             if obj:IsA("StringValue") then
                 local s = tostring(obj.Value)
@@ -2240,12 +2426,9 @@ local function getPlayerAbilities(plr)
                     table.insert(abilities, s)
                 end
             elseif obj:IsA("NumberValue") or obj:IsA("IntValue") or obj:IsA("DoubleConstrainedValue") then
-                if obj.Name:lower():match("cd") or obj.Name:lower():match("cooldown") or obj.Name:lower():match("time") then
-                    checkCD(obj.Value)
-                end
+                if obj.Name:lower():match("cd") or obj.Name:lower():match("cooldown") or obj.Name:lower():match("time") then checkCD(obj.Value) end
             end
         end
-        
         if #abilities == 0 then
             for _, obj in pairs(plr:GetDescendants()) do
                 if obj:IsA("StringValue") and (obj.Value:lower():match("rbxasset") or obj.Value:lower():match("http")) then
@@ -2256,30 +2439,20 @@ local function getPlayerAbilities(plr)
             end
         end
     end)
-    
     local unique = {}
     local res = {}
     for _, v in ipairs(abilities) do
-        if not unique[v] then
-            unique[v] = true
-            table.insert(res, v)
-        end
+        if not unique[v] then unique[v] = true; table.insert(res, v) end
     end
-    
     local a1 = res[1] or "?"
     local a2 = res[2] or "?"
-    
     if string.len(a1) > 15 then a1 = string.sub(a1, 1, 13) .. ".." end
     if string.len(a2) > 15 then a2 = string.sub(a2, 1, 13) .. ".." end
-    
     if Mono.AbilityCD then
         table.sort(cds)
-        local cd1 = cds[1]
-        local cd2 = cds[2]
-        if cd1 then a1 = a1 .. string.format(" (%.1fs)", cd1) end
-        if cd2 then a2 = a2 .. string.format(" (%.1fs)", cd2) end
+        if cds[1] then a1 = a1 .. string.format(" (%.1fs)", cds[1]) end
+        if cds[2] then a2 = a2 .. string.format(" (%.1fs)", cds[2]) end
     end
-    
     return a1, a2
 end
 
@@ -2288,9 +2461,7 @@ Players.PlayerRemoving:Connect(function(plr)
         if espCache[plr] then
             if espCache[plr].Highlight then espCache[plr].Highlight:Destroy() end
             if espCache[plr].Billboard then espCache[plr].Billboard:Destroy() end
-            if espCache[plr].Orbits then
-                for _, orb in ipairs(espCache[plr].Orbits) do orb.gui:Destroy() end
-            end
+            if espCache[plr].Orbits then for _, orb in ipairs(espCache[plr].Orbits) do orb.gui:Destroy() end end
             if espCache[plr].Arrow then espCache[plr].Arrow:Destroy() end
             espCache[plr] = nil
         end
@@ -2300,56 +2471,41 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
-local espCache = {}
-
 local function updateESP()
     local t = tick()
     local camPos = Camera.CFrame.Position
     local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local sm = Mono.StreamerMode.Enabled
     
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == LocalPlayer then continue end
-        
-        if not PlayerData[plr] then
-            PlayerData[plr] = { isDead = false, lastPos = Vector3.zero }
-        end
+        if not PlayerData[plr] then PlayerData[plr] = { isDead = false, lastPos = Vector3.zero } end
         
         local char = plr.Character
         local isEnem = isEnemy(plr)
         
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            PlayerData[plr].lastPos = char.HumanoidRootPart.Position
-        end
+        if char and char:FindFirstChild("HumanoidRootPart") then PlayerData[plr].lastPos = char.HumanoidRootPart.Position end
         
         local isDead = false
         if char then
             local hum = char:FindFirstChild("Humanoid")
             if hum and hum.Health <= 0 then isDead = true end
             if not char.Parent then isDead = true end 
-        else
-            isDead = true
-        end
+        else isDead = true end
 
         if isDead then
             if PlayerData[plr].isDead == false then
                 PlayerData[plr].isDead = true
                 local distToDeath = (camPos - PlayerData[plr].lastPos).Magnitude
-                
                 if isEnem then
-                    if LastTargetHit == plr and (tick() - LastTargetTime < 3) then
-                        doKillEffect()
-                    end
+                    if LastTargetHit == plr and (tick() - LastTargetTime < 3) then doKillEffect() end
                 else
-                    if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then
-                        showNotification("☠️ " .. plr.Name .. " УМЕР", Mono.KillColor)
-                    end
+                    if Mono.TeammateNotifs and distToDeath <= Mono.DeathNotifDistance then showNotification("☠️ " .. plr.Name .. " УМЕР", Mono.KillColor) end
                 end
             end
-        else
-            PlayerData[plr].isDead = false
-        end
+        else PlayerData[plr].isDead = false end
 
-        if char and char:FindFirstChild("HumanoidRootPart") and not isDead then
+        if char and char:FindFirstChild("HumanoidRootPart") and not isDead and not sm then
             local targetPart = char.HumanoidRootPart
             local distToPlayer = (targetPart.Position - camPos).Magnitude
             local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
@@ -2381,7 +2537,7 @@ local function updateESP()
                     abilText.Name = "Abilities"
                     abilText.Size = UDim2.new(1, 0, 0, 20)
                     abilText.BackgroundTransparency = 1
-                    abilText.Font = Enum.Font.GothamBlack
+                    abilText.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBlack
                     abilText.TextSize = 16 
                     abilText.TextColor3 = Color3.fromRGB(255, 200, 50) 
                     abilText.TextStrokeTransparency = 0
@@ -2391,7 +2547,7 @@ local function updateESP()
                     tl.Name = "Name"
                     tl.Size = UDim2.new(1, 0, 0, 15)
                     tl.BackgroundTransparency = 1
-                    tl.Font = Enum.Font.GothamBold
+                    tl.Font = Mono.UIFont == "Arcade" and Enum.Font.Arcade or Enum.Font.GothamBold
                     tl.TextSize = 12
                     tl.TextStrokeTransparency = 0
                     tl.LayoutOrder = 2 
@@ -2407,15 +2563,8 @@ local function updateESP()
                 
                 espCache[plr].Highlight.Enabled = true
                 espCache[plr].Billboard.Enabled = true
-                
-                if espCache[plr].Highlight.Adornee ~= char then 
-                    espCache[plr].Highlight.Adornee = char 
-                end
-                
-                if espCache[plr].Billboard.Adornee ~= targetPart then 
-                    espCache[plr].Billboard.Adornee = targetPart 
-                end
-                
+                if espCache[plr].Highlight.Adornee ~= char then espCache[plr].Highlight.Adornee = char end
+                if espCache[plr].Billboard.Adornee ~= targetPart then espCache[plr].Billboard.Adornee = targetPart end
                 espCache[plr].Text.Text = string.format("%s [%dm]", plr.Name, math.floor(distToPlayer))
                 espCache[plr].Highlight.FillColor = Mono.ESPColor
                 espCache[plr].Text.TextColor3 = Mono.ESPColor
@@ -2428,10 +2577,7 @@ local function updateESP()
                     espCache[plr].AbilityText.Visible = false
                 end
             else
-                if espCache[plr] and espCache[plr].Highlight then
-                    espCache[plr].Highlight.Enabled = false
-                    espCache[plr].Billboard.Enabled = false
-                end
+                if espCache[plr] and espCache[plr].Highlight then espCache[plr].Highlight.Enabled = false; espCache[plr].Billboard.Enabled = false end
             end
 
             -- ORBITS
@@ -2451,12 +2597,9 @@ local function updateESP()
                         table.insert(espCache[plr].Orbits, {gui = bb, text = tl})
                     end
                 end
-
                 for i, orb in ipairs(espCache[plr].Orbits) do
                     orb.gui.Enabled = true
-                    if orb.gui.Adornee ~= targetPart then 
-                        orb.gui.Adornee = targetPart 
-                    end
+                    if orb.gui.Adornee ~= targetPart then orb.gui.Adornee = targetPart end
                     orb.text.Text = Mono.OrbitEmoji
                     local angle = t * 2 + (i * (math.pi * 2 / 3))
                     local radius = 3.5
@@ -2464,9 +2607,7 @@ local function updateESP()
                 end
             else
                 if espCache[plr] and espCache[plr].Orbits then
-                    for _, orb in ipairs(espCache[plr].Orbits) do
-                        orb.gui.Enabled = false
-                    end
+                    for _, orb in ipairs(espCache[plr].Orbits) do orb.gui.Enabled = false end
                 end
             end
             
@@ -2481,26 +2622,20 @@ local function updateESP()
                     arr.BackgroundTransparency = 1
                     arr.Size = UDim2.new(0, 20, 0, 20)
                     arr.AnchorPoint = Vector2.new(0.5, 0.5)
-                    
                     local stroke = Instance.new("UIStroke", arr)
                     stroke.Color = Color3.fromRGB(0, 0, 0)
                     stroke.Thickness = 1.5
                     stroke.Transparency = 0.2
-                    
                     arr.Parent = screenGui
                     espCache[plr].Arrow = arr
                 end
-                
                 local arrow = espCache[plr].Arrow
                 arrow.Visible = true
                 arrow.TextColor3 = Mono.OffScreenArrows.Color
-                
                 local proj = Camera.CFrame:PointToObjectSpace(targetPart.Position)
                 local angle = math.atan2(proj.X, -proj.Y)
-                
                 local rX = center.X + math.sin(angle) * Mono.OffScreenArrows.Radius
                 local rY = center.Y - math.cos(angle) * Mono.OffScreenArrows.Radius
-                
                 arrow.Position = UDim2.new(0, rX, 0, rY)
                 arrow.Rotation = math.deg(angle)
             else
@@ -2521,15 +2656,12 @@ local frames = 0
 local lastUpdate = tick()
 
 RunService.Stepped:Connect(function()
-    -- NOCLIP ЛОГИКА (ВЫПОЛНЯЕТСЯ КАЖДЫЙ КАДР ФИЗИКИ)
     if Mono.Noclip.Enabled then
         local char = LocalPlayer.Character
         if char then
             pcall(function()
                 for _, part in pairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
+                    if part:IsA("BasePart") then part.CanCollide = false end
                 end
             end)
         end
@@ -2538,6 +2670,24 @@ end)
 
 RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
     pcall(function()
+        local sm = Mono.StreamerMode.Enabled
+        watermarkFrame.Visible = (Mono.WatermarkEnabled and not sm)
+        hudFrame.Visible = not sm
+        bindsFrame.Visible = not sm
+        specFrame.Visible = not sm
+        mobileToggle.Visible = not sm
+        if sm and Mono.MenuOpen then
+            mainFrame.Visible = false
+            menuBlur.Size = 0
+        elseif not sm and Mono.MenuOpen then
+            mainFrame.Visible = true
+            menuBlur.Size = Mono.MenuBlur
+        end
+
+        if Mono.ThemeMode == "RGB 🌈" then ApplyThemeVisuals(Color3.fromHSV(tick() % 5 / 5, 1, 1))
+        elseif Mono.ThemeMode == "Fade 🌊" then ApplyThemeVisuals(Mono.ThemeColor:Lerp(Color3.new(1,1,1), (math.sin(tick() * 2) + 1) / 4))
+        else ApplyThemeVisuals(Mono.ThemeColor) end
+
         updateESP()
         
         frames = frames + 1
@@ -2545,50 +2695,41 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v52 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v53 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
         
-        -- GOD MODE (BYPASS)
         local char = LocalPlayer.Character
         if char then
             pcall(function()
                 for _, part in pairs(char:GetChildren()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                        if Mono.GodMode then
-                            part.CanQuery = false
-                            part.CanTouch = false
-                        else
-                            if not Mono.Wallbang then
-                                part.CanQuery = true
-                            end
-                            part.CanTouch = true
-                        end
+                        if Mono.GodMode then part.CanQuery = false; part.CanTouch = false
+                        else if not Mono.Wallbang then part.CanQuery = true end part.CanTouch = true end
                     end
                 end
             end)
         end
         
-        -- ФУНКЦИЯ SPEEDS
-        if Mono.Speed.Enabled then
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum.WalkSpeed = Mono.Speed.Value
-                end
-            end
+        if Mono.Speed.Enabled and char then
+            local hum = char:FindFirstChild("Humanoid")
+            if hum then hum.WalkSpeed = Mono.Speed.Value end
         end
         
-        if Mono.FOV.Enabled then
+        if Mono.FOV.Enabled and not sm then
             fovFrame.Visible = true
-            fovFrame.Size = UDim2.new(0, Mono.FOV.Radius * 2, 0, Mono.FOV.Radius * 2)
+            local r = Mono.FOV.Radius
+            if Mono.FOV.Dynamic and char and char:FindFirstChild("HumanoidRootPart") then
+                r = r + (char.HumanoidRootPart.Velocity.Magnitude * 1.5)
+            end
+            fovFrame.Size = UDim2.new(0, r * 2, 0, r * 2)
             fovStroke.Color = Mono.FOV.Color
         else
             fovFrame.Visible = false
         end
         
-        if Mono.Crosshair.Enabled then
+        if Mono.Crosshair.Enabled and not sm then
             crosshairFolder.Parent = screenGui
             local cx = Camera.ViewportSize.X / 2
             local cy = Camera.ViewportSize.Y / 2
@@ -2596,12 +2737,10 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local g = Mono.Crosshair.Gap
             local t = Mono.Crosshair.Thickness
             local col = Mono.Crosshair.Color
-            
             chTop.Size = UDim2.new(0, t, 0, s); chTop.Position = UDim2.new(0, cx, 0, cy - g); chTop.BackgroundColor3 = col
             chBot.Size = UDim2.new(0, t, 0, s); chBot.Position = UDim2.new(0, cx, 0, cy + g); chBot.BackgroundColor3 = col
             chLeft.Size = UDim2.new(0, s, 0, t); chLeft.Position = UDim2.new(0, cx - g, 0, cy); chLeft.BackgroundColor3 = col
             chRight.Size = UDim2.new(0, s, 0, t); chRight.Position = UDim2.new(0, cx + g, 0, cy); chRight.BackgroundColor3 = col
-            
             UserInputService.MouseIconEnabled = not Mono.Crosshair.HideDefault
         else
             crosshairFolder.Parent = nil
@@ -2611,28 +2750,33 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         if Mono.TimeOfDay == "Day ☀️" then Lighting.ClockTime = 14
         elseif Mono.TimeOfDay == "Night 🌙" then Lighting.ClockTime = 0 end
 
+        -- RCS (Антиотдача)
+        if Mono.RCS.Enabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) and isHoldingGun() then
+            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(-Mono.RCS.Power / 100), 0, 0)
+        end
+
         if Mono.Aimbot.Enabled then
             local target = getClosestVisibleEnemy()
             if target then
-                local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
+                local targetPos = target.Position
+                -- Miss Chance (Humanizer)
+                if Mono.Aimbot.MissChance > 0 and math.random(1, 100) <= Mono.Aimbot.MissChance then
+                    targetPos = targetPos + Vector3.new(math.random(-20, 20)/10, math.random(-20, 20)/10, math.random(-20, 20)/10)
+                end
+                local targetCFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
                 if Mono.Aimbot.Mode == "Legit 🎯" then
                     Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, Mono.Aimbot.Smoothness)
                 else
                     Camera.CFrame = targetCFrame
                 end
                 local targetPlayer = getPlayerFromPart(target)
-                if targetPlayer then
-                    LastTargetHit = targetPlayer
-                    LastTargetTime = tick()
-                end
+                if targetPlayer then LastTargetHit = targetPlayer; LastTargetTime = tick() end
             end
         end
 
-        -- TRIGGERBOT С ИМИТАЦИЕЙ РЕАКЦИИ
         if Mono.TriggerBot.Enabled then
             local hitResult = raycastFromCenter()
             local validTarget = false
-            
             if hitResult and hitResult.Instance then
                 local targetPlayer = getPlayerFromPart(hitResult.Instance)
                 if targetPlayer and isEnemy(targetPlayer) then
@@ -2643,15 +2787,18 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
                         local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                         
-                        if onScreen and ((not Mono.FOV.Enabled) or (dist <= Mono.FOV.Radius)) then
+                        local currentFovRad = Mono.FOV.Radius
+                        if Mono.FOV.Dynamic and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            currentFovRad = Mono.FOV.Radius + (LocalPlayer.Character.HumanoidRootPart.Velocity.Magnitude * 1.5)
+                        end
+
+                        if onScreen and ((not Mono.FOV.Enabled) or (dist <= currentFovRad)) then
                             validTarget = true
                             if TriggerHoverTarget ~= targetPlayer then
                                 TriggerHoverTarget = targetPlayer
                                 TriggerHoverStartTime = tick()
                             end
-                            
                             local reqDelay = (Mono.TriggerBot.Mode == "Legit 🎯") and Mono.TriggerBot.Delay or 0
-                            
                             if tick() - TriggerHoverStartTime >= reqDelay then
                                 LastTargetHit = targetPlayer
                                 LastTargetTime = tick()
@@ -2664,10 +2811,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                     end
                 end
             end
-            
-            if not validTarget then
-                TriggerHoverTarget = nil
-            end
+            if not validTarget then TriggerHoverTarget = nil end
         else
             TriggerHoverTarget = nil
         end
@@ -2679,9 +2823,7 @@ task.delay(1, function()
     pcall(function()
         local fileName = GetCurrentFileName()
         local success, content = pcall(function()
-            if type(readfile) == "function" then
-                return readfile(fileName)
-            end
+            if type(readfile) == "function" then return readfile(fileName) end
             return nil
         end)
         if success and content and content ~= "" then
