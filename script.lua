@@ -8,42 +8,24 @@ local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- === 1. БЕЗОПАСНАЯ ЗАГРУЗКА И ОЧИСТКА ===
-local targetParent = nil
-pcall(function() 
-    if type(gethui) == "function" then 
-        targetParent = gethui() 
-    end
-end)
-if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
-if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
+-- === 1. БЕЗОПАСНАЯ ЗАГРУЗКА И ОЧИСТКА (БЕЗ COREGUI) ===
+local targetParent = LocalPlayer:WaitForChild("PlayerGui")
 
 pcall(function()
     local oldGui = targetParent:FindFirstChild("MonogrammaKlient")
     if oldGui then oldGui:Destroy() end
     local oldBlur = Lighting:FindFirstChild("MonoMenuBlur")
     if oldBlur then oldBlur:Destroy() end
-    -- Удаляем старую папку визуалов, если есть
-    local oldVis = targetParent:FindFirstChild("MonoVisualsFolder")
-    if oldVis then oldVis:Destroy() end
+    local oldGeiger = Camera:FindFirstChild("MonoGeiger")
+    if oldGeiger then oldGeiger:Destroy() end
 end)
 
--- Папка для 3D визуалов (ESP, орбиты) – гарантированно живая
-local visualsFolder = Instance.new("Folder")
-visualsFolder.Name = "MonoVisualsFolder"
-visualsFolder.Parent = targetParent
-
--- Создаем звук Гейгера
+-- Создаем звук Гейгера в Камере (Безопасно от React)
 local geigerSound = Instance.new("Sound")
 geigerSound.Name = "MonoGeiger"
 geigerSound.SoundId = "rbxassetid://15666462"
 geigerSound.Volume = 0.5
-geigerSound.Parent = targetParent
-
--- Папка для ViewModel (ножа) будет в workspace, чтобы рендериться
-local vmHolder = Instance.new("Folder")
-vmHolder.Name = "MonoViewModelHolder"
-vmHolder.Parent = workspace
+geigerSound.Parent = Camera
 
 -- === 2. НАСТРОЙКИ ЧИТА ===
 local Mono = {
@@ -64,6 +46,7 @@ local Mono = {
     
     GodMode = false,
     StreamerMode = { Enabled = false, Key = Enum.KeyCode.F8 },
+    Wallbang = false,
     
     FOV = { Enabled = false, Radius = 150, Color = Color3.fromRGB(255, 255, 255), Dynamic = false },
     ESP = { Enabled = false, MaxDistance = 350 },
@@ -92,6 +75,7 @@ local Mono = {
     WeatherType = "Rain 🌧️",       
     WeatherEmoji = "🕸️",
     CleanWorld = false, 
+    Stretch = { Enabled = false, Value = 90 },
     
     ConfigNames = {"Config 1", "Config 2", "Config 3", "Config 4", "Config 5", "Config 6"},
     SelectedConfigSlot = 1,
@@ -198,6 +182,24 @@ task.spawn(function()
     end
 end)
 
+local function applyWallbang()
+    pcall(function()
+        for _, part in pairs(workspace:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if not (part.Parent and part.Parent:FindFirstChild("Humanoid")) then
+                    part.CanQuery = not Mono.Wallbang
+                end
+            end
+        end
+    end)
+end
+
+workspace.DescendantAdded:Connect(function(v)
+    if Mono.Wallbang and v:IsA("BasePart") and not (v.Parent and v.Parent:FindFirstChild("Humanoid")) then
+        pcall(function() v.CanQuery = false end)
+    end
+end)
+
 -- ДИНАМИЧЕСКИЙ CLEAN WORLD
 local function applyMaxFPS(v)
     pcall(function()
@@ -237,6 +239,11 @@ screenGui.Name = "MonogrammaKlient"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetParent
+
+-- Папка для 3D визуалов внутри PlayerGui (чтобы не крашило CoreGui)
+local visualsFolder = Instance.new("Folder")
+visualsFolder.Name = "MonoVisuals"
+visualsFolder.Parent = screenGui
 
 -- === BLUR ФОНА ===
 local menuBlur = Instance.new("BlurEffect")
@@ -1800,7 +1807,7 @@ local function LoadConfigFromTable(dec)
     Mono.GodMode = dec.GodMode or false
     Mono.StreamerMode.Enabled = dec.StreamE or false
     pcall(function() Mono.StreamerMode.Key = Enum.KeyCode[dec.StreamK] or Enum.UserInputType[dec.StreamK] end)
-    
+
     Mono.AbilityESP = dec.AbilESPE or false
     Mono.AbilityCD = dec.AbilCDE or false
     Mono.Geiger.Enabled = dec.GeigerE or false
@@ -2590,8 +2597,6 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
-local espCache = {}
-
 local function updateESP()
     local t = tick()
     local camPos = Camera.CFrame.Position
@@ -2763,7 +2768,7 @@ local function updateESP()
                 arrow.Position = UDim2.new(0, rX, 0, rY)
                 arrow.Rotation = math.deg(angle)
             else
-                if espCache[plr] and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
+                if pcall(function() return espCache[plr].Arrow end) and espCache[plr].Arrow then espCache[plr].Arrow.Visible = false end
             end
         else
             if espCache[plr] then
@@ -2841,51 +2846,56 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             end
         end
 
-        -- LEFT HAND VIEWMODEL (НОЖ В ЛЕВОЙ РУКЕ) - РАБОТАЕТ!
-        local char = LocalPlayer.Character
-        if Mono.ViewModel.Enabled and not sm and char then
-            local knife = getKnifeTool(char)
-            if knife then
-                local handle = knife:FindFirstChild("Handle") or knife:FindFirstChildOfClass("Part") or knife:FindFirstChildOfClass("MeshPart")
-                if handle then
-                    local clone = vmHolder:FindFirstChild("VM_Item")
-                    if not clone or clone:GetAttribute("Source") ~= knife.Name then
-                        vmHolder:ClearAllChildren()
-                        clone = handle:Clone()
-                        clone.Name = "VM_Item"
-                        clone:SetAttribute("Source", knife.Name)
-                        clone.Anchored = true
-                        clone.CanCollide = false
-                        -- Очищаем лишние скрипты
-                        for _, v in pairs(clone:GetDescendants()) do if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end end
-                        clone.Parent = vmHolder
+        -- LEFT HAND VIEWMODEL
+        local vmFolder = Camera:FindFirstChild("MonoViewModel")
+        if not vmFolder then
+            vmFolder = Instance.new("Folder", Camera)
+            vmFolder.Name = "MonoViewModel"
+        end
+        if Mono.ViewModel.Enabled and not sm then
+            local char = LocalPlayer.Character
+            if char then
+                local knife = getKnifeTool(char)
+                if knife then
+                    local handle = knife:FindFirstChild("Handle") or knife:FindFirstChildOfClass("Part") or knife:FindFirstChildOfClass("MeshPart")
+                    if handle then
+                        local clone = vmFolder:FindFirstChild("VM_Item")
+                        if not clone or clone:GetAttribute("Source") ~= knife.Name then
+                            vmFolder:ClearAllChildren()
+                            clone = handle:Clone()
+                            clone.Name = "VM_Item"
+                            clone:SetAttribute("Source", knife.Name)
+                            clone.Anchored = true
+                            clone.CanCollide = false
+                            for _, v in pairs(clone:GetDescendants()) do if v:IsA("Script") or v:IsA("LocalScript") then v:Destroy() end end
+                            clone.Parent = vmFolder
+                        end
+                        
+                        local speed = Mono.ViewModel.Speed
+                        local t = tick() * speed
+                        local offset = CFrame.new(-1.5, -1, -2.5)
+                        local animRot = CFrame.new()
+                        
+                        if Mono.ViewModel.AnimMode == "Spin 🌪️" then animRot = CFrame.Angles(0, t, 0)
+                        elseif Mono.ViewModel.AnimMode == "Flip 🌀" then animRot = CFrame.Angles(t, 0, 0)
+                        elseif Mono.ViewModel.AnimMode == "Hover ☁️" then 
+                            offset = offset * CFrame.new(0, math.sin(t) * 0.2, 0)
+                            animRot = CFrame.Angles(0, math.sin(t * 0.5) * 0.5, 0)
+                        end
+                        
+                        clone.CFrame = Camera.CFrame * offset * animRot
+                    else
+                        vmFolder:ClearAllChildren()
                     end
-                    
-                    local speed = Mono.ViewModel.Speed
-                    local t = tick() * speed
-                    -- Оффсет левой руки: слева, ниже, перед камерой
-                    local offset = CFrame.new(-1.5, -1, -2.5) 
-                    local animRot = CFrame.new()
-                    
-                    if Mono.ViewModel.AnimMode == "Spin 🌪️" then
-                        animRot = CFrame.Angles(0, t, 0)
-                    elseif Mono.ViewModel.AnimMode == "Flip 🌀" then
-                        animRot = CFrame.Angles(t, 0, 0)
-                    elseif Mono.ViewModel.AnimMode == "Hover ☁️" then 
-                        offset = offset * CFrame.new(0, math.sin(t) * 0.2, 0)
-                        animRot = CFrame.Angles(0, math.sin(t * 0.5) * 0.5, 0)
-                    end
-                    
-                    clone.CFrame = Camera.CFrame * offset * animRot
                 else
-                    vmHolder:ClearAllChildren()
+                    vmFolder:ClearAllChildren()
                 end
-            else
-                vmHolder:ClearAllChildren()
             end
         else
-            vmHolder:ClearAllChildren()
+            vmFolder:ClearAllChildren()
         end
+
+        updateESP()
 
         -- FPS И PING
         frames = frames + 1
@@ -2898,6 +2908,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             lastUpdate = tick()
         end
         
+        local char = LocalPlayer.Character
         if char then
             pcall(function()
                 for _, part in pairs(char:GetChildren()) do
@@ -2956,7 +2967,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             local target = getClosestVisibleEnemy()
             if target then
                 local targetPos = target.Position
-                -- Miss Chance (Humanizer)
                 if Mono.Aimbot.MissChance > 0 and math.random(1, 100) <= Mono.Aimbot.MissChance then
                     targetPos = targetPos + Vector3.new(math.random(-20, 20)/10, math.random(-20, 20)/10, math.random(-20, 20)/10)
                 end
