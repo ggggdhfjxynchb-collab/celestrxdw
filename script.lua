@@ -83,7 +83,7 @@ local TriggerHoverStartTime = 0
 
 local BindWait = nil 
 local PlayerData = {} 
-local DeadCache = {}  -- БЫЛО ПРОПУЩЕНО
+local DeadCache = {} 
 local LastTargetHit = nil
 local LastTargetTime = 0
 
@@ -2525,8 +2525,6 @@ Players.PlayerRemoving:Connect(function(plr)
 end)
 
 -- === ESP, РАДАР И ЛОГИКА ===
-local espCache = {}
-
 local function updateESP()
     local t = tick()
     local camPos = Camera.CFrame.Position
@@ -2710,7 +2708,7 @@ local function updateESP()
     end
 end
 
--- === ОСНОВНОЙ ЦИКЛ ===
+-- === ОСНОВНОЙ ЦИКЛ РЕНДЕРА ===
 local frames = 0
 local lastUpdate = tick()
 
@@ -2735,6 +2733,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         bindsFrame.Visible = not sm
         specFrame.Visible = not sm
         mobileToggle.Visible = not sm
+        
         if sm and Mono.MenuOpen then
             mainFrame.Visible = false
             menuBlur.Size = 0
@@ -2743,7 +2742,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
             menuBlur.Size = Mono.MenuBlur
         end
 
-        -- Динамическая тема (легкое обновление, не грузит)
         local themeColor = Mono.ThemeColor
         if Mono.ThemeMode == "RGB 🌈" then
             themeColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
@@ -2752,14 +2750,38 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         end
         UpdateDynamicTheme(themeColor)
 
+        -- СЧЕТЧИК ГЕЙГЕРА (WH SOUND CHECK)
+        if Mono.Geiger.Enabled then
+            local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            local closestDist = math.huge
+            for _, plr in pairs(Players:GetPlayers()) do
+                if isEnemy(plr) and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+                    local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.HumanoidRootPart.Position)
+                    if pos.Z > 0 then
+                        local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if dist < closestDist then closestDist = dist end
+                    end
+                end
+            end
+            if closestDist <= Mono.Geiger.Radius then
+                local rate = math.clamp(closestDist / Mono.Geiger.Radius, 0.05, 1) * 0.5
+                if tick() - lastGeigerTick > rate then
+                    lastGeigerTick = tick()
+                    geigerSound.Volume = (Mono.Geiger.Volume / 100) * (1 - (closestDist / Mono.Geiger.Radius))
+                    geigerSound:Play()
+                end
+            end
+        end
+
         updateESP()
-        
+
+        -- FPS И PING
         frames = frames + 1
         if tick() - lastUpdate >= 1 then
             local fps = frames
             local ping = 0
             pcall(function() ping = math.floor(game:GetService("Stats").PerformanceStats.Ping:GetValue()) end)
-            watermarkText.Text = "MONOGRAMMA v54 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
+            watermarkText.Text = "MONOGRAMMA v58 | FPS: " .. tostring(fps) .. " | Ping: " .. tostring(ping) .. "ms"
             frames = 0
             lastUpdate = tick()
         end
@@ -2770,7 +2792,7 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
                 for _, part in pairs(char:GetChildren()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                         if Mono.GodMode then part.CanQuery = false; part.CanTouch = false
-                        else if not Mono.Wallbang then part.CanQuery = true end part.CanTouch = true end
+                        else part.CanQuery = true; part.CanTouch = true end
                     end
                 end
             end)
@@ -2813,11 +2835,6 @@ RunService:BindToRenderStep("MonoCore", Enum.RenderPriority.Camera.Value + 1, fu
         
         if Mono.TimeOfDay == "Day ☀️" then Lighting.ClockTime = 14
         elseif Mono.TimeOfDay == "Night 🌙" then Lighting.ClockTime = 0 end
-
-        -- RCS (Антиотдача)
-        if Mono.RCS.Enabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) and isHoldingGun() then
-            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(-Mono.RCS.Power / 100), 0, 0)
-        end
 
         if Mono.Aimbot.Enabled then
             local target = getClosestVisibleEnemy()
